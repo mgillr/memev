@@ -15,7 +15,7 @@ const real = fs.lstatSync(opt.view);
 if (!real.isFile() || real.size !== 0) stop(`${opt.view} must be an empty file`);
 
 const { code } = opt;
-const { Vault, initVault } = await import(pathToFileURL(path.join(code, 'src', 'engine', 'vault.mjs')).href);
+const { Vault } = await import(pathToFileURL(path.join(code, 'src', 'engine', 'vault.mjs')).href);
 const gate = await import(pathToFileURL(path.join(code, 'src', 'engine', 'redteam-gate.mjs')).href);
 const specAbs = path.join(code, opt.spec);
 const raw = fs.readFileSync(specAbs); const spec = JSON.parse(raw);
@@ -26,7 +26,9 @@ if (before.status !== 'SIGNABLE' || before.signable_sha256 !== opt.signable) sto
 const blob = (buf) => crypto.createHash('sha1').update(`blob ${buf.length}\0`).update(buf).digest('hex');
 const crit = (x) => x.tasks.reduce((a, t) => a + t.criteria.length, 0);
 const root = path.resolve(opt.vault);
-if (!fs.existsSync(path.join(root, '.memev'))) initVault(root, { template: path.join(code, 'templates', 'vault') });
+const signedDir = path.join(root, 'contracts', 'signed');
+const held = () => (fs.existsSync(signedDir) ? fs.readdirSync(signedDir) : []);
+const heldBefore = new Set(held());
 // Point the vault's gate at the clone for this run, and put the setting back afterwards.
 const cfgFile = path.join(root, '.memev', 'config.json');
 const cfgBefore = fs.existsSync(cfgFile) ? fs.readFileSync(cfgFile, 'utf8') : null;
@@ -36,7 +38,7 @@ fs.writeFileSync(cfgFile, `${JSON.stringify(cfg, null, 2)}\n`);
 
 const v = new Vault(root, { keyDir: opt.view, commitDelayMs: 10 }).open();
 const ID = { id: 'signing', agent: 'owner', scopes: ['read', 'write', 'admin'], paths: ['**'] };
-let rc = 1; let bodyAt = null;
+let rc = 1;
 try {
   if (!v.config?.contracts?.redteam_root) throw new Error('the vault did not load contracts.redteam_root');
   const d = v.contractDraft(ID, {
@@ -45,7 +47,7 @@ try {
     base: opt.base, provenance: { record: opt.record, review: opt.review }, spec: specAbs,
   });
   const s = v.contractSign(ID, { id: d.id, local: true });
-  bodyAt = path.join(root, 'contracts', 'signed', `${d.id}.json`);
+  const bodyAt = path.join(signedDir, `${d.id}.json`);
   const chk = v.contractCheckSignature(d.id);
   if (!chk.ok) throw new Error(`signature check failed for ${d.id}: ${chk.detail}`);
   if (s.keyid !== opt.keyId) throw new Error(`signed by ${s.keyid}, and the command names ${opt.keyId}`);
@@ -63,7 +65,8 @@ try {
   console.log(`  ${signed.tasks.length} tasks, ${crit(signed)} criteria, signature ok`);
   rc = 0;
 } catch (e) {
-  if (bodyAt) console.error(`STOPPED AFTER SIGNING: ${e.message}. A signed body exists at ${bodyAt}. Do not land it; tell the lead.`);
+  const added = held().filter((f) => !heldBefore.has(f));
+  if (added.length) console.error(`STOPPED AFTER SIGNING: ${e.message}. These signed files exist in ${signedDir}: ${added.join(', ')}. Do not land them; tell the lead.`);
   else console.error(`Refused: ${e.message}. Nothing was signed.`);
 } finally {
   try { v.commits?.flush?.(); } catch (e) { console.error(`commit flush: ${e.message}`); }

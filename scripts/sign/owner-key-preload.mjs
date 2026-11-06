@@ -40,12 +40,20 @@ const version = opt.version ? Number(opt.version) : null;
 if (opt.version && (!Number.isInteger(version) || version < 2)) stop('--version must be an integer of 2 or more');
 const expected = process.env.MEMEV_OWNER_KEY_ID;
 if (!/^[0-9a-f]{16}$/.test(expected || '')) stop('the command must name your key id');
+// Nothing else may load beside this process's two programs.
+for (const k of ['NODE_OPTIONS', 'NODE_PATH']) if (process.env[k]) stop(`${k} is set in this shell, and could load another program beside the key; unset it`);
+const self = fs.realpathSync(fileURLToPath(import.meta.url));
+const loaded = process.execArgv;
+let loadedFile = '';
+try { loadedFile = loaded.length === 2 && loaded[0] === '--import' ? fs.realpathSync(loaded[1]) : ''; } catch { /* compared below */ }
+if (loadedFile !== self) stop('node must be given this one --import and nothing else');
 
 // The key file, and the view: a real empty file, so a run with this preload left off cannot generate a key there.
-let viewStat = null;
-try { viewStat = fs.lstatSync(VIEW); } catch { /* absent: made below */ }
-if (viewStat && !(viewStat.isFile() && viewStat.size === 0)) stop(`${VIEW} must be an empty file; something else is there, so look at it first`);
 if (!fs.existsSync(KEY)) stop(`no key at ${KEY}`);
+let viewStat = null;
+try { viewStat = fs.lstatSync(VIEW); } catch { /* absent: made here */ }
+if (viewStat && !(viewStat.isFile() && viewStat.size === 0)) stop(`${VIEW} must be an empty file; something else is there, so look at it first`);
+if (!viewStat) fs.closeSync(fs.openSync(VIEW, 'wx', 0o600));
 const pem = fs.readFileSync(KEY, 'utf8');
 if (!pem.includes('BEGIN ENCRYPTED PRIVATE KEY')) stop('the key file is not encrypted');
 if ((fs.statSync(KEY).mode & 0o077) !== 0) stop('the key file can be read by others; run chmod 600 on it');
@@ -53,10 +61,11 @@ if ((fs.statSync(KEY).mode & 0o077) !== 0) stop('the key file can be read by oth
 // The clone: these two programs, at the stated commit, with nothing changed.
 let code;
 try { code = fs.realpathSync(opt.code); } catch { stop(`--code ${opt.code} does not exist`); }
-const git = (...a) => execFileSync('/usr/bin/git', ['-C', code, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+// A plain environment, so GIT_DIR and the like in his shell cannot change what these checks see.
+const git = (...a) => execFileSync('/usr/bin/git', ['-C', code, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { PATH: '/usr/bin:/bin', HOME: os.homedir() }, maxBuffer: 1 << 26 }).trim();
 const preloadFile = path.join(code, 'scripts', 'sign', 'owner-key-preload.mjs');
 const toolFile = path.join(code, 'scripts', 'sign', 'owner-sign.mjs');
-if (fs.realpathSync(fileURLToPath(import.meta.url)) !== preloadFile) stop('this preload is not the clone\'s own copy');
+if (self !== preloadFile) stop('this preload is not the clone\'s own copy');
 let script = '';
 try { script = fs.realpathSync(process.argv[1] || ''); } catch { /* compared below */ }
 if (script !== toolFile) stop('this key is given only to the clone\'s scripts/sign/owner-sign.mjs');
@@ -64,13 +73,15 @@ let head = ''; let dirty = '';
 try { head = git('rev-parse', 'HEAD'); dirty = git('status', '--porcelain'); } catch { stop('--code is not a git clone'); }
 if (head !== opt.commit) stop(`the clone is at ${head}, and the command names ${opt.commit}`);
 if (dirty) stop('the clone has changes, so it is not the commit it says it is');
+// `status` does not see a file marked assume-unchanged or skip-worktree, so these look past it.
+if (git('ls-files', '-v').split('\n').some((l) => /^[a-zS]/.test(l))) stop('the clone hides files from git, so it is not the commit it says it is');
+for (const f of [preloadFile, toolFile]) {
+  const rel = path.relative(code, f);
+  if (git('rev-parse', `HEAD:${rel}`) !== git('hash-object', '--no-filters', f)) stop(`${rel} is not the copy in the stated commit`);
+}
 try { git('cat-file', '-e', `${opt.base}^{commit}`); git('merge-base', '--is-ancestor', opt.base, head); } catch { stop(`--base ${opt.base} is not a commit behind the clone's HEAD`); }
 const specAbs = path.join(code, opt.spec);
 for (const f of [specAbs, path.join(code, opt.record)]) if (!fs.existsSync(f)) stop(`not in the clone: ${f}`);
-
-// A terminal, before anything slower.
-let tty;
-try { tty = fs.openSync('/dev/tty', 'r+'); } catch { stop('this needs your own Terminal, so a passphrase can be typed'); }
 
 // The gate of this clone, before the passphrase.
 const specRaw = fs.readFileSync(specAbs); const spec = JSON.parse(specRaw);
@@ -82,7 +93,7 @@ if (judged.record !== opt.record) stop(`this spec's red-team record is ${judged.
 
 // What the signed body would replace or repeat, in the clone and the signing vault.
 const vaultRoot = path.resolve(opt.vault);
-if (!fs.existsSync(path.dirname(vaultRoot))) stop(`the folder above --vault does not exist: ${vaultRoot}`);
+if (!fs.existsSync(path.join(vaultRoot, '.memev'))) stop(`--vault ${opt.vault} is not a vault`);
 const signedDir = path.join(vaultRoot, 'contracts', 'signed');
 const held = fs.existsSync(signedDir) ? fs.readdirSync(signedDir).filter((f) => f.endsWith('.json') && !f.endsWith('.sig.json')) : [];
 const title = (d, f) => { try { return JSON.parse(fs.readFileSync(path.join(d, f), 'utf8')).title; } catch { return null; } };
@@ -92,9 +103,19 @@ if (opt.supersedes) {
   const old = JSON.parse(fs.readFileSync(f, 'utf8'));
   if (old.title !== spec.title) stop('the superseded contract\'s title is not the spec\'s title');
   if ((old.version || 1) + 1 !== version) stop(`the superseded contract is version ${old.version || 1}; --version must be ${(old.version || 1) + 1}`);
-} else if (held.some((f) => title(signedDir, f) === spec.title)) stop('the signing vault already holds a signed body with this title, and the command supersedes nothing');
-// The log must be writable before his key signs anything.
-try { fs.closeSync(fs.openSync(path.resolve(opt.out), 'a', 0o600)); } catch { stop(`--out ${opt.out} cannot be written`); }
+} else {
+  if (held.some((f) => title(signedDir, f) === spec.title)) stop('the signing vault already holds a signed body with this title, and the command supersedes nothing');
+  const inClone = path.join(code, 'contracts', 'signed');
+  const landed = fs.existsSync(inClone) ? fs.readdirSync(inClone).filter((f) => f.endsWith('.json') && !f.endsWith('.sig.json')) : [];
+  if (landed.some((f) => title(inClone, f) === spec.title)) stop('the clone already holds a signed body with this title, and the command supersedes nothing');
+}
+// The log must be writable before his key signs anything. No file is made until there is something to put in it.
+const outAbs = path.resolve(opt.out);
+try { fs.accessSync(fs.existsSync(outAbs) ? outAbs : path.dirname(outAbs), fs.constants.W_OK); } catch { stop(`--out ${opt.out} cannot be written`); }
+
+// A terminal, last, so every check above can be tested without one.
+let tty;
+try { tty = fs.openSync('/dev/tty', 'r+'); } catch { stop('this needs your own Terminal, so a passphrase can be typed'); }
 
 // Show what is being signed, then ask.
 const fileSha = sha256(specRaw);
