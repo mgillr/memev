@@ -61,7 +61,29 @@ These are measured figures on generated notes, on one computer. They are not a p
 | Stop, nothing written (guard) | 2,000 ms | 49 | 352 |
 | New note, p50 (guard) | 200 ms | 11.9 | 107 |
 
-The last two are guards against getting worse: main passes them too, and they claim no gain. Recall p95 and send are also guards in the `--against` check, since main measured under twice their ceilings, so a faster computer could pass the old code. This run's notes differ a little from the table above, so compare the columns of one table and not across the two.
+The last two are guards against getting worse: main passes them too, and they claim no gain. Recall p95 and send are also guards in the `--against` check, since main measured under twice their ceilings, so a faster computer could pass the old code. First import is a guard for the same reason: on the Linux server below, main's code passes it. This run's notes differ a little from the table above, so compare the columns of one table and not across the two.
+
+## On a Linux server
+
+One run of each at 50,000 notes, on a shared 16-core AMD EPYC server with 30 GB, Linux and Node 22.23.3, with other jobs running. This code is f560360192b8dd9083b7a313275c2580d284ce73, and main's code is 93d97329a9257c6e4d03a1f1ff4650abd998845c, measured with this page's benches.
+
+| Ceiling | Limit | This code | Main's code |
+|---|---|---|---|
+| Start | 10,000 ms | 800 | 30,809 |
+| First import (guard) | 200,000 ms | 45,538 | 60,601 |
+| Stop after a write | 2,000 ms | 74 | 6,328 |
+| Recall p95 (guard) | 100 ms | 29.9 | 145.9 |
+| First recall after a save | 1,000 ms | 64 | 5,619 |
+| `/healthz` timeouts while writing | 0 | 0 | 14 |
+| Commit stops the thread, p50 | 25 ms | 0.9 | 148.9 |
+| Roster | 50 ms | 1.26 | 1,623 |
+| Tasks | 200 ms | 8.18 | 5,139 |
+| Send (guard) | 200 ms | 0.4 | 323 |
+| Stop, nothing written (guard) | 2,000 ms | 55 | 314 |
+| New note, p50 (guard) | 200 ms | 4.2 | 68.3 |
+
+- First import gains far less here than on the iMac: 25 percent against about 4.5 times. Why is not known.
+- With fixed ports, 2 of 13 runs here lost a number when a daemon never answered, and the bench waited 400 s without saying why. A daemon whose port is taken exits with code 4 and did that in a test, but no failed run was caught with its output, so that cause is the likely one and not proven. The benches now take a free port and stop at once with the daemon's error. Three short runs since have passed.
 
 ## Costs and limits
 
@@ -71,4 +93,4 @@ The last two are guards against getting worse: main passes them too, and they cl
 
 ## Not measured
 
-Power loss, a real vault at this size, Windows, Linux, a full disk, a clock set back, and two computers through git. No figure here says anything about those.
+Power loss, a real vault at this size, Windows, a full disk, a clock set back, and two computers through git. Linux is measured only as above, on one server. No figure here says anything about those.

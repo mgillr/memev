@@ -9,6 +9,7 @@
 //   node scripts/bench/speed/targets.mjs --against <commit>         run these benches on that commit's code: exits 0 only if every ceiling in
 //                                                                   CAUGHT fails there, and lists by name the ceilings it passes
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -33,7 +34,9 @@ export const CEILINGS = {
 // The ceilings meant to catch a return to the old cost. The others guard against getting worse and claim no gain over the old code.
 // a3_recall_p95_ms and a6_send_ms are guards for that reason: the old code measured under twice their ceilings (158 ms against 100, 378 ms against 200),
 // so a faster machine could pass the old code and make this judgement wrong for no change in the code.
-export const CAUGHT = ['a1_start_ms', 'a7_first_import_ms', 'a8_stop_after_write_ms', 'a3_recall_after_save_ms', 'a2_health_timeouts', 'a5_commit_block_p50_ms', 'a6_roster_ms', 'a6_tasks_ms'];
+// a7_first_import_ms is a guard too: a ceiling stays in CAUGHT only if the old code measured at least twice it on the fastest machine this runs on, and on
+// the 16-core Linux server the old code took 60,601 ms against 200,000 (docs/testing/SPEED-RESULTS.md). The iMac's measured gain stays in that page.
+export const CAUGHT = ['a1_start_ms', 'a8_stop_after_write_ms', 'a3_recall_after_save_ms', 'a2_health_timeouts', 'a5_commit_block_p50_ms', 'a6_roster_ms', 'a6_tasks_ms'];
 
 /** Against old code: every ceiling in CAUGHT must fail there, and a number that did not come back does not count as caught. */
 export function judgeOld(numbers, caught = CAUGHT, ceilings = CEILINGS) {
@@ -52,6 +55,9 @@ export function evaluate(numbers, ceilings = CEILINGS) {
   });
   return { ok: rows.every((r) => r.ok), rows };
 }
+
+// A port the system says is free now. A fixed one can be taken on a shared machine, and the daemon then exits with its reason unseen.
+const freePort = () => new Promise((resolve, reject) => { const s = net.createServer(); s.on('error', reject); s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(String(port))); }); });
 
 const main = async () => {
   const argv = process.argv.slice(2);
@@ -105,22 +111,22 @@ const main = async () => {
     const git = (...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t.invalid', ...a], { cwd: root, env, encoding: 'utf8' });
     git('add', '-A'); git('commit', '-qm', 'notes');
 
-    const start = runBench('start.mjs', '--root', root, '--runs', '4', '--tree', REPO).filter((x) => x.run !== undefined && x.ok);
+    const start = runBench('start.mjs', '--root', root, '--port', await freePort(), '--runs', '4', '--tree', REPO).filter((x) => x.run !== undefined && x.ok);
     numbers.a7_first_import_ms = start.find((x) => x.run === 0)?.health_ms;
     const settled = start.filter((x) => x.run > 0).sort((a, b) => a.health_ms - b.health_ms);
     numbers.a1_start_ms = settled[Math.floor(settled.length / 2)]?.health_ms;
     const stops = start.filter((x) => x.run > 0).map((x) => x.stop_ms).sort((a, b) => a - b);
     numbers.a8_stop_ms = stops[Math.floor(stops.length / 2)];
-    const touched = runBench('start.mjs', '--root', root, '--runs', '3', '--tree', REPO, '--touch', '--settle', '700').filter((x) => x.run !== undefined && x.ok).map((x) => x.stop_ms).sort((a, b) => a - b);
+    const touched = runBench('start.mjs', '--root', root, '--port', await freePort(), '--runs', '3', '--tree', REPO, '--touch', '--settle', '700').filter((x) => x.run !== undefined && x.ok).map((x) => x.stop_ms).sort((a, b) => a - b);
     numbers.a8_stop_after_write_ms = touched[Math.floor(touched.length / 2)];
 
-    const daemon = runBench('daemon.mjs', '--root', root, '--port', '47831', '--code', REPO, '--repeats', '2').at(-1);
+    const daemon = runBench('daemon.mjs', '--root', root, '--port', await freePort(), '--code', REPO, '--repeats', '2').at(-1);
     numbers.a3_recall_p95_ms = worst((daemon?.recall_idle ?? []).map((r) => r.p95));
     numbers.a3_recall_after_save_ms = worst((daemon?.write_cycle ?? []).flatMap((w) => [w.recall_at_save_ms, w.recall_after_ms]));
     const timeouts = (daemon?.write_cycle ?? []).map((w) => w.health.timeouts_800ms);
     numbers.a2_health_timeouts = timeouts.length ? timeouts.reduce((a, b) => a + b, 0) : undefined;
 
-    const write = runBench('write.mjs', '--root', root, '--reps', '1', '--n', '15', '--port', '47832', '--json').find((x) => x.label === 'now');
+    const write = runBench('write.mjs', '--root', root, '--reps', '1', '--n', '15', '--port', await freePort(), '--json').find((x) => x.label === 'now');
     numbers.a4_new_note_p50_ms = write?.new_p50;
     numbers.a5_commit_block_p50_ms = runBench('git.mjs', '--root', root, '--rounds', '10', '--delay', '50', '--json').at(-1)?.queue_block?.p50;
 
