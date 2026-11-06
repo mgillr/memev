@@ -1,0 +1,48 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PGP-1.06.3",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "982651d58c4e24f04eb6e23714dee7f039374b01b6e53cf0a3966d61ef16eee1",
+      "base_commit": "58c5f791d1aba51d58e24c6c89a87bc3de289ec9",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/DECISIONS.md",
+            "sha256": "3307322f2c70781f4362f95243bcd1905e86e8214abf604ed965ca540aa9c696"
+          },
+          {
+            "path": "contracts/programme/specs/PGP-1.06-memev-ops-sr3-engine-decision.json",
+            "sha256": "9cdca107674d33eb99b83760dda189be11fb1608ece3b2f1bf04a36c168ca887"
+          }
+        ]
+      },
+      "manifest_kind": "docs",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "NOT AN INDEPENDENT REVIEW. The second seat wrote this draft and signs this round with its reviewer key under the owner's decision of 6 Nov 2026, a one-off for this contract, because the interim key was unavailable on this Mac. The lead reviewed the draft and folded four changes before this round: T2 requirement 1 and the SR-3.05 wording; the request listing every change; a T1 criterion that fails if the old SR-3.03 text stays; the 31 Oct tiers marked superseded. The lead's review covers: the snapshot is byte-identical to the spec at 64325d2d, the same text under the id PGP-1.06.2, nothing is removed from version 1, 4 criteria are added, 2 requirements are changed, and the request lists every change. The red-then-green run was the second seat's own runner over the grep and command criteria, not the lead's: red at memev-ops a08e0a04, green at b6698659. PGP-1.06.2's record was refused because its first commit held different notes and history stays; this is the same text under a new id, and PGP-1.06.2 was never signed.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OGI0MzdlOTIzNDgxY2QyMDFkM2Y1MjAwZWVjNDc5ZGE4NWU2MzhmN2Q1OTlmODFmMGUwMjE2ZTk4YmM3YjdiYw==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "pCHWi8XekYHp9d1N3m7cICqsyBd6Nv7Z+DuEsW6ERFjEwAckTNfrRR3VxNAdot8gmHWQA194OJ+1UuwUJVX3Bg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NzI4YzM2OTQ1YmQ1Y2Y2ODEwZjgyMWVkMGQzNjFkZjA5ZTM2NGY0NzFiYzMzNGE2Mzg1ZDhjODJmZTBkODEzYg==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "KT3gmHg7jUEq5Ug4KDcud/Pv78EqoGZKQOel6VT7B6vHulk4dweWLFrX5dk08BEjOpQYm+bdpoMJHt1lCYbpDA=="
+          }
+        ]
+      }
+    }
+  ]
+}
