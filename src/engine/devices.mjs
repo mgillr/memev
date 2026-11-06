@@ -234,13 +234,65 @@ export function verifyProof(pubkey, { method, path: p, ts, nonce, sig, body = ''
   if (!(Math.abs(at - Number(ts)) <= skewMs)) return { ok: false, reason: 'signature timestamp too far from now' };
   try { return crypto.verify(null, proofPayload({ method, path: p, ts, nonce, bodyHash: bodySha(body) }), publicKeyFrom(pubkey), Buffer.from(String(sig), 'base64')) ? { ok: true } : { ok: false, reason: 'bad signature' }; } catch (e) { return { ok: false, reason: e.message }; }
 }
-/** Nonces seen in the last few minutes, so a signed request can be used once. */
+/**
+ * Nonces used in the skew window, so a signed request can be used once, also across a restart. Each is on disk before the
+ * request is served: use() reads the store, merges it (another server on this vault may have written), drops what has aged
+ * out and writes the result, and throws if it cannot, with the nonce kept in memory so a replay is still refused. An entry
+ * goes only when its signed time has left the window, so a count never pushes one out and a clock stepping back drops
+ * nothing; the store holds what signatures could still be accepted, no more. A damaged store is set aside under
+ * <store>.damaged-<time> and the time it was found is kept as not_before: what it held is gone, so a request signed before
+ * then is refused as used until no such request could be accepted any more. Fresh requests are served all along.
+ */
 export class NonceCache {
-  constructor(ttlMs = 10 * 60e3) { this.ttl = ttlMs; this.m = new Map(); }
-  use(nonce, at = Date.now()) {
-    if (this.m.size > 50000) for (const [k, t] of this.m) if (at - t > this.ttl) this.m.delete(k);
-    if (this.m.has(nonce) && at - this.m.get(nonce) <= this.ttl) return false;
-    this.m.set(nonce, at); return true;
+  constructor(file, { skewMs = 5 * 60e3 } = {}) {
+    this.file = file; this.skew = skewMs; this.m = new Map(); this.notBefore = null;
+    this._read(Date.now());
+    this.started = true;
+  }
+  /** The store's contents, or null if it is not one. Nothing else is accepted, so a stray value cannot read as an empty store. */
+  static _parse(text) {
+    const o = JSON.parse(text);
+    if (!o || typeof o !== 'object' || Array.isArray(o) || o.v !== 1) return null;
+    if (!o.nonces || typeof o.nonces !== 'object' || Array.isArray(o.nonces)) return null;
+    if (o.not_before !== null && !Number.isFinite(o.not_before)) return null;
+    return Object.values(o.nonces).every(Number.isFinite) ? o : null;
+  }
+  _read(at) {
+    let text;
+    try { text = fs.readFileSync(this.file, 'utf8'); }
+    catch (e) {
+      if (e.code === 'ENOENT') return;
+      // a directory here is a fault in writing, which the write will report; at the start it is damage like any other
+      if (e.code === 'EISDIR' && this.started) return;
+      this._damaged(at, e.message); return;
+    }
+    let o = null; let why = 'wrong shape';
+    try { o = NonceCache._parse(text); } catch (e) { why = e.message; }
+    if (!o) { this._damaged(at, why); return; }
+    for (const [k, ts] of Object.entries(o.nonces)) if (!this.m.has(k)) this.m.set(k, ts);
+    if (o.not_before !== null) this.notBefore = Math.max(this.notBefore ?? 0, o.not_before);
+  }
+  _damaged(at, why) {
+    const aside = `${this.file}.damaged-${at}`;
+    let moved = true;
+    try { fs.renameSync(this.file, aside); } catch { moved = false; }
+    console.error(`[memev] the store of used signed requests ${this.file} is damaged (${why})${moved ? `; kept as ${aside}` : ''}. Requests signed before now are refused until they could no longer be accepted.`);
+    this.notBefore = Math.max(this.notBefore ?? 0, at);
+    // said at once so a kill before the next signed request forgets nothing; if this fails too, the next write reports it
+    try { this._write(at); } catch (e) { console.error(`[memev] ${e.message}`); }
+  }
+  _write(at) {
+    for (const [k, ts] of this.m) if (at - ts > this.skew) this.m.delete(k);
+    if (this.notBefore !== null && at - this.notBefore > this.skew) this.notBefore = null;
+    writePrivate(this.file, JSON.stringify({ v: 1, not_before: this.notBefore, nonces: Object.fromEntries(this.m) }));
+  }
+  /** True when this key is free, and it is now on disk. False when it was used. Throws when it could not be written. */
+  use(key, signedAt, at = Date.now()) {
+    this._read(at);
+    if (this.m.has(key) || (this.notBefore !== null && signedAt < this.notBefore && at - this.notBefore <= this.skew)) return false;
+    this.m.set(key, signedAt);
+    this._write(at);
+    return true;
   }
 }
 // AI apps and tools that run on a computer. A cloud connector credential used by one of these was

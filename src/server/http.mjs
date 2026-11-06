@@ -156,7 +156,7 @@ export function renderBus(u, { lead = false } = {}) {
 
 export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICENSE_KEYS, env = process.env } = {}) {
   const limiter = new Buckets(vault.config.remote?.rate_per_min || 120);
-  const nonces = new NonceCache();
+  const nonces = new NonceCache(path.join(vault.state, 'nonces.json'));
   // a grant whose device was removed stops working at once: the device's token_id is the grant's id
   const oauth = new OAuthStore(path.join(vault.state, 'oauth.json'), (id) => { vault.devices.fresh(); return vault.devices.list().some((d) => d.token_id === id && d.status === 'revoked'); });
   // the licence file is read again at most every few seconds, so an install takes effect at once
@@ -304,7 +304,16 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       if (needsProof) {
         if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) await getBody();
         proof = dev?.pubkey ? verifyProof(dev.pubkey, { method: req.method, path: url.pathname, ts: req.headers['x-memev-ts'], nonce: req.headers['x-memev-nonce'], sig: req.headers['x-memev-sig'], body: raw || '' }) : { ok: false, reason: 'this computer was added without a device key' };
-        if (proof.ok && !nonces.use(`${dev.id}:${req.headers['x-memev-nonce']}`)) proof = { ok: false, reason: 'this signed request was already used' };
+        if (proof.ok) {
+          // by the device's key and not its record or token, which the signature does not cover; on disk before anything runs
+          let free;
+          try { free = nonces.use(`${sha256(String(dev.pubkey)).slice(0, 32)}:${req.headers['x-memev-nonce']}`, Number(req.headers['x-memev-ts'])); }
+          catch (e) {
+            console.error(`[memev] could not record a signed request, so it is refused: ${e.message}`);
+            return send(500, { error: 'nonce_store', error_description: 'this vault could not record the signed request, so it was not run; send a new one' });
+          }
+          if (!free) proof = { ok: false, reason: 'this signed request was already used' };
+        }
       }
       // which device this is, what kind of client, and whether its credential looks shared
       let seen = null;

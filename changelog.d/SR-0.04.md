@@ -5,3 +5,5 @@
 - A remote setup session can now run what its allowlist accepts: `memev deployment set local` works without a flag, and a licence file named in the session is read from the vault, where the allowlist checked it.
 
 - The OAuth issuer now comes from `remote.issuer`, or the running relay or tunnel, and never from the Host header of the request.
+
+- A signed request stays used across a restart: the nonces in the skew window are on disk, pruned by age, before the request is served. A damaged store is set aside and the server keeps running, refusing requests signed before the damage was found until they could no longer be accepted.
