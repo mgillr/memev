@@ -5,11 +5,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { CAUGHT, CEILINGS, evaluate, judgeOld } from '../scripts/bench/speed/targets.mjs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const TOOL = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'bench', 'speed', 'targets.mjs');
+// Loaded here and not by an import line, so on code with no ceilings the first test fails on its assertion rather than the file failing to load.
+const targets = fs.existsSync(TOOL) ? await import(pathToFileURL(TOOL).href) : null;
+const { CAUGHT, CEILINGS, evaluate, judgeOld } = targets ?? {};
 const atCeiling = () => Object.fromEntries(Object.entries(CEILINGS).map(([k, [c]]) => [k, c]));
+
+test('the ceilings command is there', () => {
+  assert.ok(targets, 'scripts/bench/speed/targets.mjs is there');
+});
 
 test('every axis has a ceiling', () => {
   for (const axis of ['a1_', 'a2_', 'a3_', 'a4_', 'a5_', 'a6_', 'a7_', 'a8_']) assert.ok(Object.keys(CEILINGS).some((k) => k.startsWith(axis)), axis);
