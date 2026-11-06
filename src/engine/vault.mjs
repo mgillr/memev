@@ -808,15 +808,13 @@ export class Vault extends EventEmitter {
    * (hard scope: that project's sections plus sections with no project; `all_projects` widens it to a
    * boost), and the review state (dropped sections and short-lived ones past their date are left out).
    */
-  _recallFilter(identity, { project = null, all_projects = false, dropPath = null } = {}) {
+  _recallFilter(identity, { project = null, all_projects = false } = {}) {
     const scope = all_projects ? 'all' : (this.config.recall?.scope ?? 'project');
     const pj = scope === 'project' && project ? slug(project) : null;
     const open = !identity.paths || identity.paths.includes('**');
     const today = new Date().toISOString().slice(0, 10);
-    const pc = new Map(), ac = new Map(), dc = new Map(); const dropping = typeof dropPath === 'function';
+    const pc = new Map(), ac = new Map();
     const fn = (d) => {
-      // what a caller never wants is left out before ranking, so it cannot take a place in the top and leave the page short
-      if (dropping) { let x = dc.get(d.path); if (x === undefined) { x = !!dropPath(d.path); dc.set(d.path, x); } if (x) return false; }
       const r = this.reviews.size ? (d.lookup ? d.lookup(this.reviews) : this.reviews.get(`${d.path}#${d.heading || ''}`)) : null;
       if (r?.action === 'drop') return false;
       const until = r?.action === 'keep' ? r.until : d.rb;
@@ -828,7 +826,10 @@ export class Vault extends EventEmitter {
     fn.scope = pj ? 'project' : 'all';
     return fn;
   }
-  /** Recall: the index, filtered to what the token may read and the project, annotated with graph context; the use is logged. */
+  /**
+   * Recall: the index, filtered to what the token may read and the project, annotated with graph context; the use is logged.
+   * `dropPath` names paths a caller never wants. They are left out before ranking, so they cannot take the page and leave it short.
+   */
   recall(identity, { query, project = null, all_projects = false, limit = 6, offset = 0, client = null, session = null, log = true, dropPath = null }) {
     const t0 = performance.now();
     this._need(identity, 'read', null);
@@ -836,7 +837,7 @@ export class Vault extends EventEmitter {
     const off = Math.max(0, Math.trunc(Number(offset)) || 0);
     // A far offset must not cost a full ranking: the index is asked for one page past the bound at most, and an offset
     // past the bound is an empty page. A client that follows next never gets there; next stops at the bound.
-    const top = this.index.query(query, { limit: Math.min(off, RECALL_OFFSET_MAX) + lim, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects, dropPath }) });
+    const top = this.index.query(query, { limit: Math.min(off, RECALL_OFFSET_MAX) + lim, project, boosts: this.tuning?.boosts, drop: typeof dropPath === 'function' ? dropPath : null, filter: this._recallFilter(identity, { project, all_projects }) });
     const total = top.total;
     const hits = off > RECALL_OFFSET_MAX ? [] : top.slice(off, off + lim);
     for (const h of hits) {
@@ -1069,6 +1070,7 @@ export class Vault extends EventEmitter {
 
   _replayGraph() {
     const f = path.join(this.state, 'graph.json'); const snap = readJson(f, null); let from = 1;
+    try { for (const n of fs.readdirSync(this.state)) if (n.startsWith('graph.json.') && n.endsWith('.behind.tmp')) fs.rmSync(path.join(this.state, n), { force: true }); } catch { /* a save a stop cut short leaves its temporary file */ }
     if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); this.reviews = new Map(snap.reviews || []); this.contractSessions = new Map(snap.contract_sessions || []); this.contractResults = new Map(snap.contract_results || []); from = snap.seq + 1; if (snap.seq === this.log.seq) this._graphSaved = snap.seq; }
     for (const rec of this.log.iterate({ fromSeq: from })) { if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec); else if (rec.type === 'tournament.match' || rec.type === 'feedback' || rec.type === 'review' || rec.type === 'contract.signed' || rec.type === 'contract.verified') this._applyMisc(rec); }
   }

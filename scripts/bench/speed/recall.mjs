@@ -19,7 +19,7 @@ const report = { index: path.basename(INDEX || ''), states: {}, controls: {} };
 
 const orc = new RecallIndex(INDEX); if (!orc.load()) throw new Error('the oracle index did not load');
 const docsAll = [...orc.docs.values()];
-// Prompts as the growth rig's exp1 and exp3 make them: the labelled set, the off-topic set, and text cut from sections.
+// Prompts as the growth report's first and third experiments make them: the labelled set, the off-topic set, and text cut from sections.
 const Q = JSON.parse(fs.readFileSync(path.join(REPO, 'bench/queries.json'), 'utf8'));
 const cut = (seed, n) => { const rnd = rng(seed); const out = []; for (let i = 0; i < n; i++) { const d = docsAll[Math.floor(rnd() * docsAll.length)]; const w = (d.snippet || '').split(/\s+/); const m = 6 + Math.floor(rnd() * 60); const at = Math.floor(rnd() * Math.max(1, w.length - m)); out.push({ p: w.slice(at, at + m).join(' '), proj: null }); } return out; };
 const prompts = [...Q.on_topic.map((q) => ({ p: q.prompt, proj: q.project })), ...Q.off_topic.map((q) => ({ p: q.prompt, proj: null })), ...cut(12345, MAXP), ...cut(987, MAXP >> 1)];
@@ -29,15 +29,19 @@ const rb = rng(7); const key = (d) => `${d.path}#${d.heading || ''}`; const boos
 const reviews = new Map(); for (let i = 0; i < 50; i++) reviews.set(key(docsAll[Math.floor(rb() * docsAll.length)]), i % 2 ? { action: 'drop' } : { action: 'keep', until: '2020-01-01' });
 const filterOf = (revs) => (identity, o) => Vault.prototype._recallFilter.call({ reviews: revs, config: { recall: { scope: 'project' } } }, identity, o);
 const none = filterOf(new Map()), withRev = filterOf(reviews); const open = { paths: ['**'], scopes: ['read'] }, limited = { paths: ['notes/**', 'memory/**'], scopes: ['read'] };
+// the hook's test of a path, widened to some notes so that a fixture with few journals still has sections to drop
+const pastWork = (p) => p.startsWith('work/sessions/') || p.startsWith('contracts/drafts/') || p.startsWith('notes/n1');
 const CONFIGS = {
   route: (x) => ({ limit: 4, project: x.proj, boosts: {}, filter: none(open, { project: x.proj }) }),
   tuned: (x) => ({ limit: 6, project: x.proj, boosts, filter: withRev(open, { project: x.proj }) }),
   limited: (x) => ({ limit: 6, project: x.proj || 'billing', boosts, filter: withRev(limited, { project: x.proj || 'billing' }) }),
   wide: (x) => ({ limit: 10, project: x.proj || 'billing', boosts: null, filter: none(open, { project: x.proj || 'billing', all_projects: true }) }),
   remember: () => ({ limit: 5, prefix: 'memory/', filter: (d) => reviews.get(key(d))?.action !== 'drop' }),
-  hook: (x) => ({ limit: 4, project: x.proj, boosts: {}, filter: none(open, { project: x.proj, dropPath: (p) => p.startsWith('work/sessions/') || p.startsWith('contracts/drafts/') }) }),
+  hook: (x) => ({ limit: 4, project: x.proj, boosts: {}, drop: pastWork, filter: none(open, { project: x.proj }) }),
   bare: () => ({ limit: 60 }),
 };
+// the oracle has no `drop`: it gets the same test inside its filter
+const forOracle = (o) => (o.drop ? { ...o, drop: undefined, filter: (d) => !o.drop(d.path) && o.filter(d) } : o);
 const show = (r) => JSON.stringify(r) + r.total;
 
 export function compare(ix, label, list = prompts, { latency = true } = {}) {
@@ -45,7 +49,7 @@ export function compare(ix, label, list = prompts, { latency = true } = {}) {
   for (const [name, mk] of Object.entries(CONFIGS)) {
     const ta = [], tb = [];
     for (const x of list) {
-      const t0 = performance.now(); const a = orc.query(x.p, mk(x)); const t1 = performance.now(); const b = ix.query(x.p, mk(x)); const t2 = performance.now(); ta.push(t1 - t0); tb.push(t2 - t1); out.compared++;
+      const t0 = performance.now(); const a = orc.query(x.p, forOracle(mk(x))); const t1 = performance.now(); const b = ix.query(x.p, mk(x)); const t2 = performance.now(); ta.push(t1 - t0); tb.push(t2 - t1); out.compared++;
       if (show(a) !== show(b)) { out.differ++; if (!out.first) out.first = { config: name, p: x.p.slice(0, 60), a: a.slice(0, 2).map((h) => [h.path, h.line, h.score]), b: b.slice(0, 2).map((h) => [h.path, h.line, h.score]), ta: a.total, tb: b.total }; }
       else if (a.length) { const h = a[0]; const da = orc.docsOf(h.path, h.heading || '').find((d) => d.line === h.line); const db = ix.docsOf(h.path, h.heading || '').find((d) => d.line === h.line); const ea = JSON.stringify(orc.explain(x.p, da, { project: x.proj, boosts })); const eb = db ? JSON.stringify(ix.explain(x.p, db, { project: x.proj, boosts })) : 'missing'; out.compared++; if (ea !== eb) { out.differ++; if (!out.first) out.first = { config: `${name}/explain`, p: x.p.slice(0, 60), ea: ea.slice(0, 200), eb: eb.slice(0, 200) }; } }
     }

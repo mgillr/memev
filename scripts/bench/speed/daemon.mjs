@@ -30,7 +30,7 @@ for (let t = 0; t < 200 && !fs.existsSync(path.join(ROOT, '.memev', 'tuning.json
 if (!FOLD) {
   out.recall_idle = []; for (let r = 0; r < REPEATS; r++) { const a = []; let totals = 0; for (const q of Q.on_topic) { const x = await recall(q.prompt, q.project); a.push(x.ms); totals += x.j.total || 0; } out.recall_idle.push({ ...stat(a), mean_total: Math.round(totals / a.length) }); }
   out.write_cycle = [];
-  for (let r = 0; r < REPEATS; r++) { // the rig's own sequence: a write, the debounced save watched, a second write, a recall at the save moment, one after
+  for (let r = 0; r < REPEATS; r++) { // the sequence of the growth report: a write, the debounced save watched, a second write, a recall at the save moment, one after
     const w1 = await post('/v1/journal', { session: `stall${r}`, role: 'user', text: 'a turn to trigger the debounced index save', project: 'billing' }); const health = await watch(9000); const w2 = await post('/v1/journal', { session: `stall${r}`, role: 'assistant', text: 'second write', project: 'billing' }); await sleep(2950); const at = await recall('database migration timeout', 'billing'); await sleep(500); const after = await recall('database migration timeout', 'billing');
     if (health.timeouts_800ms) bad++; out.write_cycle.push({ write1_ms: Math.round(w1.ms), health, write2_ms: Math.round(w2.ms), recall_at_save_ms: Math.round(at.ms), recall_after_ms: Math.round(after.ms) });
   }

@@ -208,7 +208,8 @@ export class SegIndex {
     return { words, all: ts, terms, N, avg };
   }
   _scratch(need) { const n = this.seg ? this.seg.head.n : 0; if (!this.score || this.score.length < n) { const room = n + (n >> 3); this.score = new Float64Array(room); this.seen = new Uint32Array(room); this.stamp = 0; } if (!this.order || this.order.length < need) this.order = new Uint32Array(Math.max(need, 1024)); this.stamp++; }
-  query(q, { limit = 8, project = null, prefix = null, boosts = null, filter = null } = {}) {
+  /** `drop` is a pure test of a path alone, asked once per path of a segment and remembered with it, so it costs a column read per section. */
+  query(q, { limit = 8, project = null, prefix = null, boosts = null, filter = null, drop = null } = {}) {
     if (!this._N()) return empty(); const { terms, N, avg } = this._plan(q); if (!terms.length) return empty();
     const seg = this.seg, ov = this.ov, n = seg ? seg.head.n : 0, dead = this.dead; let need = 0; for (const t of terms) need += (t.e ? t.e.df : 0) + (t.ot === undefined ? 0 : ov.postings[t.ot].length);
     this._scratch(need); const score = this.score, seen = this.seen, stamp = this.stamp, order = this.order; const c = seg ? seg.cols() : null; const ovScore = new Map(); let m = 0;
@@ -221,11 +222,12 @@ export class SegIndex {
     const proj = project ? String(project).toLowerCase() : null; const top = []; let total = 0; const fly = seg ? new FilterDoc(seg, 0) : null; const plain = seg ? new SegDoc(seg, 0) : null;
     // Empty tuning is every daemon's first state: nothing can change a score, so no heading is needed.
     let maxB = 1, boostSieve = null; if (boosts) { const k = boostInfo(boosts); maxB = k.max; boostSieve = k.sieve; }
-    const hasBoosts = boostSieve !== null; const projId = seg && proj ? seg.projectId(proj) : 0; const verdict = filter && seg ? new Int8Array(seg.projects.length + 1) : null;
+    const hasBoosts = boostSieve !== null; const projId = seg && proj ? seg.projectId(proj) : 0; const verdict = filter && seg ? new Int8Array(seg.projects.length + 1) : null; const dropped = drop && seg ? seg.pathVerdicts(drop) : null;
     for (let x = 0; x < m; x++) {
       const v = order[x]; let d, s, fp;
-      if (v >= n) { d = ov.docs.get(v - n); s = ovScore.get(v - n); if (prefix && !d.path.startsWith(prefix)) continue; if (filter && !filter(d)) continue; fp = proj && d.project === proj ? 1.5 : 1; } else {
+      if (v >= n) { d = ov.docs.get(v - n); s = ovScore.get(v - n); if (prefix && !d.path.startsWith(prefix)) continue; if (drop && drop(d.path)) continue; if (filter && !filter(d)) continue; fp = proj && d.project === proj ? 1.5 : 1; } else {
         s = score[v]; const o = v * ROW; if (prefix && !plain.at(v).path.startsWith(prefix)) continue;
+        if (dropped) { const pid = c[o + C_PATH]; let x = dropped[pid]; if (!x) x = dropped[pid] = drop(seg.paths[pid - 1]) ? 2 : 1; if (x === 2) continue; }
         if (filter) {
           const j = c[o + C_PROJ]; const memo = verdict && c[o + C_RB] === 0 && (fly.sieve === null || !fly.sieve.has(c[o + C_SIG])) ? verdict[j] : 0;
           if (memo === 2) continue;

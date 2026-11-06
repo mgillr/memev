@@ -32,9 +32,13 @@ test('the prompt hook leaves past journals out before ranking, so a prompt asked
   // the same words in more journal sections than the page holds: ranked first they fill the top 4, and dropped afterwards they leave it empty
   for (let i = 0; i < 6; i++) v.append(OWNER, { path: `work/sessions/2026-11-0${i + 1}-s${i}.md`, text: `### ${i}\n${ask} ${ask} ${ask}\n` });
   assert.equal(v.recall(OWNER, { query: ask, limit: 4, log: false }).every((h) => h.path.startsWith('work/sessions/')), true, 'the control: unfiltered, journals take the whole page');
-  const got = await hookRecall(v, ask);
-  assert.ok(got.hits.some((h) => h.path.startsWith('memory/decisions/')), `the memory reached the hook; got ${JSON.stringify(got.hits.map((h) => h.path))}`);
-  assert.equal(got.hits.some((h) => h.path.startsWith('work/sessions/')), false, 'no past journal reached the hook');
+  // once with the journals in the overlay, once folded into the segment
+  for (const where of ['overlay', 'segment']) {
+    const got = await hookRecall(v, ask);
+    assert.ok(got.hits.some((h) => h.path.startsWith('memory/decisions/')), `${where}: the memory reached the hook; got ${JSON.stringify(got.hits.map((h) => h.path))}`);
+    assert.equal(got.hits.some((h) => h.path.startsWith('work/sessions/')), false, `${where}: no past journal reached the hook`);
+    v.index.save(); v.index.compact(); assert.equal(v.index.ov.docs.size, 0);
+  }
   v.close();
 });
 

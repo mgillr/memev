@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // The on-disk segment behind the recall index: immutable files in one folder, read by offset, never parsed whole.
-// Fixed-width columns are little-endian typed arrays, so a query reads them without building objects.
+// Fixed-width columns are typed arrays, so a query reads them without building objects.
 // The bytes follow the host, which on every usual Node target (x64 and arm64) is little-endian. head.json names the order, so a folder carried to a host of the other order is rebuilt from the notes.
 // Bump SEG_VERSION with any change of these files: an index of another version is rebuilt from the notes.
 //   head.json   counts, every 64th dictionary word with its byte offset; written last, so a folder without it is unfinished
@@ -115,6 +115,8 @@ export class Seg {
   }
   ids(e) { const a = new Uint32Array(e.df); fs.readSync(this.fdI, a, 0, e.df * 4, e.row * 4); return a; }
   tfs(e) { const a = new Uint16Array(e.df); fs.readSync(this.fdT, a, 0, e.df * 2, e.row * 2); return a; }
+  /** What a pure test of a path said, by path id: 0 not asked yet, 1 kept, 2 dropped. A segment's paths never change, so it is kept per test. */
+  pathVerdicts(fn) { this.cols(); if (!this.verdicts) this.verdicts = new WeakMap(); let v = this.verdicts.get(fn); if (!v) { v = new Uint8Array(this.paths.length + 1); this.verdicts.set(fn, v); } return v; }
   projectId(p) { this.cols(); if (!this.projIds) this.projIds = new Map(this.projects.map((x, k) => [x, k + 1])); return this.projIds.get(p) || 0; }
   heading(i) { const c = this.cols(), v = c[i * ROW + C_HEAD]; if (v & NO_HEADING) return null; if (!this.h) this.h = readAligned(path.join(this.dir, 'heads.bin')); const e = i + 1 < this.head.n ? (c[(i + 1) * ROW + C_HEAD] & 0x7fffffff) : this.head.headBytes; return this.h.ucs2Slice(v, e); }
   rb(i) { return decodeRb(this.cols()[i * ROW + C_RB] & 0x7fffffff); }
