@@ -107,11 +107,15 @@ test('MEM-029 AC02: the relay only forwards: vault tokens are never readable by 
     const wire = Buffer.concat(seen.filter((e) => ['in', 'out'].includes(e.dir)).map((e) => e.bytes));
     assert.ok(wire.length > 1000, 'the relay carried real traffic');
     const control = seen.filter((e) => e.dir.startsWith('control')).map((e) => e.bytes.toString('utf8')).join('\n');
+    // Nonces, signatures and public keys are random base64, which can hold a short string such as /c/ by chance. Blank them for
+    // the search, so a secret in any other field is still found. Tokens are also searched for in the unblanked text below.
+    const controlFields = control.split('\n').filter(Boolean).map((l) => JSON.stringify(JSON.parse(l), (k, v) => (['nonce', 'sig', 'pub'].includes(k) ? '' : v))).join('\n');
     const idn = JSON.parse(fs.readFileSync(client.identityFile(r.root), 'utf8'));
     const secrets = [r.connector.token, r.computer.token, r.localToken, r.connector.token.slice(3, 30), r.computer.token.slice(3, 30), MEMORY, 'weir', 'heron', 'Bearer', 'authorization', 'x-memev-sig', 'x-memev-nonce', 'memev_recall', '/mcp', '/c/', 'jsonrpc', 'cloud-ai-app', 'HTTP/1.1', 'PRIVATE KEY', idn.key.split('\n')[1], r.deviceKey.split('\n')[1]];
     for (const x of secrets) {
       assert.equal(wire.includes(Buffer.from(x)), false, `the relay saw ${x.slice(0, 12)} on the wire`);
-      assert.equal(control.includes(x), false, `the relay saw ${x.slice(0, 12)} on its control line`);
+      assert.equal(controlFields.includes(x), false, `the relay saw ${x.slice(0, 12)} on its control line`);
+      if (x.length >= 20) assert.equal(control.includes(x), false, `the relay saw ${x.slice(0, 12)} in a random field of its control line`);
     }
     // the only things on its control line are the public key, a nonce, a signature, session ids and addresses
     const kinds = new Set(control.split('\n').filter(Boolean).map((l) => JSON.parse(l).t)); for (const k of kinds) assert.ok(['hello', 'challenge', 'auth', 'ready', 'open', 'accept', 'ok', 'ping', 'pong'].includes(k), k);
