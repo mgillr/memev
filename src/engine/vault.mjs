@@ -11,6 +11,7 @@ import crypto from 'node:crypto';
 import { sha256, readJson, writeJson, writePrivateJson, exists, now, stamp, slug, truncate, randomToken } from './util.mjs';
 import { OpLog } from './oplog.mjs';
 import { RecallIndex, tokenize, sections } from './index.mjs';
+import { SegIndex } from './segindex.mjs';
 import { TokenStore, allowed } from './tokens.mjs';
 import { CommitQueue, git, gitInitMain } from './git.mjs';
 import { lineSplice, applySplice } from './diff.mjs';
@@ -65,7 +66,7 @@ export class Vault extends EventEmitter {
     this.devices.ensureHost(this.host);
     this.devices.migrate(this.tokens); // existing installs: every token becomes its own device entry
     this.bus = new Bus({ root: this.root, devices: this.devices, commit: (p) => this.commits.add(p, 'bus'), config: this.config.bus || {} });
-    this.index = new RecallIndex(path.join(this.state, 'index.jsonl'));
+    this.index = process.env.MEMEV_RIG_SEG === '1' ? new SegIndex(path.join(this.state, 'index.jsonl')) : new RecallIndex(path.join(this.state, 'index.jsonl'));
     this.graph = new Graph();
     this.tournament = new Tournament();
     this.feedback = new Map();
@@ -74,9 +75,16 @@ export class Vault extends EventEmitter {
     this.contractResults = new Map();
     this.commits = new CommitQueue(this.root, { enabled: this.opts.git !== false, delayMs: this.opts.commitDelayMs ?? 400 });
     this._seedBus();
+    const RIG = process.env.MEMEV_RIG_SEG === '1';
+    if (RIG) this._rigFp = this._rigLoadFp();
     this.recover();
     const loaded = this.index.load();
-    if (!loaded || this.index.stats().notes === 0) this.reindexAll(); else for (const p of this.allNotes()) this.graph.indexNote(p, this._read(p));
+    if (!loaded || this.index.stats().notes === 0) { this._rigChanged = null; this.reindexAll(); }
+    else if (RIG) this._rigOpenNotes();
+    else for (const p of this.allNotes()) this.graph.indexNote(p, this._read(p));
+    if (process.env.MEMEV_RIG_STOPPED === '1' || RIG) { let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch {} if (saved !== null) for (const [p, h] of this.log.heads) { if (h.seq > saved && !h.deleted) { const b = this._read(p); if (b !== null) { this.index.update(p, b, { mtime: Date.now() }); } } else if (h.seq > saved && h.deleted) this.index.remove(p); } }
+    // RIG_FIX_STOPPED: a note imported at start reaches recall (main leaves it out until the next rebuild).
+    if (process.env.MEMEV_RIG_STOPPED === '1' || RIG) for (const p of this.imported || []) { const b = this._read(p); if (b !== null) this.index.update(p, b, { mtime: Date.now() }); }
     this._replayGraph();
     this.tuning = loadTuning(this);
     this.started = now();
@@ -95,7 +103,7 @@ export class Vault extends EventEmitter {
     } catch {}
   }
 
-  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this._saveGraph(); this.devices?.saveSoon(); this.log.close(); }
+  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this._rigSeq(); this._saveGraph(); if (process.env.MEMEV_RIG_SEG === '1') { try { this._rigSaveCold(); } catch {} } this.devices?.saveSoon(); this.log.close(); }
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
@@ -186,6 +194,7 @@ export class Vault extends EventEmitter {
       if (h.deleted || !h.ch) continue;
       each(p, () => {
         if (this._linked(p)) return; // never rebuilt through a link: the write would land wherever the link points
+        if (this._rigFp) { const f = this._rigFp.get(p); if (f && f[2] === h.ch) { try { const st = fs.statSync(this.abs(p)); if (st.size === f[0] && st.mtimeMs === f[1]) return; } catch {} } }
         const cur = this._read(p);
         if (cur !== null && sha256(cur) === h.ch) return;
         const content = this.materialize(p);
@@ -197,6 +206,19 @@ export class Vault extends EventEmitter {
     for (const p of this.allNotes()) if (!this.log.heads.has(p)) each(p, () => { this._importExternal(p, this._read(p), 'startup'); imported.push(p); });
     this.recovered = fixed; this.imported = imported; this.skipped = skipped;
     return fixed;
+  }
+  _rigLoadFp() { try { return new Map(JSON.parse(fs.readFileSync(path.join(this.state, 'notes.fp.json'), 'utf8'))); } catch { return null; } }
+  _rigSaveCold() { // Written at close: stat plus logged hash per note, and the note part of the graph.
+    const out = []; for (const [p, h] of this.log.heads) { if (h.deleted || !h.ch) continue; try { const st = fs.statSync(this.abs(p)); out.push([p, [st.size, st.mtimeMs, h.ch]]); } catch {} }
+    writePrivateJson(path.join(this.state, 'notes.fp.json'), out);
+    const g = this.graph; const rep = (k, v) => (v instanceof Map ? { $m: [...v] } : v instanceof Set ? { $s: [...v] } : v);
+    fs.writeFileSync(path.join(this.state, 'graph-notes.json'), JSON.stringify({ entities: g.entities, sectionEnts: g.sectionEnts, notesSections: g.notesSections, noteEnts: g.noteEnts, cooc: g.cooc }, rep), { mode: 0o600 });
+  }
+  _rigOpenNotes() {
+    const rev = (k, v) => (v && v.$m ? new Map(v.$m) : v && v.$s ? new Set(v.$s) : v); let snap = null;
+    if (this._rigFp) { try { snap = JSON.parse(fs.readFileSync(path.join(this.state, 'graph-notes.json'), 'utf8'), rev); } catch {} }
+    if (snap) Object.assign(this.graph, snap);
+    for (const p of this.allNotes()) { const f = snap && this._rigFp.get(p); let same = false; if (f) { try { const st = fs.statSync(this.abs(p)); same = st.size === f[0] && st.mtimeMs === f[1]; } catch {} } if (!same) { const b = this._read(p); this.graph.indexNote(p, b); } }
   }
   _importExternal(p, body, source) {
     const rec = this.log.append({ type: 'put', path: p, agent: 'external', client: source, data: { content: body, ch: sha256(body), external: true } });
@@ -297,7 +319,8 @@ export class Vault extends EventEmitter {
     this._indexSaveSoon();
     this.emit('change', { path: p, type: rec.type, seq: rec.seq, client });
   }
-  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); this._saveGraph(); }, 3000); this._ist.unref?.(); }
+  _rigSeq() { if (process.env.MEMEV_RIG_STOPPED === '1' || process.env.MEMEV_RIG_SEG === '1') { try { fs.writeFileSync(path.join(this.state, 'index.seq'), String(this.log.seq)); } catch {} } }
+  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); this._rigSeq(); this._saveGraph(); }, 3000); this._ist.unref?.(); }
 
   // ---- note operations
   get(identity, p) { p = checkPath(p); this._need(identity, 'read', p); const b = this._read(p); if (b === null) throw new VaultError('not_found', `no note ${p}`); return { path: p, body: b }; }
@@ -651,13 +674,13 @@ export class Vault extends EventEmitter {
     return fn;
   }
   /** Recall: the index, filtered to what the token may read and the project, annotated with graph context; the use is logged. */
-  recall(identity, { query, project = null, all_projects = false, limit = 6, offset = 0, client = null, session = null, log = true }) {
+  recall(identity, { query, project = null, all_projects = false, limit = 6, offset = 0, client = null, session = null, log = true, rigDrop = null }) {
     this._need(identity, 'read', null);
     const lim = limit == null ? 6 : Math.min(10, Math.max(1, Math.trunc(Number(limit)) || 1));
     const off = Math.max(0, Math.trunc(Number(offset)) || 0);
     // A far offset must not cost a full ranking: the index is asked for one page past the bound at most, and an offset
     // past the bound is an empty page. A client that follows next never gets there; next stops at the bound.
-    const top = this.index.query(query, { limit: Math.min(off, RECALL_OFFSET_MAX) + lim, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
+    const top = this.index.query(query, { limit: Math.min(off, RECALL_OFFSET_MAX) + lim, project, boosts: this.tuning?.boosts, filter: rigDrop ? ((f) => (d) => !rigDrop(d.path) && f(d))(this._recallFilter(identity, { project, all_projects })) : this._recallFilter(identity, { project, all_projects }) });
     const total = top.total;
     const hits = off > RECALL_OFFSET_MAX ? [] : top.slice(off, off + lim);
     for (const h of hits) {
@@ -926,7 +949,7 @@ export class Vault extends EventEmitter {
     return {
       oplog: { bytes: this._dirBytes(oplogDir), segments: segs.length, archived: segs.filter((s) => s.archived).length, activeBytes: this._segBytes(oplogDir), archivedBytes: this._segBytes(path.join(oplogDir, 'archive')) },
       journal: { bytes: this._dirBytes(this.abs('work/sessions')), files: this._dirFiles(this.abs('work/sessions'), '.md') },
-      index: { bytes: fs.existsSync(indexFile) ? fs.statSync(indexFile).size : 0 },
+      index: { bytes: (fs.existsSync(indexFile) ? fs.statSync(indexFile).size : 0) + this._dirBytes(`${indexFile.replace(/\.jsonl$/, '')}.seg`) + (fs.existsSync(`${indexFile.replace(/\.jsonl$/, '')}.overlay.jsonl`) ? fs.statSync(`${indexFile.replace(/\.jsonl$/, '')}.overlay.jsonl`).size : 0) },
       git: { bytes: this._dirBytes(path.join(this.root, '.git', 'objects')) },
     };
   }
