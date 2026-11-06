@@ -12,6 +12,8 @@ import { sha256, readJson, writeJson, writePrivateJson, exists, now, stamp, slug
 import { OpLog } from './oplog.mjs';
 import { RecallIndex, tokenize, sections } from './index.mjs';
 import { SegIndex } from './segindex.mjs';
+import { Worker } from 'node:worker_threads';
+import { NoteState } from './notestate.mjs';
 import { TokenStore, allowed } from './tokens.mjs';
 import { CommitQueue, git, gitInitMain } from './git.mjs';
 import { lineSplice, applySplice } from './diff.mjs';
@@ -76,15 +78,24 @@ export class Vault extends EventEmitter {
     this.commits = new CommitQueue(this.root, { enabled: this.opts.git !== false, delayMs: this.opts.commitDelayMs ?? 400 });
     this._seedBus();
     const RIG = process.env.MEMEV_RIG_SEG === '1';
-    if (RIG) this._rigFp = this._rigLoadFp();
-    this.recover();
+    this.notes = new NoteState(this.state).load();
+    const scan = this._scanNotes();
+    this.graph.bulkLoad = true;
     const loaded = this.index.load();
-    if (!loaded || this.index.stats().notes === 0) { this._rigChanged = null; this.reindexAll(); }
-    else if (RIG) this._rigOpenNotes();
-    else for (const p of this.allNotes()) this.graph.indexNote(p, this._read(p));
-    if (process.env.MEMEV_RIG_STOPPED === '1' || RIG) { let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch {} if (saved !== null) for (const [p, h] of this.log.heads) { try { if (h.seq > saved && !h.deleted) { const b = this._read(p); if (b !== null) { this.index.update(p, b, { mtime: Date.now() }); } } else if (h.seq > saved && h.deleted) this.index.remove(p); } catch {} } }
+    const rebuild = !loaded || (this.index.isEmpty ? this.index.isEmpty() : this.index.stats().notes === 0);
+    // a first run reads each note once: the import indexes what it just read, in the path order a rebuild uses, when every note is new
+    const allNew = rebuild && ![...scan.keys()].some((p) => this.log.heads.has(p));
+    if (allNew && this.index.buildFrom) { this.imported = []; this.recovered = []; this.skipped = []; this.log.group(() => this.index.buildFrom(this._firstRunNotes(scan))); }
+    else {
+      this.recover(scan, allNew ? (p, b) => { this.index.update(p, b); this._graphNote(p, b); } : null);
+      if (rebuild) this.reindexAll(scan, allNew ? new Set(this.imported) : null);
+      else this._restoreGraph(scan);
+    }
+    this.graph.bulkLoad = false;
+    try { this.notes.opened(scan); } catch { this.notes.recs = null; } // a cache that cannot be written costs reads next time, never the vault
+    if (!rebuild && (process.env.MEMEV_RIG_STOPPED === '1' || RIG)) { let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch {} if (saved !== null) for (const [p, h] of this.log.heads) { try { if (h.seq > saved && !h.deleted) { const b = this._read(p); if (b !== null) { this.index.update(p, b, { mtime: Date.now() }); } } else if (h.seq > saved && h.deleted) this.index.remove(p); } catch {} } }
     // RIG_FIX_STOPPED: a note imported at start reaches recall (main leaves it out until the next rebuild).
-    if (process.env.MEMEV_RIG_STOPPED === '1' || RIG) for (const p of this.imported || []) { try { const b = this._read(p); if (b !== null) this.index.update(p, b, { mtime: Date.now() }); } catch {} }
+    if (!rebuild && (process.env.MEMEV_RIG_STOPPED === '1' || RIG)) for (const p of this.imported || []) { try { const b = this._read(p); if (b !== null) this.index.update(p, b, { mtime: Date.now() }); } catch {} }
     this._replayGraph();
     this.tuning = loadTuning(this);
     this.started = now();
@@ -103,7 +114,7 @@ export class Vault extends EventEmitter {
     } catch {}
   }
 
-  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this._rigSeq(); this._saveGraph(); if (process.env.MEMEV_RIG_SEG === '1') { try { this._rigSaveCold(); } catch {} } this.devices?.saveSoon(); this.log.close(); }
+  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this._rigSeq(); this._saveGraph(); clearTimeout(this._idle); this.notes?.close(); try { this._sweepWorker?.terminate(); } catch {} this.devices?.saveSoon(); this.log.close(); }
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
@@ -176,7 +187,53 @@ export class Vault extends EventEmitter {
     const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules' || e.isSymbolicLink()) continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) { if (r === 'work/archive') continue; walk(path.join(d, e.name), r); } else if (e.name.endsWith('.md')) out.push(r); } };
     walk(base, dir.replace(/\/$/, '')); return out.sort();
   }
-  reindexAll() { for (const p of this.allNotes()) { const b = this._read(p); this.index.update(p, b); this.graph.indexNote(p, b); } this.index.save(); }
+  reindexAll(scan = null, done = null) { for (const p of scan ? [...scan.keys()].sort() : this.allNotes()) { if (done?.has(p)) continue; const b = this._read(p); this.index.update(p, b); this._graphNote(p, b); } this.index.save(); }
+  /**
+   * Every note the walk finds, with its lstat. The walk skips links, so a note in the result has no link on the way to it, and one
+   * lstat per note stands in for checking each folder of each path. allNotes keeps its own walk for callers that want names only.
+   */
+  _scanNotes() {
+    const out = new Map();
+    const walk = (d, rel) => {
+      let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+      for (const e of ents) {
+        if (e.name.startsWith('.') || e.name === 'node_modules' || e.isSymbolicLink()) continue;
+        const r = rel ? `${rel}/${e.name}` : e.name; const full = `${d}${path.sep}${e.name}`;
+        if (e.isDirectory()) { if (r !== 'work/archive') walk(full, r); }
+        else if (e.name.endsWith('.md')) { try { out.set(r, fs.lstatSync(full)); } catch { out.set(r, null); } }
+      }
+    };
+    walk(this.root, ''); return out;
+  }
+  /** A folder's first open: each note is logged and taken into the graph as it passes on its way to the index. */
+  *_firstRunNotes(scan) {
+    for (const p of [...scan.keys()].sort()) {
+      let body = null;
+      try { body = this._read(p); this._importExternal(p, body, 'startup'); this.imported.push(p); this._graphNote(p, body); }
+      catch (e) { this.skipped.push({ path: p, reason: e.code || e.message }); continue; }
+      yield [p, body];
+    }
+  }
+  /** True when a note's stat is the one its saved record holds. Changed time too, which no tool can set back, so an edit that restores the modified time still shows. */
+  _sameStat(st, r) { return !!st && !!r && st.isFile() && st.size === r.size && st.mtimeMs === r.mtimeMs && (this.opts.ignoreCtime === true || st.ctimeMs === r.ctimeMs); }
+  /** Index a note in the graph and keep what was found for the next start. */
+  _graphNote(p, body) { const found = this.graph.indexNote(p, body); const ch = this.log.heads.get(p)?.ch; let st = null; try { st = fs.lstatSync(this.abs(p)); } catch {} if (ch && st) this.notes.put(p, st, ch, found, this.log.heads.get(p).hash); else this.notes.drop(p); }
+  /**
+   * The graph is a pure function of the notes in path order, so it is rebuilt from the saved records of the notes that are still there
+   * and unchanged, and from the text of the rest. A note gone from disk has no line in that order, so it cannot linger.
+   */
+  _restoreGraph(scan) {
+    const { recs } = this.notes; const mentions = this.notes.mentions.map((t) => (t ? { id: t[0], name: t[1], kind: t[2] } : t)); const changed = new Set([...(this.recovered || []), ...(this.imported || [])]);
+    const keep = (r) => r.secs.every((s) => s[1].every((m) => mentions[m]));
+    let run = [];
+    for (const p of [...scan.keys()].sort()) {
+      const r = recs.get(p); const h = this.log.heads.get(p);
+      if (r?.secs && h && r.ch === h.ch && !changed.has(p) && this._sameStat(scan.get(p), r) && keep(r)) { if (r.secs.length) run.push([p, r.secs]); continue; }
+      if (run.length) { this.graph.restore(mentions, run); run = []; }
+      try { this._graphNote(p, this._read(p)); } catch {}
+    }
+    if (run.length) this.graph.restore(mentions, run);
+  }
 
   /**
    * Reconcile the files with the log at startup (and before every write to a note):
@@ -185,7 +242,7 @@ export class Vault extends EventEmitter {
    *   file differs otherwise   → edited by hand or by git: recorded as an external 'put' (the old
    *                              version stays in the log), never overwritten
    */
-  recover() {
+  recover(scan = this._scanNotes(), onImport = null) {
     const fixed = [], imported = [], skipped = [];
     // one path the file system cannot take (a NUL in it, a note where a folder must be, a folder where the note goes) is
     // skipped with its reason, so the rest of the vault opens; before, it threw and the vault never opened again (issue 230)
@@ -193,32 +250,47 @@ export class Vault extends EventEmitter {
     for (const [p, h] of this.log.heads) {
       if (h.deleted || !h.ch) continue;
       each(p, () => {
+        const st = scan.get(p); const r = this.notes?.recs?.get(p);
+        if (st && r && r.ch === h.ch && this._sameStat(st, r)) return; // the walk found no link on the way, and the file is as Memev left it
         if (this._linked(p)) return; // never rebuilt through a link: the write would land wherever the link points
-        if (this._rigFp) { const f = this._rigFp.get(p); if (f && f[2] === h.ch) { try { const st = fs.statSync(this.abs(p)); if (st.isFile() && st.size === f[0] && st.mtimeMs === f[1]) return; } catch {} } }
         const cur = this._read(p);
-        if (cur !== null && sha256(cur) === h.ch) return;
+        if (cur !== null && sha256(cur) === h.ch) { if (st && r && r.ch === h.ch) this.notes.restat(p, st); return; }
         const content = this.materialize(p);
         if (content === null || sha256(content) !== h.ch) return;
-        if (cur === null || (content.startsWith(cur) && cur.length < content.length)) { fs.mkdirSync(path.dirname(this.abs(p)), { recursive: true }); fs.writeFileSync(this.abs(p), content); fixed.push(p); }
+        if (cur === null || (content.startsWith(cur) && cur.length < content.length)) { fs.mkdirSync(path.dirname(this.abs(p)), { recursive: true }); fs.writeFileSync(this.abs(p), content); fixed.push(p); if (p.endsWith('.md') && !/(^|\/)(\.|node_modules\/|work\/archive\/)/.test(p)) scan.set(p, fs.lstatSync(this.abs(p))); }
         else { this._importExternal(p, cur, 'startup'); imported.push(p); }
       });
     }
-    for (const p of this.allNotes()) if (!this.log.heads.has(p)) each(p, () => { this._importExternal(p, this._read(p), 'startup'); imported.push(p); });
+    this.log.group(() => { for (const p of [...scan.keys()].sort()) if (!this.log.heads.has(p)) each(p, () => { const b = this._read(p); this._importExternal(p, b, 'startup'); imported.push(p); onImport?.(p, b); }); });
     this.recovered = fixed; this.imported = imported; this.skipped = skipped;
     return fixed;
   }
-  _rigLoadFp() { try { return new Map(JSON.parse(fs.readFileSync(path.join(this.state, 'notes.fp.json'), 'utf8'))); } catch { return null; } }
-  _rigSaveCold() { // Written at close: stat plus logged hash per note, and the note part of the graph.
-    const out = []; for (const [p, h] of this.log.heads) { if (h.deleted || !h.ch) continue; try { const st = fs.statSync(this.abs(p)); if (st.isFile()) out.push([p, [st.size, st.mtimeMs, h.ch]]); } catch {} }
-    writePrivateJson(path.join(this.state, 'notes.fp.json'), out);
-    const g = this.graph; const rep = (k, v) => (v instanceof Map ? { $m: [...v] } : v instanceof Set ? { $s: [...v] } : v);
-    fs.writeFileSync(path.join(this.state, 'graph-notes.json'), JSON.stringify({ entities: g.entities, sectionEnts: g.sectionEnts, notesSections: g.notesSections, noteEnts: g.noteEnts, cooc: g.cooc }, rep), { mode: 0o600 });
+  /** Finish what a start left for later, a slice at a time, so the thread stays free. */
+  startIdleWork() {
+    const step = () => { if (this.graph.step(5)) { this._idle = setTimeout(step, 1); this._idle.unref?.(); } };
+    step();
   }
-  _rigOpenNotes() {
-    const rev = (k, v) => (v && v.$m ? new Map(v.$m) : v && v.$s ? new Set(v.$s) : v); let snap = null;
-    if (this._rigFp) { try { snap = JSON.parse(fs.readFileSync(path.join(this.state, 'graph-notes.json'), 'utf8'), rev); } catch {} }
-    if (snap) Object.assign(this.graph, snap);
-    for (const p of this.allNotes()) { const f = snap && this._rigFp.get(p); let same = false; if (f) { try { const st = fs.statSync(this.abs(p)); same = st.isFile() && st.size === f[0] && st.mtimeMs === f[1]; } catch {} } if (!same) { try { const b = this._read(p); this.graph.indexNote(p, b); } catch {} } }
+  /**
+   * The background check of every note against the log, for what a stat cannot show: a file system with a coarse or unusable changed
+   * time, or a clock set back. A worker hashes, so the thread stays free; a note that differs goes through syncFromDisk here, as any
+   * outside edit does. status().sweep says how far it got and what it found, with the time from the start of the sweep to each finding.
+   */
+  startSweep({ restEvery, restMs } = {}) {
+    if (this.sweep?.state === 'running') return this.sweep;
+    const items = []; for (const [p, h] of this.log.heads) if (!h.deleted && h.ch) items.push(`${h.ch} ${p}`);
+    const t0 = performance.now();
+    const sw = this.sweep = { state: 'running', started: now(), total: items.length, hashed: 0, bytes: 0, missing: 0, differs: 0, changed: 0, found: [], cycle_ms: null, error: null };
+    const w = this._sweepWorker = new Worker(new URL('./notes-worker.mjs', import.meta.url), { workerData: { job: 'sweep', root: this.root, items: items.join('\n'), restEvery, restMs } });
+    w.unref();
+    w.on('message', (m) => {
+      if (m.type === 'differs') {
+        sw.differs++;
+        try { this._nc?.delete(m.path); if (this.syncFromDisk(m.path, 'sweep')) { sw.changed++; if (sw.found.length < 100) sw.found.push({ path: m.path, ms: Math.round(performance.now() - t0) }); } } catch (e) { sw.error = e.message; }
+      } else { sw.hashed = m.hashed; sw.bytes = m.bytes; sw.missing = m.missing; }
+      if (m.type === 'done') { sw.state = 'done'; sw.cycle_ms = Math.round(performance.now() - t0); this.emit('sweep', sw); }
+    });
+    w.on('error', (e) => { sw.state = 'failed'; sw.error = e.message; this.emit('sweep', sw); });
+    return sw;
   }
   _importExternal(p, body, source) {
     const rec = this.log.append({ type: 'put', path: p, agent: 'external', client: source, data: { content: body, ch: sha256(body), external: true } });
@@ -252,10 +324,10 @@ export class Vault extends EventEmitter {
     if (known && h && !h.deleted && known.ch === h.ch) return null;
     const cur = this._read(p);
     if (cur !== null) this._ncSet(p, cur);
-    if (cur === null) { if (h && !h.deleted) { const rec = this.log.append({ type: 'delete', path: p, agent: 'external', client: source, data: { external: true } }); this.index.remove(p); this.graph.removeNote(p); return rec; } return null; }
+    if (cur === null) { if (h && !h.deleted) { const rec = this.log.append({ type: 'delete', path: p, agent: 'external', client: source, data: { external: true } }); this.index.remove(p); this.graph.removeNote(p); this.notes.drop(p); return rec; } return null; }
     if (h && !h.deleted && h.ch === sha256(cur)) return null;
     const rec = this._importExternal(p, cur, source);
-    this.index.update(p, cur, { mtime: rec.ts }); this.graph.indexNote(p, cur); this._indexSaveSoon();
+    this.index.update(p, cur, { mtime: rec.ts }); this._graphNote(p, cur); this._indexSaveSoon();
     return rec;
   }
 
@@ -310,17 +382,18 @@ export class Vault extends EventEmitter {
     if (appended) {
       // an append that starts new sections: index only those (the cost follows the new text, not the note)
       this.index.appendSections(p, appended.text, { lineOffset: appended.lineOffset, mtime: rec.ts });
-      this.graph.indexSections(p, sections(appended.text));
+      const found = this.graph.indexSections(p, sections(appended.text)); const ch = this.log.heads.get(p)?.ch; let st = null; try { st = fs.lstatSync(this.abs(p)); } catch {}
+      if (ch && st) this.notes.add(p, st, ch, found, rec); else this.notes.drop(p);
     } else {
       const body = this._read(p);
-      this.index.update(p, body ?? '', { mtime: rec.ts }); this.graph.indexNote(p, body ?? '');
+      this.index.update(p, body ?? '', { mtime: rec.ts }); this._graphNote(p, body ?? '');
     }
     this.commits.add(p, client);
     this._indexSaveSoon();
     this.emit('change', { path: p, type: rec.type, seq: rec.seq, client });
   }
   _rigSeq() { if (process.env.MEMEV_RIG_STOPPED === '1' || process.env.MEMEV_RIG_SEG === '1') { try { fs.writeFileSync(path.join(this.state, 'index.seq'), String(this.log.seq)); } catch {} } }
-  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); this._rigSeq(); this._saveGraph(); }, 3000); this._ist.unref?.(); }
+  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); this._rigSeq(); this._saveGraph(); try { this.notes.flush(); } catch {} }, 3000); this._ist.unref?.(); }
 
   // ---- note operations
   get(identity, p) { p = checkPath(p); this._need(identity, 'read', p); const b = this._read(p); if (b === null) throw new VaultError('not_found', `no note ${p}`); return { path: p, body: b }; }
@@ -371,7 +444,7 @@ export class Vault extends EventEmitter {
     p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._guard(p, '', true, false);
     if (this._read(p) === null) throw new VaultError('not_found', `no note ${p}`);
     const rec = this.log.append({ type: 'delete', path: p, agent: identity.agent, client, data: {} });
-    fs.rmSync(this.abs(p)); this._nc?.delete(p); this.index.remove(p); this.graph.removeNote(p); this.commits.add(p, client); this._indexSaveSoon();
+    fs.rmSync(this.abs(p)); this._nc?.delete(p); this.index.remove(p); this.graph.removeNote(p); this.notes.drop(p); this.commits.add(p, client); this._indexSaveSoon();
     return { path: p, seq: rec.seq, op: 'delete', note: 'the content stays in the operation log and in git history' };
   }
 
@@ -685,8 +758,7 @@ export class Vault extends EventEmitter {
     const hits = off > RECALL_OFFSET_MAX ? [] : top.slice(off, off + lim);
     for (const h of hits) {
       const key = `${h.path}#${h.heading || ''}`;
-      const ents = this.graph.sectionEnts.get(key) || [];
-      h.related = ents.slice(0, 5).map((id) => this.graph.entities.get(id)?.name).filter(Boolean);
+      h.related = this.graph.relatedNames(h.path, h.heading || '', 5);
       const claims = [...this.graph.claims.values()].filter((c) => c.evidence.some((e) => e.path === h.path));
       if (claims.length) h.claims = claims.slice(0, 3).map((c) => ({ id: c.id, claim: `${c.subject} ${c.predicate}${c.object ? ` ${c.object}` : ''}`, status: Graph.assess(c).status }));
       const u = this.graph.usage.get(key); if (u) h.used = u.count;
@@ -913,10 +985,10 @@ export class Vault extends EventEmitter {
 
   _replayGraph() {
     const f = path.join(this.state, 'graph.json'); const snap = readJson(f, null); let from = 1;
-    if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); this.reviews = new Map(snap.reviews || []); this.contractSessions = new Map(snap.contract_sessions || []); this.contractResults = new Map(snap.contract_results || []); from = snap.seq + 1; }
+    if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); this.reviews = new Map(snap.reviews || []); this.contractSessions = new Map(snap.contract_sessions || []); this.contractResults = new Map(snap.contract_results || []); from = snap.seq + 1; if (snap.seq === this.log.seq) this._graphSaved = snap.seq; }
     for (const rec of this.log.iterate({ fromSeq: from })) { if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec); else if (rec.type === 'tournament.match' || rec.type === 'feedback' || rec.type === 'review' || rec.type === 'contract.signed' || rec.type === 'contract.verified') this._applyMisc(rec); }
   }
-  _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }); }
+  _saveGraph() { if (this._graphSaved === this.log.seq) return; this._graphSaved = this.log.seq; writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }); }
 
   // ---- retention and compaction
   /** Total bytes of every file under a directory (recursive). */
@@ -1014,7 +1086,7 @@ export class Vault extends EventEmitter {
 
   status() {
     const mu = process.memoryUsage();
-    return { version: VERSION, vault: this.root, started: this.started, oplog: this.log.stats(), index: this.index.stats(), graph: this.graph.stats(), memory: { rss_mb: Math.round(mu.rss / 1048576), heap_mb: Math.round(mu.heapUsed / 1048576) }, recovered: this.recovered?.length || 0, imported: this.imported?.length || 0 };
+    return { version: VERSION, vault: this.root, started: this.started, oplog: this.log.stats(), index: this.index.stats(), graph: this.graph.stats(), memory: { rss_mb: Math.round(mu.rss / 1048576), heap_mb: Math.round(mu.heapUsed / 1048576) }, recovered: this.recovered?.length || 0, imported: this.imported?.length || 0, sweep: this.sweep ? { ...this.sweep } : null };
   }
 }
 

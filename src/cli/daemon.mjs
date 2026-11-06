@@ -17,6 +17,11 @@ export async function healthy(root, port = null) {
   } catch { return false; }
 }
 
+// The pid of a daemon still opening this vault, or null. It removes the file when it listens, and a dead pid is no daemon.
+export function loadingPid(root) {
+  try { const { pid } = JSON.parse(fs.readFileSync(path.join(root, '.memev', 'daemon.loading'), 'utf8')); return pidAlive(pid) ? pid : null; } catch { return null; }
+}
+
 // True when nothing listens on the port on this machine's loopback address.
 export const portFree = (port) => new Promise((resolve) => {
   const s = net.createServer(); s.unref();
@@ -53,6 +58,8 @@ export function lastListenError(root) {
 // Why this vault's daemon is not serving, in one line: a port held by another program right now, or else the listen
 // error of its last start. Null when there is nothing more to say than that it is not running.
 export async function whyNotRunning(root) {
+  const loading = loadingPid(root);
+  if (loading) return `the daemon (pid ${loading}) is still loading this vault; it answers when it is done`;
   const info = daemonInfo(root);
   if (info && pidAlive(info.pid)) return `the daemon (pid ${info.pid}) is running on port ${info.port} but does not answer; run memev restart`;
   // the daemon refuses to start on a config with a syntax error (server/main.mjs), every time, so say that and not only
@@ -74,6 +81,15 @@ export async function ensureDaemon(root, { quiet = false, waitMs = 6000 } = {}) 
 }
 
 export async function startDaemon(root, { quiet = false, waitMs = 6000, spawn: spawnProc = spawn } = {}) {
+  // one is already opening this vault: wait for it instead of starting another that would only find the lock taken
+  const opening = loadingPid(root);
+  if (opening) {
+    const until = Date.now() + waitMs;
+    while (Date.now() < until && loadingPid(root)) await new Promise((r) => setTimeout(r, 100));
+    const info = daemonInfo(root); if (info && (await healthy(root, info.port))) return true;
+    if (!quiet) console.error(`Memev is still loading this vault (pid ${opening}) and will answer when it is done; see ${path.join(root, '.memev', 'daemon.log')}`);
+    return false;
+  }
   const logFile = path.join(root, '.memev', 'daemon.log');
   try { if (fs.statSync(logFile).size > 5 * 1024 * 1024) fs.renameSync(logFile, `${logFile}.1`); } catch {}
   const fd = fs.openSync(logFile, 'a', 0o600);
@@ -89,6 +105,9 @@ export async function startDaemon(root, { quiet = false, waitMs = 6000, spawn: s
     if (ours && (await healthy(root, info.port))) { if (!quiet) console.log(`Memev is running on http://127.0.0.1:${info.port} (pid ${info.pid})`); return true; }
     if (child.exitCode !== null && child.exitCode !== 3) break; // 3 = another daemon already serves the vault
   }
+  // Still opening the vault: a first run or a conversion takes as long as it takes, and stopping it would only mean starting over.
+  const loading = loadingPid(root);
+  if (loading) { if (!quiet) console.error(`Memev is still loading this vault (pid ${loading}) and will answer when it is done; see ${logFile}`); return false; }
   // It did not start in time. Stop it, so it cannot come up later, unreported, after this says it did not start.
   if (child.exitCode === null) { try { process.kill(child.pid, 'SIGTERM'); } catch {} }
   if (!quiet) console.error(`Memev did not start; see ${logFile}`);
@@ -96,6 +115,14 @@ export async function startDaemon(root, { quiet = false, waitMs = 6000, spawn: s
 }
 
 export async function stopDaemon(root, { waitMs = 5000 } = {}) {
+  const loading = loadingPid(root);
+  if (loading) {
+    process.kill(loading, 'SIGTERM'); const until = Date.now() + waitMs;
+    while (Date.now() < until && pidAlive(loading)) await new Promise((r) => setTimeout(r, 100));
+    if (pidAlive(loading)) process.kill(loading, 'SIGKILL');
+    try { for (const f of ['daemon.json', 'daemon.lock', 'daemon.loading']) fs.rmSync(path.join(root, '.memev', f), { force: true }); } catch {}
+    return true;
+  }
   const info = daemonInfo(root);
   if (!info || !pidAlive(info.pid)) { try { fs.rmSync(path.join(root, '.memev', 'daemon.json'), { force: true }); fs.rmSync(path.join(root, '.memev', 'daemon.lock'), { force: true }); } catch {} return false; }
   process.kill(info.pid, 'SIGTERM');

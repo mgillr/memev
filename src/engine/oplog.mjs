@@ -14,11 +14,13 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { sha256, readJson, writeJson, now } from './util.mjs';
+import { sha256, readJson, writeJson, writeAtomic, now } from './util.mjs';
 import { mergeContractHash } from './envelope.mjs';
 import { oplogRecordToEnvelope, LOCAL_MERGE_CONTRACT } from './envelope-adapters.mjs';
 
 const CHUNK = 1 << 20;
+const CLOSE_SNAPSHOT_AT = 200;
+const BATCH_BYTES = 1 << 20;
 const segName = (n) => `seg-${String(n).padStart(6, '0')}.jsonl`;
 
 /** Stream the lines of a file from `offset`, synchronously, CHUNK bytes at a time. Yields [line, byteOffset]. */
@@ -54,6 +56,10 @@ function hashFile(file) {
     return h.digest('hex');
   } finally { fs.closeSync(fd); }
 }
+
+// The heads in a snapshot, flat: path, seq, hash, content hash, deleted, five values per note. Parsing it costs a fifth of one object per note.
+const headsToFlat = (heads) => { const a = []; for (const [p, h] of heads) a.push(p, h.seq, h.hash, h.ch ?? null, h.deleted ? 1 : 0); return a; };
+const headsFromFlat = (a) => { const m = new Map(); for (let i = 0; i < a.length; i += 5) m.set(a[i], a[i + 4] ? { seq: a[i + 1], hash: a[i + 2], deleted: true } : { seq: a[i + 1], hash: a[i + 2], ch: a[i + 3] }); return m; };
 
 export const formatHlc = ({ ms, c }) => `${String(ms).padStart(13, '0')}.${String(c).padStart(4, '0')}`;
 export function parseHlc(s) { const m = /^(\d{13})\.(\d{4,})$/.exec(String(s || '')); return m ? { ms: Number(m[1]), c: Number(m[2]) } : null; }
@@ -99,11 +105,12 @@ export class OpLog {
   open() {
     fs.mkdirSync(this.dir, { recursive: true, mode: 0o700 });
     this.manifest = readJson(this.manifestPath, null) || { version: 1, segments: [] };
+    const manifestBefore = JSON.stringify(this.manifest);
     if (!this.manifest.segments.length) this.manifest.segments.push({ name: segName(1), first: 1, last: 0, bytes: 0, sealed: false, created: now() });
     const snap = readJson(this.snapshotPath, null);
     let fromSeg = 0, fromOff = 0;
-    if (snap && snap.version === 1) {
-      this.seq = snap.seq; this.heads = new Map(Object.entries(snap.heads || {}));
+    if (snap && (snap.version === 1 || snap.version === 2)) {
+      this.seq = snap.seq; this.heads = snap.version === 2 ? headsFromFlat(snap.heads) : new Map(Object.entries(snap.heads || {}));
       if (snap.hlc) this.observeClock(snap.hlc);
       fromSeg = Math.max(0, this.manifest.segments.findIndex((s) => s.name === snap.active?.name));
       fromOff = snap.active?.offset || 0;
@@ -131,7 +138,8 @@ export class OpLog {
     }
     const active = this.active;
     this.fd = fs.openSync(path.join(this.dir, active.name), 'a', 0o600);
-    this._saveManifest();
+    // nothing replayed and nothing to repair: the file on disk already says this, and a start need not fsync it again
+    if (JSON.stringify(this.manifest) !== manifestBefore) this._saveManifest();
     return this;
   }
 
@@ -156,15 +164,35 @@ export class OpLog {
     const line = `${JSON.stringify(rec)}\n`;
     // finish a short write; if it cannot finish, cut the partial record off again so the next append starts on a line of its own
     const buf = Buffer.from(line); let done = 0;
-    try { while (done < buf.length) { const n = fs.writeSync(this.fd, buf, done, buf.length - done); if (!(n > 0)) throw new Error('no progress'); done += n; } }
+    if (this.batching) { this.batchBuf.push(buf); this.batchBytes += buf.length; if (this.batchBytes >= BATCH_BYTES) this._writeBatch(); done = buf.length; }
+    else try { while (done < buf.length) { const n = fs.writeSync(this.fd, buf, done, buf.length - done); if (!(n > 0)) throw new Error('no progress'); done += n; } }
     catch (e) { try { fs.ftruncateSync(this.fd, this.active.bytes); } catch {} throw new Error(`op log short write: ${done} of ${buf.length} bytes (${e.message}); the partial record was removed`); }
-    if (this.fsync) fs.fdatasyncSync(this.fd);
+    if (this.fsync && !this.batching) fs.fdatasyncSync(this.fd);
     const a = this.active; a.bytes += Buffer.byteLength(line); a.last = rec.seq; if (!a.first) a.first = rec.seq;
     this._apply(rec);
     if (this.envelopes) this._buildEnvelope(rec);
-    if (++this.sinceSnapshot >= this.snapshotEvery) this.snapshot();
+    if (++this.sinceSnapshot >= this.snapshotEvery && !this.batching) this.snapshot();
     if (a.bytes >= this.segmentBytes) this.roll();
     return rec;
+  }
+
+  _writeBatch() {
+    if (!this.batchBytes) return;
+    const b = Buffer.concat(this.batchBuf); this.batchBuf = []; this.batchBytes = 0;
+    for (let o = 0; o < b.length;) o += fs.writeSync(this.fd, b, o, b.length - o);
+  }
+  /**
+   * Run appends as one group: one sync at the end and no snapshot in between (a snapshot must never promise bytes that are not yet on
+   * disk). Only for records that can be made again from what is still on disk, so a crash inside the group loses nothing: the start's
+   * import of notes the log has not seen. A record that was torn is cut on open, and its note is simply not in the log yet.
+   */
+  group(fn) {
+    if (this.batching) return fn();
+    this.batching = true; this.batchBuf = []; this.batchBytes = 0;
+    try { return fn(); } finally {
+      this._writeBatch(); this.batching = false;
+      if (this.fd !== null) { if (this.fsync) fs.fdatasyncSync(this.fd); if (this.sinceSnapshot >= this.snapshotEvery) this.snapshot(); }
+    }
   }
 
   _buildEnvelope(rec) {
@@ -175,6 +203,7 @@ export class OpLog {
   roll() {
     const a = this.active;
     if (!a.bytes) return;
+    if (this.batching) this._writeBatch();
     fs.fsyncSync(this.fd); fs.closeSync(this.fd);
     a.sealed = true; a.sha256 = hashFile(path.join(this.dir, a.name)); a.sealedAt = now();
     const n = this.manifest.segments.length + 1;
@@ -205,7 +234,7 @@ export class OpLog {
   }
 
   snapshot() {
-    writeJson(this.snapshotPath, { version: 1, seq: this.seq, hlc: formatHlc(this.clock), at: now(), active: { name: this.active.name, offset: this.active.bytes }, heads: Object.fromEntries(this.heads) }, 0o600);
+    writeAtomic(this.snapshotPath, JSON.stringify({ version: 2, seq: this.seq, hlc: formatHlc(this.clock), at: now(), active: { name: this.active.name, offset: this.active.bytes }, heads: headsToFlat(this.heads) }), 0o600);
     this._saveManifest();
     this.sinceSnapshot = 0;
   }
@@ -251,5 +280,6 @@ export class OpLog {
     return { seq: this.seq, segments: this.manifest.segments.length, sealed: this.manifest.segments.filter((s) => s.sealed).length, bytes, paths: this.heads.size };
   }
 
-  close() { if (this.fd !== null) { try { fs.fsyncSync(this.fd); } catch {} fs.closeSync(this.fd); this.fd = null; this.snapshot(); } }
+  // A snapshot only shortens the next replay. With little to replay, a close writes none: the next start reads those few records, the same as after a crash.
+  close() { if (this.fd !== null) { try { fs.fsyncSync(this.fd); } catch {} fs.closeSync(this.fd); this.fd = null; if (this.sinceSnapshot >= CLOSE_SNAPSHOT_AT || !fs.existsSync(this.snapshotPath)) this.snapshot(); else if (this.sinceSnapshot) this._saveManifest(); } }
 }

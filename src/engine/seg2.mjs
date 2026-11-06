@@ -6,27 +6,45 @@ import { fileURLToPath } from 'node:url';
 
 const bmp = (f, df, N, len, avg) => { const k1 = 1.2, b = 0.75; const idf = Math.log(1 + (N - df + 0.5) / (df + 0.5)); return idf * (f * (k1 + 1)) / (f + k1 * (1 - b + b * len / avg)); };
 
+/** Growing typed columns of one posting per row, in document order. No object per posting, so the collector has nothing to walk. */
+class PostingRows {
+  constructor() { this.n = 0; this.cap = 1 << 20; this.term = new Uint32Array(this.cap); this.doc = new Uint32Array(this.cap); this.tf = new Uint16Array(this.cap); }
+  push(t, d, f) {
+    if (this.n === this.cap) { this.cap *= 2; const a = new Uint32Array(this.cap), b = new Uint32Array(this.cap), c = new Uint16Array(this.cap); a.set(this.term); b.set(this.doc); c.set(this.tf); this.term = a; this.doc = b; this.tf = c; }
+    const i = this.n++; this.term[i] = t; this.doc[i] = d; this.tf[i] = f;
+  }
+}
 export function writeSeg(dir, docs) { // docs: iterable of { path, heading, line, len, project, mtime, snippet, rb, fl, terms: [[w, tf]] }
   fs.mkdirSync(dir, { recursive: true });
-  const post = new Map(); const metaFd = fs.openSync(path.join(dir, 'meta.jsonl'), 'w'); const row = []; let off = 0, n = 0, totalLen = 0, buf = '';
-  const P = new Map(), J = new Map(); const id = (m, k) => { if (k == null) return 0; let v = m.get(k); if (v === undefined) { v = m.size + 1; m.set(k, v); } return v; };
+  const rows = new PostingRows(); const termIds = new Map(); const metaFd = fs.openSync(path.join(dir, 'meta.jsonl'), 'w'); const row = []; let off = 0, n = 0, totalLen = 0, buf = '';
+  const P = new Map(), J = new Map(); const id = (m, k) => { if (k == null) return 0; let v = m.get(k); if (v === undefined) { v = m.size + 1; m.set(Buffer.from(k).toString(), v); } return v; }; // a copy: a view would keep the whole note's text alive
   for (const d of docs) {
     const line = `${JSON.stringify({ heading: d.heading, line: d.line, mtime: d.mtime, snippet: d.snippet, rb: d.rb || null, fl: d.fl || null })}\n`; const ml = Buffer.byteLength(line);
     buf += line; row.push(d.len, off, ml, id(P, d.path), id(J, d.project), d.rb ? 1 : 0); off += ml; totalLen += d.len; if (buf.length > 1 << 20) { fs.writeSync(metaFd, buf); buf = ''; }
-    for (const [w, f] of d.terms) { let p = post.get(w); if (!p) post.set(w, p = []); p.push(n, f); } n++;
+    for (const [w, f] of d.terms) { let t = termIds.get(w); if (t === undefined) { t = termIds.size; termIds.set(Buffer.from(w).toString(), t); } rows.push(t, n, Math.min(f, 65535)); } n++;
   }
   if (buf) fs.writeSync(metaFd, buf); fs.closeSync(metaFd);
-  finishSeg(dir, n, totalLen, row, P, J, post);
+  finishRows(dir, n, totalLen, row, P, J, termIds, rows);
   return { n };
 }
-function finishSeg(dir, n, totalLen, row, P, J, post) {
+/** The postings of a segment from rows: count per term, lay the terms out in sorted order, then one stable pass drops each row in place. */
+function finishRows(dir, n, totalLen, row, P, J, termIds, rows) {
+  writeCols(dir, n, row, P, J);
+  const words = [...termIds.keys()].sort(); const df = new Uint32Array(termIds.size); const at = new Float64Array(termIds.size);
+  for (let i = 0; i < rows.n; i++) df[rows.term[i]]++;
+  let pos = 0; for (const w of words) { const t = termIds.get(w); at[t] = pos; pos += df[t] * 6; }
+  const out = Buffer.allocUnsafe(pos);
+  for (let i = 0; i < rows.n; i++) { const t = rows.term[i]; const o = at[t]; at[t] = o + 6; out.writeUInt32LE(rows.doc[i], o); out.writeUInt16LE(rows.tf[i], o + 4); }
+  const pfd = fs.openSync(path.join(dir, 'post.bin'), 'w'); for (let o = 0; o < out.length;) o += fs.writeSync(pfd, out, o, Math.min(out.length - o, 1 << 30)); fs.closeSync(pfd);
+  const dfd = fs.openSync(path.join(dir, 'dict.txt'), 'w'); const sparse = []; let dpos = 0, bytes = 0, i = 0, dbuf = '';
+  for (const w of words) { const d = df[termIds.get(w)]; const l = `${w}\t${d}\t${dpos}\n`; if (i++ % 64 === 0) sparse.push([w, bytes]); dbuf += l; bytes += Buffer.byteLength(l); dpos += d * 6; if (dbuf.length > 1 << 20) { fs.writeSync(dfd, dbuf); dbuf = ''; } }
+  if (dbuf) fs.writeSync(dfd, dbuf); fs.closeSync(dfd);
+  fs.writeFileSync(path.join(dir, 'head.json'), JSON.stringify({ version: 2, n, totalLen, terms: words.length, sparse, dictBytes: bytes }));
+}
+function writeCols(dir, n, row, P, J) {
   const c = Buffer.alloc(n * 24); for (let i = 0; i < n; i++) { const o = i * 6, b = i * 24; c.writeUInt32LE(row[o], b); c.writeDoubleLE(row[o + 1], b + 4); c.writeUInt32LE(row[o + 2], b + 12); c.writeUInt32LE(row[o + 3], b + 16); c.writeUInt16LE(row[o + 4], b + 20); c.writeUInt16LE(row[o + 5], b + 22); }
   fs.writeFileSync(path.join(dir, 'cols.bin'), c);
   fs.writeFileSync(path.join(dir, 'names.json'), JSON.stringify({ paths: [...P.keys()], projects: [...J.keys()] }));
-  const words = [...post.keys()].sort(); const pfd = fs.openSync(path.join(dir, 'post.bin'), 'w'); const dfd = fs.openSync(path.join(dir, 'dict.txt'), 'w'); const sparse = []; let pos = 0, bytes = 0, i = 0, dbuf = '';
-  for (const w of words) { const p = post.get(w); const df = p.length / 2; const b = Buffer.alloc(df * 6); for (let k = 0; k < df; k++) { b.writeUInt32LE(p[k * 2], k * 6); b.writeUInt16LE(Math.min(p[k * 2 + 1], 65535), k * 6 + 4); } fs.writeSync(pfd, b); const l = `${w}\t${df}\t${pos}\n`; if (i++ % 64 === 0) sparse.push([w, bytes]); dbuf += l; bytes += Buffer.byteLength(l); pos += b.length; if (dbuf.length > 1 << 20) { fs.writeSync(dfd, dbuf); dbuf = ''; } }
-  if (dbuf) fs.writeSync(dfd, dbuf); fs.closeSync(dfd); fs.closeSync(pfd);
-  fs.writeFileSync(path.join(dir, 'head.json'), JSON.stringify({ version: 2, n, totalLen, terms: words.length, sparse, dictBytes: bytes }));
 }
 
 export class Seg {

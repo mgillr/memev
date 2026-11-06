@@ -1,8 +1,21 @@
 // Rig prototype, not landed code. The RecallIndex's interface over an on-disk segment and a small overlay.
 // Nothing is loaded at open; a save writes only the overlay; a fold runs on a worker thread.
 import fs from 'node:fs'; import path from 'node:path';
-import { RecallIndex, tokenize } from './index.mjs';
+import { RecallIndex, tokenize, INDEX_VERSION as OLD_VERSION } from './index.mjs';
+import { readLines } from './oplog.mjs';
 import { writeSeg, Seg, foldInWorker, overlayDocs } from './seg2.mjs';
+
+/** The old file's sections one at a time, for writeSeg: no index in memory. False when the file is not a whole index of the current version. */
+export function convertOldIndex(file, dir) {
+  const lines = readLines(file); const first = lines.next();
+  if (first.done) return false;
+  let head; try { head = JSON.parse(first.value[0]); } catch { return false; }
+  if (head.version !== OLD_VERSION) return false;
+  fs.rmSync(dir, { recursive: true, force: true });
+  function* docs() { for (const [line] of lines) { if (!line) continue; const r = JSON.parse(line); const terms = new Array(r.t.length); for (let i = 0; i < r.t.length; i++) terms[i] = [r.t[i], r.f[i]]; yield { path: r.path, heading: r.heading ?? null, line: r.line ?? 1, len: r.len, project: r.project ?? null, mtime: r.mtime ?? null, snippet: r.snippet, rb: r.rb ?? null, fl: r.fl ?? null, terms }; } }
+  try { writeSeg(dir, docs()); } catch (e) { fs.rmSync(dir, { recursive: true, force: true }); if (e instanceof SyntaxError) return false; throw e; }
+  return true;
+}
 
 const round3 = (x) => Number(x.toFixed(3));
 class LazyDoc {
@@ -22,8 +35,8 @@ export class SegIndex {
     let g = null; try { g = Number(fs.readFileSync(this._cur(), 'utf8')); } catch {}
     if (g === null) {
       if (!fs.existsSync(this.file)) return false;
-      const old = new RecallIndex(this.file); if (!old.load()) return false; // one-time conversion from the old file
-      this.ov = old; this._writeFromOverlay(); fs.rmSync(this.file, { force: true }); return true;
+      if (!convertOldIndex(this.file, this._dir(this.gen + 1))) return false; // one-time conversion from the old file
+      this.seg = new Seg(this._dir(this.gen + 1)); this._publish(this.gen + 1); fs.rmSync(this.file, { force: true }); this.dirty = false; return true;
     }
     this.seg = new Seg(this._dir(g)); this.gen = g;
     if (fs.existsSync(this.ovFile) && !this.ov.load()) return false;
@@ -66,6 +79,17 @@ export class SegIndex {
   }
   get byPath() { const me = this; return { has(p) { return me.ov.byPath.has(p) || (!!me.seg && !me.deadPaths.has(p) && me.seg.ordinalsOf(p).length > 0); } }; }
   get docs() { const me = this; return { get size() { return me._N(); }, *values() { if (me.seg) for (let i = 0; i < me.seg.head.n; i++) if (!me.dead.has(i)) yield new LazyDoc(me.seg, i); yield* me.ov.docs.values(); } }; }
+  /**
+   * Build the first segment straight from notes, one at a time, with the index's own code turning each into sections: nothing is held in
+   * memory but the postings. `notes` yields [path, body]. Nothing shows until it is published, so a crash leaves no half index.
+   */
+  buildFrom(notes) {
+    const out = []; const sink = new RecallIndex(this.ovFile); sink._add = (p, d) => { out.push({ path: p, heading: d.heading ?? null, line: d.line ?? 1, len: d.len, project: d.project ?? null, mtime: d.mtime ?? null, snippet: d.snippet, rb: d.rb ?? null, fl: d.fl ?? null, terms: d.tf }); };
+    function* docs() { for (const [p, body] of notes) { sink.update(p, body); yield* out; out.length = 0; } }
+    fs.mkdirSync(this.root, { recursive: true }); const g = this.gen + 1; fs.rmSync(this._dir(g), { recursive: true, force: true });
+    writeSeg(this._dir(g), docs()); this.seg = new Seg(this._dir(g)); this._publish(g); this.dirty = false;
+  }
+  isEmpty() { return this._N() === 0; }
   _N() { return (this.seg ? this.seg.head.n - this.dead.size : 0) + this.ov.docs.size; }
   _Len() { return (this.seg ? this.seg.head.totalLen - this.deadLen : 0) + this.ov.totalLen; }
   docsOf(p, heading) { const out = []; if (this.seg && !this.deadPaths.has(p)) for (const i of this.seg.ordinalsOf(p)) { const d = new LazyDoc(this.seg, i); if (heading === undefined || heading === null || (d.heading || '') === heading) out.push(d); } return out.concat(this.ov.docsOf(p, heading)); }

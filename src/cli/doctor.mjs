@@ -313,13 +313,13 @@ function backupVaultId(url) {
 export async function allChecks({ root, env }) {
   const r = [];
   const info = daemonInfo(root);
-  const { healthy, startDaemon, whyNotRunning } = await import('./daemon.mjs');
+  const { healthy, startDaemon, whyNotRunning, loadingPid } = await import('./daemon.mjs');
   const up = info && pidAlive(info.pid) && (await healthy(root));
   const why = up ? null : await whyNotRunning(root); // for example another program on its port
   r.push(C('daemon', 'daemon running', up ? 'ok' : 'fail', up ? `pid ${info.pid}, port ${info.port}` : why || 'not running', up ? null : { desc: 'start it', destructive: false, run: () => startDaemon(root, { quiet: true }) }));
   r.push(...await twoVaultChecks(root));
   let vault = null;
-  if (!up && isVault(root)) { const { Vault } = await import('../engine/vault.mjs'); try { vault = new Vault(root, { git: false }).open(); } catch (e) { r.push(C('open', 'vault opens', 'fail', e.message)); } }
+  if (!up && isVault(root) && !loadingPid(root)) { const { Vault } = await import('../engine/vault.mjs'); try { vault = new Vault(root, { git: false }).open(); } catch (e) { r.push(C('open', 'vault opens', 'fail', e.message)); } }
   if (up) {
     const restart = async () => { const d = await import('./daemon.mjs'); await d.stopDaemon(root); await d.startDaemon(root, { quiet: true }); };
     try {
