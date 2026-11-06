@@ -83,9 +83,9 @@ export async function command(cmd, pos, flags, { root }) {
   if (!exists(path.join(root, '.memev', 'config.json'))) throw new Error(`no vault at ${root}; run memev init`);
   const sub = pos[0] || 'show';
   if (sub === 'set') {
-    const { mode, provider } = set(root, flags);
+    const { mode, provider } = set(root, flags, pos[1]);
     console.log(`deployment set: mode ${mode}, provider ${provider}`);
-    if (flags.mode === 'cloud-hosted') console.log('cloud-hosted is planned: the managed service is not available yet; this setting records the choice and changes nothing else.');
+    if ((flags.mode ?? pos[1]) === 'cloud-hosted') console.log('cloud-hosted is planned: the managed service is not available yet; this setting records the choice and changes nothing else.');
     return 0;
   }
   if (sub !== 'show') throw new Error('memev deployment [set --mode M --ai T]');
@@ -95,8 +95,9 @@ export async function command(cmd, pos, flags, { root }) {
   return 0;
 }
 
-function set(root, flags) {
-  const { mode, ai } = flags;
+// `memev deployment set local` means the same as --mode local: a remote setup session allows no flags (src/cli/setup-remote.mjs)
+function set(root, flags, word) {
+  const { mode = word, ai } = flags;
   if (mode !== undefined && !MODES.includes(mode)) throw new Error(`unknown mode: ${mode}; valid modes: ${MODES.join(', ')}`);
   if (ai !== undefined && !PROVIDERS.includes(ai)) throw new Error(`unknown ai provider: ${ai}; valid providers: ${PROVIDERS.join(', ')}`);
   if (mode === undefined && ai === undefined) throw new Error('memev deployment set --mode <local|on-prem|cloud-hosted> [--ai <hosted-api|internal-llm|mixed>]');

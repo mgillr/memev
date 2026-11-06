@@ -322,6 +322,8 @@ export class Session {
     const bin = path.join(PKG, 'bin', 'memev.mjs');
     return new Promise((resolve) => {
       const child = spawn(process.execPath, [bin, ...argv], {
+        // in the vault, because that is where the allowlist resolved a relative path: a licence file it checked is the one read
+        cwd: this.root,
         env: { ...process.env, MEMEV_ROOT: this.root },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
