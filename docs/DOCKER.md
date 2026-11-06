@@ -43,7 +43,7 @@ Point an app at `http://127.0.0.1:7787/mcp` (the port in `MEMEV_PORT` if you set
 
 Inside the container the tunnel, the login service and app registration are off: the container
 cannot see your apps or your login session. For cloud access, run the tunnel on the host
-(`cloudflared tunnel --url http://127.0.0.1:7787`) and use a token issued with `--remote`.
+(`cloudflared tunnel --url http://127.0.0.1:7787`). A cloud AI app uses a connector: `memev token issue cloud-app --remote --note "cloud connector"`, then the address `https://<tunnel>/c/<token>/mcp`. A `--remote` token without that note does not work: from another computer the server asks for a device key. To add another computer, use `memev invite` and `memev join`.
 
 ## Permissions
 
