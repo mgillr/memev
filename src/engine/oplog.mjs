@@ -19,6 +19,7 @@ import { mergeContractHash } from './envelope.mjs';
 import { oplogRecordToEnvelope, LOCAL_MERGE_CONTRACT } from './envelope-adapters.mjs';
 
 const CHUNK = 1 << 20;
+const SLICE_HEADS = 2000;
 const segName = (n) => `seg-${String(n).padStart(6, '0')}.jsonl`;
 
 /** Stream the lines of a file from `offset`, synchronously, CHUNK bytes at a time. Yields [line, byteOffset]. */
@@ -69,8 +70,8 @@ export function recordHash(rec) {
 }
 
 export class OpLog {
-  constructor(dir, { segmentBytes = 16 * 1024 * 1024, snapshotEvery = 1000, fsync = true, deviceId = null, mergeContract = LOCAL_MERGE_CONTRACT, envelopes = true } = {}) {
-    this.dir = dir; this.segmentBytes = segmentBytes; this.snapshotEvery = snapshotEvery; this.fsync = fsync;
+  constructor(dir, { segmentBytes = 16 * 1024 * 1024, snapshotEvery = 1000, snapshotSliceAt = 5000, fsync = true, deviceId = null, mergeContract = LOCAL_MERGE_CONTRACT, envelopes = true } = {}) {
+    this.dir = dir; this.segmentBytes = segmentBytes; this.snapshotEvery = snapshotEvery; this.snapshotSliceAt = snapshotSliceAt; this.snapshotting = null; this.fsync = fsync;
     this.heads = new Map(); this.headWatch = null; this.seq = 0; this.sinceSnapshot = 0; this.fd = null; this.recovered = [];
     // Each record names the device that wrote it and carries a hybrid logical clock, so logs from
     // several devices can later be merged in a deterministic order. Records written before this
@@ -163,7 +164,7 @@ export class OpLog {
     const a = this.active; a.bytes += Buffer.byteLength(line); a.last = rec.seq; if (!a.first) a.first = rec.seq;
     this._apply(rec);
     if (this.envelopes) this._buildEnvelope(rec);
-    if (++this.sinceSnapshot >= this.snapshotEvery) this.snapshot();
+    if (++this.sinceSnapshot >= this.snapshotEvery) { if (this.heads.size >= this.snapshotSliceAt) this._snapshotInSlices(); else this.snapshot(); }
     if (a.bytes >= this.segmentBytes) this.roll();
     return rec;
   }
@@ -209,6 +210,35 @@ export class OpLog {
     writeJson(this.snapshotPath, { version: 1, seq: this.seq, hlc: formatHlc(this.clock), at: now(), active: { name: this.active.name, offset: this.active.bytes }, heads: Object.fromEntries(this.heads) }, 0o600);
     this._saveManifest();
     this.sinceSnapshot = 0;
+  }
+
+  /**
+   * The same snapshot for a vault too big to serialize in one go: at 50,000 notes that stopped the daemon's thread for 600 ms every
+   * 1,000 writes. A few thousand heads per turn of the event loop, written and synced off the thread. It is a fuzzy checkpoint: seq and
+   * offset are taken first, and a head that changes meanwhile may be newer than them, which is safe because a snapshot only starts a
+   * replay, and replaying from that offset sets every such path to its last record. An old or missing snapshot only means a longer
+   * replay, so a kill at any step here loses nothing.
+   */
+  _snapshotInSlices() {
+    if (this.snapshotting) return this.snapshotting;
+    this.sinceSnapshot = 0;
+    return this.snapshotting = this._writeSlices().catch(() => { /* the next one tries again; the log is untouched */ }).finally(() => { this.snapshotting = null; });
+  }
+  async _writeSlices() {
+    const head = { version: 1, seq: this.seq, hlc: formatHlc(this.clock), at: now(), active: { name: this.active.name, offset: this.active.bytes } };
+    const tmp = `${this.snapshotPath}.slices.tmp`;
+    const fh = await fs.promises.open(tmp, 'w', 0o600);
+    try {
+      let out = `${JSON.stringify(head).slice(0, -1)},"heads":{`; let n = 0;
+      for (const [p, h] of this.heads) {
+        out += `${n++ ? ',' : ''}${JSON.stringify(p)}:${JSON.stringify(h)}`;
+        if (n % SLICE_HEADS === 0) { await fh.write(out); out = ''; }
+      }
+      await fh.write(`${out}}}\n`);
+      await fh.sync();
+    } finally { await fh.close(); }
+    await fs.promises.rename(tmp, this.snapshotPath);
+    if (this.fd !== null) this._saveManifest();
   }
 
   _saveManifest() { writeJson(this.manifestPath, this.manifest, 0o600); }

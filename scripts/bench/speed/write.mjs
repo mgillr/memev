@@ -52,10 +52,28 @@ async function runOne(src, label, rep) {
       R.journal_more.push((await call('POST', '/v1/journal', { session: `${tag}s${i}`, role: 'assistant', text: `an answer about retries ${i}` })).ms); await sleep(GAP);
     }
   } finally { on = false; await prober; }
-  const ts = Date.now(); c.kill('SIGTERM'); while (c.exitCode === null && Date.now() - ts < 60000) await sleep(50);
-  return { label, rep, up_ms: upMs, new_first: Number(R.new_first.toFixed(1)), new_p50: pct(R.new, 0.5), new_max: pct(R.new, 1), append_p50: pct(R.append, 0.5), append_max: pct(R.append, 1), journal_new_p50: pct(R.journal_new, 0.5), journal_new_max: pct(R.journal_new, 1), journal_more_p50: pct(R.journal_more, 0.5), journal_more_max: pct(R.journal_more, 1), health_p50: pct(R.health, 0.5), health_p99: pct(R.health, 0.99), health_max: pct(R.health, 1), health_n: R.health.length };
+  const ts = Date.now(); c.kill('SIGTERM'); while (c.exitCode === null && Date.now() - ts < 60000) await sleep(10);
+  const stopMs = Date.now() - ts;
+  return { label, rep, up_ms: upMs, stop_ms: stopMs, new_first: Number(R.new_first.toFixed(1)), new_p50: pct(R.new, 0.5), new_max: pct(R.new, 1), append_p50: pct(R.append, 0.5), append_max: pct(R.append, 1), journal_new_p50: pct(R.journal_new, 0.5), journal_new_max: pct(R.journal_new, 1), journal_more_p50: pct(R.journal_more, 0.5), journal_more_max: pct(R.journal_more, 1), health_p50: pct(R.health, 0.5), health_p99: pct(R.health, 0.99), health_max: pct(R.health, 1), health_n: R.health.length };
 }
 
+// --snapshot: the log's snapshot at this size, the old whole write against the sliced one, on the copy's own log.
+if (process.argv.includes('--snapshot')) {
+  const { OpLog } = await import('../../../src/engine/oplog.mjs');
+  const log = new OpLog(path.join(root, '.memev', 'oplog'), {}).open();
+  const gaps = async (fn) => { let on = true; let worst = 0; let last = performance.now(); const t0 = last; const loop = (async () => { while (on) { await new Promise((r) => setImmediate(r)); const t = performance.now(); worst = Math.max(worst, t - last); last = t; } })(); await fn(); const wall = performance.now() - t0; on = false; await loop; return { worst: Number(worst.toFixed(1)), wall: Number(wall.toFixed(1)) }; };
+  const R = { whole: [], sliced: [] };
+  for (let i = 0; i < REPS * 2; i++) {
+    const [name, fn] = i % 2 ? ['sliced', () => log._snapshotInSlices()] : ['whole', async () => { await sleep(0); log.snapshot(); }];
+    R[name].push(await gaps(fn)); await sleep(200);
+  }
+  const heads = log.heads.size; log.close();
+  const out = { heads, whole_block_ms: R.whole.map((r) => r.worst), sliced_block_ms: R.sliced.map((r) => r.worst), sliced_wall_ms: R.sliced.map((r) => r.wall) };
+  console.log(JSON.stringify(out));
+  if (pct(out.whole_block_ms, 0.5) < 20) { console.error('FAIL: the whole snapshot did not block, so this copy measures nothing'); process.exit(1); }
+  if (pct(out.sliced_block_ms, 0.5) > pct(out.whole_block_ms, 0.5) / 3) { console.error('FAIL: the sliced snapshot blocks over a third of the whole one'); process.exit(1); }
+  console.log('PASS'); process.exit(0);
+}
 const rows = [];
 for (let rep = 0; rep < REPS; rep++) {
   const order = control ? (rep % 2 ? [['now', HERE], ['control', control]] : [['control', control], ['now', HERE]]) : [['now', HERE]];
@@ -63,7 +81,7 @@ for (let rep = 0; rep < REPS; rep++) {
 }
 if (control) {
   const med = (l, k) => pct(rows.filter((r) => r.label === l).map((r) => r[k]), 0.5);
-  const cmp = {}; for (const k of ['new_first', 'new_p50', 'append_p50', 'journal_new_p50', 'journal_more_p50', 'health_max']) cmp[k] = [med('control', k), med('now', k)];
+  const cmp = {}; for (const k of ['new_first', 'new_p50', 'append_p50', 'journal_new_p50', 'journal_more_p50', 'health_max', 'stop_ms', 'up_ms']) cmp[k] = [med('control', k), med('now', k)];
   console.log(JSON.stringify({ median_control_vs_now: cmp }));
   if (med('now', 'new_p50') > med('control', 'new_p50')) { console.error('FAIL: a new note is not faster than the control'); process.exit(1); }
 }
