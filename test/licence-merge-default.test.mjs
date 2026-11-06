@@ -64,7 +64,7 @@ test('the vendor issuing script takes its services from issuedServices', () => {
 test('license remove says the other computers keep reading and stop writing, as the seat policy does', () => {
   assert.match(read('../src/cli/licensing.mjs'), /licence removed; this computer keeps Personal, and computers added to this vault can still read but can no longer write/);
   assert.doesNotMatch(read('../src/cli/licensing.mjs'), /nothing changes for Personal/);
-  const devices = [{ id: 'd1', kind: 'remote-computer', status: 'active', created: '2026-11-02' }];
+  const devices = [{ id: 'd1', kind: 'remote-computer', pubkey: 'k1', status: 'active', created: '2026-11-02' }];
   const p = seatPolicy({ license: null, devices });
   assert.equal(p.writable.has('d1'), false);
   assert.deepEqual(p.read_only, ['d1']);

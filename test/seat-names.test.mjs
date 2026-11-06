@@ -90,7 +90,7 @@ test('MEM-094-FIX: two computers with the same short name each get their own sea
   const { v, root } = newVault();
   try {
     const host = v.devices.get(v.devices.hostId);
-    const other = v.devices._add({ kind: 'remote-computer', label: 'MacBook-Pro' });
+    const other = v.devices._add({ kind: 'remote-computer', label: 'MacBook-Pro', pubkey: 'k1' });
     const bus = new Bus({ root, devices: v.devices });
     const a = bus.register({ client: 'claude-code', device: host });
     const b = bus.register({ client: 'claude-code', device: other });
