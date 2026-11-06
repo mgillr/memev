@@ -9,6 +9,7 @@
 //   heads.bin   headings as UTF-16, the only encoding that returns any JavaScript string unchanged, and fast to decode
 //   meta.jsonl  one line per section: line, mtime, snippet, flags. Read only for what is returned
 //   names.json  the paths and projects the ids refer to
+//   bypath.bin  u32 bucket count, path count, a hash table of path ids, then each path's section numbers
 import fs from 'node:fs';
 import path from 'node:path';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
@@ -42,6 +43,14 @@ class TextOut {
   close() { this.flush(); syncClose(this.fd); }
 }
 
+// Find a path's sections without a Map of every path on the heap, ready before the first write that needs it.
+function pathTable(paths, c, n) {
+  const np = paths.length; let nb = 16; while (nb < np * 2) nb *= 2; const t = new Uint32Array(new SharedArrayBuffer((2 + nb + np + 2 + n) * 4)); t[0] = nb; t[1] = np;
+  for (let k = 0; k < np; k++) { let h = keySig(paths[k]) & (nb - 1); while (t[2 + h]) h = (h + 1) & (nb - 1); t[2 + h] = k + 1; }
+  const O = 2 + nb, R = O + np + 2; for (let i = 0; i < n; i++) t[O + c[i * ROW + C_PATH] + 1]++; for (let k = 1; k < np + 2; k++) t[O + k] += t[O + k - 1]; const at = t.slice(O, O + np + 2); for (let i = 0; i < n; i++) t[R + at[c[i * ROW + C_PATH]]++] = i;
+  return t;
+}
+
 // The section columns and text files, shared by a first write and a fold.
 class SectionWriter {
   constructor(dir, cols) { this.dir = dir; this.cols = cols; this.meta = new TextOut(path.join(dir, 'meta.jsonl')); this.heads = new TextOut(path.join(dir, 'heads.bin')); this.P = new Map(); this.J = new Map(); this.n = 0; this.totalLen = 0; }
@@ -50,7 +59,7 @@ class SectionWriter {
     c[o + C_HEAD] = heading === null ? (this.heads.bytes | NO_HEADING) >>> 0 : this.heads.bytes; c[o + C_RB] = rbv; c[o + C_SIG] = sig; this.meta.write(line); if (heading) this.heads.write(heading); this.totalLen += len; return this.n++;
   }
   doc(d) { const fl = d.fl ? HAS_FL : 0; return this.row(d.len, Buffer.from(metaLine(d)), d.heading === null || d.heading === undefined ? null : Buffer.from(d.heading, 'utf16le'), idOf(this.P, d.path), idOf(this.J, d.project), (encodeRb(d.rb) | fl) >>> 0, keySig(`${d.path}#${d.heading || ''}`)); }
-  finish() { this.meta.close(); this.heads.close(); fs.writeFileSync(path.join(this.dir, 'cols.bin'), Buffer.from(this.cols.buffer, 0, this.n * ROW * 4), { mode: 0o600 }); syncFile(path.join(this.dir, 'cols.bin')); fs.writeFileSync(path.join(this.dir, 'names.json'), JSON.stringify({ paths: [...this.P.keys()], projects: [...this.J.keys()] }), { mode: 0o600 }); syncFile(path.join(this.dir, 'names.json')); }
+  finish() { this.meta.close(); this.heads.close(); fs.writeFileSync(path.join(this.dir, 'cols.bin'), Buffer.from(this.cols.buffer, 0, this.n * ROW * 4), { mode: 0o600 }); syncFile(path.join(this.dir, 'cols.bin')); fs.writeFileSync(path.join(this.dir, 'names.json'), JSON.stringify({ paths: [...this.P.keys()], projects: [...this.J.keys()] }), { mode: 0o600 }); syncFile(path.join(this.dir, 'names.json')); this.byPath = pathTable([...this.P.keys()], this.cols, this.n); fs.writeFileSync(path.join(this.dir, 'bypath.bin'), Buffer.from(this.byPath.buffer, this.byPath.byteOffset, this.byPath.byteLength), { mode: 0o600 }); syncFile(path.join(this.dir, 'bypath.bin')); }
 }
 class DictWriter {
   constructor(dir) { this.dir = dir; this.ids = new Out(path.join(dir, 'ids.bin'), Uint32Array); this.tfs = new Out(path.join(dir, 'tfs.bin'), Uint16Array); this.dict = new TextOut(path.join(dir, 'dict.txt')); this.sparse = []; this.row = 0; this.terms = 0; }
@@ -70,9 +79,9 @@ export function writeSeg(dir, docs) {
 }
 
 export class Seg {
-  constructor(dir, cols = null) {
+  constructor(dir, cols = null, byPath = null) {
     this.dir = dir; this.head = JSON.parse(fs.readFileSync(path.join(dir, 'head.json'), 'utf8')); if (this.head.version !== SEG_VERSION) throw new Error(`segment version ${this.head.version}`);
-    this.fdD = fs.openSync(path.join(dir, 'dict.txt'), 'r'); this.fdI = fs.openSync(path.join(dir, 'ids.bin'), 'r'); this.fdT = fs.openSync(path.join(dir, 'tfs.bin'), 'r'); this.fdM = fs.openSync(path.join(dir, 'meta.jsonl'), 'r'); this.c = cols; this.h = null; this.byPath = null; this.paths = null;
+    this.fdD = fs.openSync(path.join(dir, 'dict.txt'), 'r'); this.fdI = fs.openSync(path.join(dir, 'ids.bin'), 'r'); this.fdT = fs.openSync(path.join(dir, 'tfs.bin'), 'r'); this.fdM = fs.openSync(path.join(dir, 'meta.jsonl'), 'r'); this.c = cols; this.h = null; this.byPath = byPath; this.paths = null;
   }
   close() { for (const f of [this.fdD, this.fdI, this.fdT, this.fdM]) fs.closeSync(f); }
   /** The section columns as one typed array, read once on first use. */
@@ -90,11 +99,10 @@ export class Seg {
   rb(i) { return decodeRb(this.cols()[i * ROW + C_RB] & 0x7fffffff); }
   hasFl(i) { return (this.cols()[i * ROW + C_RB] & HAS_FL) !== 0; }
   meta(i) { const c = this.cols(), o = i * ROW; const b = Buffer.allocUnsafe(c[o + C_MLEN]); fs.readSync(this.fdM, b, 0, b.length, c[o + C_MHI] * 4294967296 + c[o + C_MLO]); return JSON.parse(b.toString('utf8')); }
-  /** Section numbers of one note, ascending. The table is built on the first write or lookup by path. */
+  /** Section numbers of one note, ascending. */
   ordinalsOf(p) {
-    const c = this.cols();
-    if (!this.byPath) { const n = this.head.n, np = this.paths.length; const off = new Uint32Array(np + 2); for (let i = 0; i < n; i++) off[c[i * ROW + C_PATH] + 1]++; for (let k = 1; k < off.length; k++) off[k] += off[k - 1]; const at = off.slice(); const ord = new Uint32Array(n); for (let i = 0; i < n; i++) ord[at[c[i * ROW + C_PATH]]++] = i; this.byPath = { off, ord, pid: new Map(this.paths.map((x, k) => [x, k + 1])) }; }
-    const id = this.byPath.pid.get(p); return id === undefined ? EMPTY : this.byPath.ord.subarray(this.byPath.off[id], this.byPath.off[id + 1]);
+    this.cols(); if (!this.byPath) { const b = readAligned(path.join(this.dir, 'bypath.bin')); this.byPath = new Uint32Array(b.buffer, b.byteOffset, b.length / 4); }
+    const t = this.byPath, nb = t[0], O = 2 + nb, R = O + t[1] + 2; for (let h = keySig(p) & (nb - 1); ; h = (h + 1) & (nb - 1)) { const k = t[2 + h]; if (!k) return EMPTY; if (this.paths[k - 1] === p) return t.subarray(R + t[O + k], R + t[O + k + 1]); }
   }
 }
 const EMPTY = new Uint32Array(0);
@@ -143,7 +151,7 @@ export function foldFiles(oldDir, newDir, logFile, logEnd) {
   }
   while (ai < addWords.length) fromAdd(addWords[ai++]);
   fs.closeSync(io); fs.closeSync(to); dw.close(w.n, w.totalLen, w.heads.bytes);
-  return { n: w.n, terms: dw.terms, cols: w.cols };
+  return { n: w.n, terms: dw.terms, cols: w.cols, byPath: w.byPath };
 }
 
 export function foldInWorker(oldDir, newDir, logFile, logEnd) {

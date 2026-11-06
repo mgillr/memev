@@ -111,19 +111,19 @@ export class SegIndex {
   /** Start a fold of the log as it stands. Reads and writes go on against this generation until the new one is ready. */
   foldSoon() {
     if (this.foldP || !this.seg) return this.foldP; this._flush(); const g = this.gen + 1; fs.rmSync(this._dir(g), { recursive: true, force: true }); const sealed = this.logEnd;
-    this.foldP = foldInWorker(this._dir(this.gen), this._dir(g), this._log(this.gen), sealed).then((r) => this._swap(g, sealed, r.cols)).catch(() => { this.foldP = null; this.foldFailed = Date.now(); fs.rm(this._dir(g), { recursive: true, force: true }, () => {}); });
+    this.foldP = foldInWorker(this._dir(this.gen), this._dir(g), this._log(this.gen), sealed).then((r) => this._swap(g, sealed, r)).catch(() => { this.foldP = null; this.foldFailed = Date.now(); fs.rm(this._dir(g), { recursive: true, force: true }, () => {}); });
     return this.foldP;
   }
   // What was written after the seal moves to the new generation. Every wait for the disk is on the thread pool, between steps;
   // writes that arrive meanwhile are copied in the last step, which is the only one that changes anything and ends with CURRENT.
-  async _swap(g, sealed, cols) {
+  async _swap(g, sealed, built) {
     const fd = fs.openSync(this._log(g), 'w+', 0o600); const cur = path.join(this.root, 'CURRENT'), tmp = `${cur}.tmp`; let copied = sealed, at = 0; const tail = [];
     const copy = () => { this._flush(); const n = this.logEnd - copied; if (!n) return; const b = Buffer.allocUnsafe(n); fs.readSync(this.logFd, b, 0, n, copied); fs.writeSync(fd, b, 0, n, at); at += n; copied += n; tail.push(b); };
     const done = (f, ...x) => new Promise((res, rej) => f(...x, (e) => (e ? rej(e) : res())));
     try {
       copy(); await done(fs.fdatasync, fd);
       const t = fs.openSync(tmp, 'w', 0o600); fs.writeSync(t, String(g)); await done(fs.fsync, t); fs.closeSync(t);
-      const seg = new Seg(this._dir(g), cols); seg.cols(); await new Promise((res) => setImmediate(res));
+      const seg = new Seg(this._dir(g), built.cols, built.byPath); seg.cols(); await new Promise((res) => setImmediate(res));
       copy(); const st = this._state(seg); this._replay(st, Buffer.concat(tail).toString('utf8')); fs.renameSync(tmp, cur);
       const was = this.gen; const oldLog = this.logFd, oldSeg = this.seg; Object.assign(this, st); this.gen = g; this.logFd = fd; this.logEnd = at; this.foldP = null;
       if (this.syncing) this.oldLog = oldLog; else fs.close(oldLog, () => {}); oldSeg.close();
