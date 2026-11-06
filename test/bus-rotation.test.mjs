@@ -113,6 +113,12 @@ test('a full file keeps its name and its inode, so a reader in another process n
   assert.ok(seen.size > 3, 'the files rolled over');
 });
 
+test('what a file is named does not set how far a send looks', () => {
+  const root = room(); const bus = new Bus({ root, devices, config: { segment_bytes: 500 } }); bus.ensure(HOST.id); bus.send(ctx, { to: 'all', type: 'status', body: 'a' });
+  fs.writeFileSync(path.join(root, 'bus/log', `${HOST.id}.3000000.jsonl`), ''); let reads = 0; const again = new Bus({ root, devices, config: { segment_bytes: 500 } }); const real = again._readLog; again._readLog = function counted(f) { reads++; return real.call(this, f); };
+  assert.equal(again._writeTo(HOST.id).last.dseq, Math.max(...bus.all().map((m) => m.dseq))); assert.ok(reads <= 3, `${reads} files looked at for 2 in the folder`);
+});
+
 test('half a line left by a kill does not take the next message with it, in a live view or after a restart', () => {
   const root = room(); let bus = new Bus({ root, devices }); bus.ensure(HOST.id); const f = path.join(root, 'bus/log', `${HOST.id}.jsonl`);
   bus.send(ctx, { to: 'all', type: 'status', body: 'first' }); bus.send(ctx, { to: 'all', type: 'status', body: 'second' });
