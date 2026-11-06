@@ -1118,7 +1118,8 @@
         "each test asserts both ways: the tree passes, and a copy with one line changed (a tier dropped from one page, a licence name changed, a headline promising a planned item, a service offered for a planned product, a second tagline) fails and names the page",
         "the site repository gets the same test. It is another repository, so this contract checks only the change note, which names the memev-site commit that adds the test and that repository's CI run",
         "a separate script, scripts/site-compare.mjs, compares the deployed site with the repository. It is run by hand and after each deploy, and CI does not depend on it: no workflow runs it, and its own test uses a local fixture server and never fetches the live site",
-        "each red-green criterion has its own subtest in test/one-truth.test.mjs or test/site-compare.test.mjs whose name starts with the criterion's label (the text before its first colon), and the criterion runs only that subtest. Each subtest's first assertion fails at the base on an assertion and never on a load error: a new module or script is imported inside the subtest or run as a child process, and a new file is checked by an assertion that it exists before it is read. No criterion command pipes through tail or head, and each prints the whole captured output (docs/scope-one/RECONCILIATION.md, 'Commands that cut their output' and 'False reds in signed criteria')"
+        "each red-green criterion has its own subtest in test/one-truth.test.mjs or test/site-compare.test.mjs whose name starts with the criterion's label (the text before its first colon), and the criterion runs only that subtest. Each subtest's first assertion fails at the base on an assertion and never on a load error: a new module or script is imported inside the subtest or run as a child process, and a new file is checked by an assertion that it exists before it is read. No criterion command pipes through tail or head, and each prints the whole captured output (docs/scope-one/RECONCILIATION.md, 'Commands that cut their output' and 'False reds in signed criteria')",
+        "MEMEV-STRATEGY.md, added at the repository root after round 2, is a page like the others: what it says of the tier set, the engine or a licence is held to the same two pages"
       ],
       "description": "The page list is DRAFT 3's. T5-c09 is weak and said so: it proves that the change note names a commit and a run of the site repository, not what that commit holds. That the comparison script is run by hand and after each deploy has no criterion: it is an act outside this repository. T5-c08 holds on main today, so it cannot go red; it can still fail.",
       "scope": {
@@ -1145,7 +1146,8 @@
           "test/licence-*.test.mjs",
           "test/helpers/**",
           "test/fixtures/one-truth/**",
-          "changelog.d/SR-0.04.md"
+          "changelog.d/SR-0.04.md",
+          "MEMEV-STRATEGY.md"
         ]
       },
       "criteria": [
@@ -1219,6 +1221,14 @@
             "type": "command",
             "cmd": "n=changelog.d/SR-0.04.md; grep -Eq 'memev-site [0-9a-f]{40}' \"$n\" && grep -Eq 'github\\.com/[A-Za-z0-9_.-]+/memev-site/actions/runs/[0-9]+' \"$n\"",
             "timeout_s": 120
+          }
+        },
+        {
+          "statement": "T5-c10: the tier set, the engine and any licence named in MEMEV-STRATEGY.md agree with docs/scope-one/DECISIONS.md and docs/LICENSING-NOTICE.md, and a copy with its tier set changed fails and names the page",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/one-truth.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T5-c10:' test/one-truth.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T5-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -1641,7 +1651,8 @@
         "this repository sets the rule through a committed list, contracts/keys/OWNER-SIGNERS.json. scripts/contracts/check-signers.mjs fails if a signed body added after the list's first commit is signed by a key not on it, if a key in REVIEWER_KEYS is on it, or if the list changed without a signature by a key already on it. The suite runs it",
         "docs/CONTRACTS.md says how to make the key: /usr/local/bin/openssl genpkey -algorithm ed25519 | /usr/local/bin/openssl pkcs8 -topk8 -v2 aes-256-cbc -iter 600000 -out FILE, which writes no plaintext to disk. 'genpkey -aes-256-cbc' alone uses 2048 iterations, too few when the seats can read the file and guess offline. /usr/bin/openssl (LibreSSL) has no Ed25519 here. It says the limit plainly: a signature proves the key, not the person, and a passphrase typed where a seat can read it is no longer his alone. A seat that changed the program he types the passphrase into could save it: the fresh clone below reduces that and does not remove it. Only a key on another device, such as a hardware key, removes it, and that is his choice",
         "SR-0.04 itself is signed before this task is built, so its one signature is made by the owner with a small script the lead gives him, which decrypts the key in memory, and which T9's signing replaces. He runs it from a fresh clone at a commit sha he is given, in his own Terminal window and never through a session, naming his expected key id; it refuses any other key, and prints the contract's id, title and hash before it asks. The same holds for every signature he makes. SR-0.04's body is then the first entry check-signers holds him to",
-        "each red-green criterion has its own subtest in test/owner-key.test.mjs whose name starts with the criterion's label (the text before its first colon), and the criterion runs only that subtest. Each subtest's first assertion fails at the base on an assertion and never on a load error: a new module or script is imported inside the subtest or run as a child process, and a new file is checked by an assertion first"
+        "each red-green criterion has its own subtest in test/owner-key.test.mjs whose name starts with the criterion's label (the text before its first colon), and the criterion runs only that subtest. Each subtest's first assertion fails at the base on an assertion and never on a load error: a new module or script is imported inside the subtest or run as a child process, and a new file is checked by an assertion first",
+        "scripts/sign holds the route the owner signs through until this task lands (PR 436). When memev contract sign does the same, that route is removed, with its test, in this task; a route left beside the real one is a second way to sign that nothing tests"
       ],
       "description": "Signing the owner alone can do: his own key, under a passphrase, checked in this repository.",
       "scope": {
@@ -1655,7 +1666,9 @@
           "docs/CONTRACTS.md",
           "docs/THREAT-MODEL.md",
           "docs/MODULES.md",
-          "changelog.d/SR-0.04.md"
+          "changelog.d/SR-0.04.md",
+          "scripts/sign/**",
+          "test/owner-sign.test.mjs"
         ]
       },
       "criteria": [
