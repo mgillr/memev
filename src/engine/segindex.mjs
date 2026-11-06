@@ -1,8 +1,21 @@
 // Rig prototype, not landed code. The RecallIndex's interface over an on-disk segment and a small overlay.
 // Nothing is loaded at open; a save writes only the overlay; a fold runs on a worker thread.
 import fs from 'node:fs'; import path from 'node:path';
-import { RecallIndex, tokenize } from './index.mjs';
+import { RecallIndex, tokenize, INDEX_VERSION as OLD_VERSION } from './index.mjs';
+import { readLines } from './oplog.mjs';
 import { writeSeg, Seg, foldInWorker, overlayDocs } from './seg2.mjs';
+
+/** The old file's sections one at a time, for writeSeg: no index in memory. False when the file is not a whole index of the current version. */
+export function convertOldIndex(file, dir) {
+  const lines = readLines(file); const first = lines.next();
+  if (first.done) return false;
+  let head; try { head = JSON.parse(first.value[0]); } catch { return false; }
+  if (head.version !== OLD_VERSION) return false;
+  fs.rmSync(dir, { recursive: true, force: true });
+  function* docs() { for (const [line] of lines) { if (!line) continue; const r = JSON.parse(line); const terms = new Array(r.t.length); for (let i = 0; i < r.t.length; i++) terms[i] = [r.t[i], r.f[i]]; yield { path: r.path, heading: r.heading ?? null, line: r.line ?? 1, len: r.len, project: r.project ?? null, mtime: r.mtime ?? null, snippet: r.snippet, rb: r.rb ?? null, fl: r.fl ?? null, terms }; } }
+  try { writeSeg(dir, docs()); } catch (e) { fs.rmSync(dir, { recursive: true, force: true }); if (e instanceof SyntaxError) return false; throw e; }
+  return true;
+}
 
 const round3 = (x) => Number(x.toFixed(3));
 class LazyDoc {
@@ -22,8 +35,8 @@ export class SegIndex {
     let g = null; try { g = Number(fs.readFileSync(this._cur(), 'utf8')); } catch {}
     if (g === null) {
       if (!fs.existsSync(this.file)) return false;
-      const old = new RecallIndex(this.file); if (!old.load()) return false; // one-time conversion from the old file
-      this.ov = old; this._writeFromOverlay(); fs.rmSync(this.file, { force: true }); return true;
+      if (!convertOldIndex(this.file, this._dir(this.gen + 1))) return false; // one-time conversion from the old file
+      this.seg = new Seg(this._dir(this.gen + 1)); this._publish(this.gen + 1); fs.rmSync(this.file, { force: true }); this.dirty = false; return true;
     }
     this.seg = new Seg(this._dir(g)); this.gen = g;
     if (fs.existsSync(this.ovFile) && !this.ov.load()) return false;

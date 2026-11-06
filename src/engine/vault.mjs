@@ -80,14 +80,17 @@ export class Vault extends EventEmitter {
     const RIG = process.env.MEMEV_RIG_SEG === '1';
     this.notes = new NoteState(this.state).load();
     const scan = this._scanNotes();
-    this.recover(scan);
     const loaded = this.index.load();
-    if (!loaded || this.index.stats().notes === 0) this.reindexAll(scan);
+    const rebuild = !loaded || this.index.stats().notes === 0;
+    // a first run reads each note once: the import indexes what it just read, in the path order a rebuild uses, when every note is new
+    const allNew = rebuild && ![...scan.keys()].some((p) => this.log.heads.has(p));
+    this.recover(scan, allNew ? (p, b) => { this.index.update(p, b); this._graphNote(p, b); } : null);
+    if (rebuild) this.reindexAll(scan, allNew ? new Set(this.imported) : null);
     else this._restoreGraph(scan);
     this.notes.opened(scan);
-    if (process.env.MEMEV_RIG_STOPPED === '1' || RIG) { let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch {} if (saved !== null) for (const [p, h] of this.log.heads) { try { if (h.seq > saved && !h.deleted) { const b = this._read(p); if (b !== null) { this.index.update(p, b, { mtime: Date.now() }); } } else if (h.seq > saved && h.deleted) this.index.remove(p); } catch {} } }
+    if (!rebuild && (process.env.MEMEV_RIG_STOPPED === '1' || RIG)) { let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch {} if (saved !== null) for (const [p, h] of this.log.heads) { try { if (h.seq > saved && !h.deleted) { const b = this._read(p); if (b !== null) { this.index.update(p, b, { mtime: Date.now() }); } } else if (h.seq > saved && h.deleted) this.index.remove(p); } catch {} } }
     // RIG_FIX_STOPPED: a note imported at start reaches recall (main leaves it out until the next rebuild).
-    if (process.env.MEMEV_RIG_STOPPED === '1' || RIG) for (const p of this.imported || []) { try { const b = this._read(p); if (b !== null) this.index.update(p, b, { mtime: Date.now() }); } catch {} }
+    if (!rebuild && (process.env.MEMEV_RIG_STOPPED === '1' || RIG)) for (const p of this.imported || []) { try { const b = this._read(p); if (b !== null) this.index.update(p, b, { mtime: Date.now() }); } catch {} }
     this._replayGraph();
     this.tuning = loadTuning(this);
     this.started = now();
@@ -179,7 +182,7 @@ export class Vault extends EventEmitter {
     const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules' || e.isSymbolicLink()) continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) { if (r === 'work/archive') continue; walk(path.join(d, e.name), r); } else if (e.name.endsWith('.md')) out.push(r); } };
     walk(base, dir.replace(/\/$/, '')); return out.sort();
   }
-  reindexAll(scan = null) { for (const p of scan ? [...scan.keys()].sort() : this.allNotes()) { const b = this._read(p); this.index.update(p, b); this._graphNote(p, b); } this.index.save(); }
+  reindexAll(scan = null, done = null) { for (const p of scan ? [...scan.keys()].sort() : this.allNotes()) { if (done?.has(p)) continue; const b = this._read(p); this.index.update(p, b); this._graphNote(p, b); } this.index.save(); }
   /**
    * Every note the walk finds, with its lstat. The walk skips links, so a note in the result has no link on the way to it, and one
    * lstat per note stands in for checking each folder of each path. allNotes keeps its own walk for callers that want names only.
@@ -221,7 +224,7 @@ export class Vault extends EventEmitter {
    *   file differs otherwise   → edited by hand or by git: recorded as an external 'put' (the old
    *                              version stays in the log), never overwritten
    */
-  recover(scan = this._scanNotes()) {
+  recover(scan = this._scanNotes(), onImport = null) {
     const fixed = [], imported = [], skipped = [];
     // one path the file system cannot take (a NUL in it, a note where a folder must be, a folder where the note goes) is
     // skipped with its reason, so the rest of the vault opens; before, it threw and the vault never opened again (issue 230)
@@ -240,7 +243,7 @@ export class Vault extends EventEmitter {
         else { this._importExternal(p, cur, 'startup'); imported.push(p); }
       });
     }
-    for (const p of [...scan.keys()].sort()) if (!this.log.heads.has(p)) each(p, () => { this._importExternal(p, this._read(p), 'startup'); imported.push(p); });
+    this.log.group(() => { for (const p of [...scan.keys()].sort()) if (!this.log.heads.has(p)) each(p, () => { const b = this._read(p); this._importExternal(p, b, 'startup'); imported.push(p); onImport?.(p, b); }); });
     this.recovered = fixed; this.imported = imported; this.skipped = skipped;
     return fixed;
   }
@@ -960,10 +963,10 @@ export class Vault extends EventEmitter {
 
   _replayGraph() {
     const f = path.join(this.state, 'graph.json'); const snap = readJson(f, null); let from = 1;
-    if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); this.reviews = new Map(snap.reviews || []); this.contractSessions = new Map(snap.contract_sessions || []); this.contractResults = new Map(snap.contract_results || []); from = snap.seq + 1; }
+    if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); this.reviews = new Map(snap.reviews || []); this.contractSessions = new Map(snap.contract_sessions || []); this.contractResults = new Map(snap.contract_results || []); from = snap.seq + 1; if (snap.seq === this.log.seq) this._graphSaved = snap.seq; }
     for (const rec of this.log.iterate({ fromSeq: from })) { if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec); else if (rec.type === 'tournament.match' || rec.type === 'feedback' || rec.type === 'review' || rec.type === 'contract.signed' || rec.type === 'contract.verified') this._applyMisc(rec); }
   }
-  _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }); }
+  _saveGraph() { if (this._graphSaved === this.log.seq) return; this._graphSaved = this.log.seq; writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }); }
 
   // ---- retention and compaction
   /** Total bytes of every file under a directory (recursive). */

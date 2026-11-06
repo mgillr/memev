@@ -185,3 +185,69 @@ test('the real daemon runs the sweep behind its start and reports it', async () 
   assert.ok(saw, `the sweep log line: ${err}`);
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('memev start leaves a daemon that says it is loading, and stops one that says nothing', async () => {
+  const { startDaemon, stopDaemon, loadingPid } = await import('../src/cli/daemon.mjs');
+  const root = fresh();
+  const stub = (say) => (exe, args, o) => spawn(process.execPath, ['-e', `${say ? `require('fs').writeFileSync(${JSON.stringify(path.join(root, '.memev', 'daemon.loading'))}, JSON.stringify({ pid: process.pid }));` : ''} setTimeout(() => {}, 60000)`], { detached: true, stdio: 'ignore', env: o.env });
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  let child; const keep = (f) => (...a) => { child = f(...a); return child; };
+  assert.equal(await startDaemon(root, { quiet: true, waitMs: 700, spawn: keep(stub(true)) }), false);
+  assert.ok(alive(child.pid), 'a loading daemon is left to finish'); assert.equal(loadingPid(root), child.pid);
+  await stopDaemon(root); assert.ok(await until(() => !alive(child.pid), 6000), 'memev stop reaches a daemon that is still loading');
+  assert.equal(loadingPid(root), null);
+  assert.equal(await startDaemon(root, { quiet: true, waitMs: 400, spawn: keep(stub(false)) }), false);
+  assert.ok(await until(() => !alive(child.pid), 3000), 'the control: one that does not say so is stopped, as before');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('a hard kill during the first import loses nothing and doubles nothing', async () => {
+  const root = fresh(); const N = 3000;
+  for (let i = 0; i < N; i++) { const d = path.join(root, 'notes', `d${i % 50}`); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, `n${i}.md`), `# n${i}\nsome words about note ${i}\n`); }
+  const script = `import { Vault } from ${JSON.stringify(path.join(PKG, 'src/engine/vault.mjs'))}; new Vault(${JSON.stringify(root)}, { git: false }).open(); process.stdout.write('opened');`;
+  const c = spawn(process.execPath, ['--input-type=module', '-e', script], { stdio: ['ignore', 'pipe', 'ignore'] });
+  let opened = false; c.stdout.on('data', () => { opened = true; });
+  const seg = path.join(root, '.memev/oplog/seg-000001.jsonl');
+  // killed once the import is under way and not finished
+  const started = await until(() => { try { return fs.statSync(seg).size > 2000; } catch { return false; } }, 60000);
+  c.kill('SIGKILL'); await new Promise((r) => c.once('exit', r));
+  assert.ok(started && !opened, 'the kill landed inside the import; otherwise this test proves nothing');
+  const killedAt = fs.statSync(seg).size;
+  const v = new Vault(root, { git: false }).open();
+  const seen = new Map(); for (const rec of v.log.iterate()) if (rec.path?.startsWith('notes/')) seen.set(rec.path, (seen.get(rec.path) || 0) + 1);
+  assert.equal(seen.size, N, 'every note is in the log'); assert.ok([...seen.values()].every((n) => n === 1), 'once each');
+  assert.equal(v.log.verify().ok, true); assert.ok(fs.statSync(seg).size > killedAt);
+  assert.equal(v.index.stats().notes >= N, true, 'and in recall');
+  v.close(); fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('a close with nothing new writes nothing, and a snapshot of the old form still opens', () => {
+  const root = fresh(); let v = open(root); v.write(ME, { path: 'notes/c.md', body: '# c\nClose Entity\n' }); v.close();
+  v = open(root); v.close();
+  const files = ['graph.json', 'oplog/manifest.json', 'notes.state'].map((f) => path.join(root, '.memev', f)); const times = () => files.map((f) => fs.statSync(f).mtimeMs);
+  const before = times(); v = open(root); v.close(); assert.deepEqual(times(), before);
+  // a few records after the last snapshot replay on open, heads included
+  v = open(root); v.write(ME, { path: 'notes/d.md', body: '# d\nnew words\n' }); const head = v.log.heads.get('notes/d.md'); v.close();
+  v = open(root); assert.deepEqual(v.log.heads.get('notes/d.md'), head); assert.equal(v.log.verify().ok, true); const seq = v.log.seq; v.close();
+  // version 1 kept its heads as an object
+  const snapF = path.join(root, '.memev/oplog/snapshot.json'); const heads = {}; v = open(root); for (const [p, h] of v.log.heads) heads[p] = h; const off = v.log.active.bytes; v.close();
+  fs.writeFileSync(snapF, JSON.stringify({ version: 1, seq, hlc: null, active: { name: 'seg-000001.jsonl', offset: off }, heads }));
+  v = open(root); assert.deepEqual(v.log.heads.get('notes/d.md'), head); assert.equal(v.log.seq, seq); v.close();
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('converting an old index gives the same segment, byte for byte, as loading it whole', async () => {
+  const { RecallIndex } = await import('../src/engine/index.mjs'); const { writeSeg, overlayDocs } = await import('../src/engine/seg2.mjs'); const { convertOldIndex } = await import('../src/engine/segindex.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-convert-')); const file = path.join(dir, 'index.jsonl'); const idx = new RecallIndex(file);
+  for (let i = 0; i < 60; i++) idx.update(`notes/n${i % 40}.md`, `# Head ${i}\nProject: p${i % 3}\nwords about cache layer number ${i} and more ${i % 5}\n\n## Second\nreview-by: 2027-01-01\nother words here\n`, { mtime: '2026-01-01T00:00:00.000Z' });
+  idx.dirty = true; idx.save();
+  const whole = new RecallIndex(file); assert.equal(whole.load(), true); writeSeg(path.join(dir, 'a'), overlayDocs(whole));
+  assert.equal(convertOldIndex(file, path.join(dir, 'b')), true);
+  for (const f of fs.readdirSync(path.join(dir, 'a'))) assert.ok(fs.readFileSync(path.join(dir, 'a', f)).equals(fs.readFileSync(path.join(dir, 'b', f))), f);
+  // the control: a changed line changes the result, and a file of another version or a broken one is refused, for a rebuild
+  const text = fs.readFileSync(file, 'utf8'); fs.writeFileSync(file, text.replace('"len":', '"len":1'));
+  assert.equal(convertOldIndex(file, path.join(dir, 'c')), true); assert.equal(fs.readFileSync(path.join(dir, 'a', 'cols.bin')).equals(fs.readFileSync(path.join(dir, 'c', 'cols.bin'))), false);
+  fs.writeFileSync(file, text.replace('"version":3', '"version":2')); assert.equal(convertOldIndex(file, path.join(dir, 'd')), false);
+  fs.writeFileSync(file, `${text.slice(0, -10)}\n`); assert.equal(convertOldIndex(file, path.join(dir, 'e')), false); assert.equal(fs.existsSync(path.join(dir, 'e')), false);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
