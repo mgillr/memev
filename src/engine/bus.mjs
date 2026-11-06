@@ -4,11 +4,11 @@
 // Everything lives in the vault under bus/ and travels with it: through git to your own backup
 // repository, and through the secure link to computers that joined. Nothing goes anywhere else.
 //   bus/log/<device>.jsonl   messages, append-only and written by one computer, so git never conflicts; when it reaches
-//                            SEGMENT_BYTES the next message first moves it, whole, to <device>.2.jsonl, <device>.3.jsonl and
-//                            so on, and goes in a new <device>.jsonl. So the newest messages are always in this one file,
-//                            which is where older code takes a computer's last counter from: after a downgrade its next
-//                            message runs on from the real counter. Every reader takes every *.jsonl here, so a computer on
-//                            an older version reads them all too
+//                            SEGMENT_BYTES the computer goes on in <device>.2.jsonl, <device>.3.jsonl and so on, and the
+//                            full file is never touched again. Every reader takes every *.jsonl here, so a computer on an
+//                            older version reads them too. One limit: code older than this takes its last counter from
+//                            <device>.jsonl alone, so a computer put back on it after a file rolled over reuses counters
+//                            (docs/BUS.md)
 //   bus/seats/<seat>.json    one seat per AI app (or session) on a computer
 //   bus/pulse/<seat>.json    the seat's last heartbeat and what it has read
 //   bus/operator.json        which seat speaks for you
@@ -122,7 +122,6 @@ export class Bus {
 
   /** Seed bus/ (the caller commits it) so the bus is part of the vault from the first commit: the layout, no operator yet, and this computer's own (empty) message file. */
   ensure(deviceId) {
-    if (deviceId) this._finishMove(deviceId);
     const files = [
       ['config.json', () => writeJson(this._p('config.json'), { format: 1, log: 'log/<device>.jsonl, then log/<device>.<n>.jsonl once that is full; append-only, written by one computer each', seats: 'seats/<seat>.json', pulse: 'pulse/<seat>.json', operator: 'operator.json' })],
       ['operator.json', () => writeJson(this._p('operator.json'), { seat: null, set: null })],
@@ -362,45 +361,24 @@ export class Bus {
     this._cache.set(file, rec);
     return rec.msgs;
   }
-  /** The numbers of this computer's moved files that are really there, highest first. What a name says never sets how far a loop runs. */
-  _movedFiles(id) {
-    const plain = `${id}.jsonl`; const prefix = `${id}.`; const out = [];
+  /**
+   * Where this computer's next message goes, and its last message so far. Its counter runs on across its files: an empty or
+   * unreadable newest file falls back to the one before, so a counter is never used twice by losing sight of an older file.
+   * Only the numbers really in the folder are looked at, so what a file is named never sets how far a loop runs.
+   */
+  _writeTo(id) {
+    const plain = `${id}.jsonl`; const prefix = `${id}.`; const numbers = [];
     for (const f of this._logFiles()) {
       if (!f.startsWith(prefix) || f === plain) continue;
       const n = Number(/^(\d+)\.jsonl$/.exec(f.slice(prefix.length))?.[1]);
-      if (Number.isSafeInteger(n) && n >= 2) out.push(n);
+      if (Number.isSafeInteger(n) && n >= 2) numbers.push(n);
     }
-    return out.sort((a, b) => b - a);
-  }
-  /**
-   * Where this computer's next message goes, and its last message so far. Its counter runs on across its files: an empty or
-   * unreadable newest file falls back to the ones before, so a counter is never used twice by losing sight of an older file.
-   */
-  _writeTo(id) {
-    const plain = `${id}.jsonl`; const moved = this._movedFiles(id); const nameOf = (n) => `${id}.${n}.jsonl`;
-    let last = this._readLog(plain).at(-1) || null;
-    for (const n of moved) { const m = this._readLog(nameOf(n)).at(-1); if (!m) continue; if (!last || m.dseq > last.dseq) last = m; break; }
-    let size = 0; try { size = fs.statSync(this._p('log', plain)).size; } catch {}
-    return { file: plain, moveTo: size >= this.segmentBytes ? nameOf((moved[0] ?? 1) + 1) : null, last };
-  }
-  /**
-   * The full file goes aside, whole, as the next numbered file; what is known of it goes with it, as nothing in it changed. A link and an unlink
-   * rather than a rename, which would silently replace a file another writer on this computer had just moved there.
-   */
-  _moveFull(file, to) {
-    const from = this._p('log', file), dest = this._p('log', to); this._w(dest);
-    try { fs.linkSync(from, dest); fs.unlinkSync(from); } catch (e) {
-      if (e.code === 'EEXIST' || e.code === 'ENOENT') return; // the other writer moved it first, and the file here is the new one
-      if (fs.existsSync(dest)) return; fs.renameSync(from, dest); // a disk with no hard links
-    }
-    const c = this._cache.get(file); this._cache.delete(file); if (c) this._cache.set(to, c);
-    const v = this._viewNow; if (v?.files.has(file)) { if (v.files.get(file) === c) { v.files.delete(file); v.files.set(to, c); } else this._viewNow = null; }
-    this.commit(this._rel('log', to));
-  }
-  /** A kill between the link and the unlink leaves one file under two names. The plain name goes, so nobody reads the messages twice. */
-  _finishMove(id) {
-    const plain = this._p('log', `${id}.jsonl`); const high = this._movedFiles(id)[0]; if (!high) return;
-    try { const a = fs.lstatSync(plain), b = fs.lstatSync(this._p('log', `${id}.${high}.jsonl`)); if (a.ino === b.ino && a.dev === b.dev) { fs.unlinkSync(plain); this._cache.delete(`${id}.jsonl`); this._viewNow = null; } } catch { /* there is nothing to finish */ }
+    numbers.sort((x, y) => y - x); const high = numbers[0] ?? 1;
+    const nameOf = (n) => (n === 1 ? plain : `${id}.${n}.jsonl`);
+    let last = null;
+    for (const n of [...numbers, 1]) { last = this._readLog(nameOf(n)).at(-1) || null; if (last) break; }
+    let size = 0; try { size = fs.statSync(this._p('log', nameOf(high))).size; } catch {}
+    return { file: nameOf(size >= this.segmentBytes ? high + 1 : high), last };
   }
   /** Each computer's highest counter so far. */
   counters() { const out = {}; for (const [device, run] of this._view().runs) out[device] = Math.max(0, run.at(-1).dseq); return out; }
@@ -509,7 +487,7 @@ export class Bus {
     let c = this._cache.get(file);
     // a file that did not exist before this line: a computer's first, or the next one after a full file
     if (!c) c = newRecord({ size: 0, mtimeMs: 0 }, '');
-    if (!c.endsLine || c.exotic) return;
+    if (c.exotic) return;
     let st; try { st = fs.statSync(this._p('log', file)); } catch { return; }
     if (st.size !== c.size + Buffer.byteLength(line)) return;
     const m = JSON.parse(line);
@@ -578,7 +556,7 @@ export class Bus {
     return to_.map((t) => this._append(who, { to: t, type: 'transition', body, ref: null, project: project ?? null }));
   }
   _append(who, fields) {
-    const { file, moveTo, last: lastInFiles } = this._writeTo(who.device.id);
+    const { file, last: lastInFiles } = this._writeTo(who.device.id);
     const last = this._last.get(who.device.id) || lastInFiles;
     let ts = now(); if (last && ts <= last.ts) ts = new Date(Date.parse(last.ts) + 1).toISOString();
     const dseq = (last?.dseq || 0) + 1;
@@ -586,7 +564,6 @@ export class Bus {
     this._w(this._p('log', file));
     fs.mkdirSync(this._p('log'), { recursive: true });
     const line = `${JSON.stringify(msg)}\n`;
-    if (moveTo) this._moveFull(file, moveTo);
     // A kill can leave half a line at the end. This message starts a line of its own, or it would run into that and be lost with it.
     const torn = this._cache.get(file)?.endsLine === false;
     fs.appendFileSync(this._p('log', file), torn ? `\n${line}` : line);

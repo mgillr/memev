@@ -11,6 +11,9 @@ import { Bus as Oracle } from './fixtures/bus-main-oracle.mjs';
 import { lockstep, moduleCopy, BUS_SRC } from './helpers/bus-lockstep.mjs';
 
 const SEEDS = 16;
+// skipHalfLine: the comparison leaves out a half written last line on the computer's own file, because there the reference is wrong on purpose. Main's bus
+// lets the next message run into that half line and loses it; this bus does not. So the two cannot be compared after that step. The promise this comparison
+// held there, that such a line does not corrupt the view, is now held by "half a line left by a kill" in bus-rotation.test.mjs, along with not losing the message.
 
 test('every answer and every file matches the reference on random histories', async () => {
   let ran = 0;
