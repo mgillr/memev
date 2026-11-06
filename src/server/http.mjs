@@ -89,13 +89,39 @@ function oauthIssuer(vault, { local, port }) {
   return tunnel?.enabled && tunnel.url ? issuerUrl(tunnel.url) : null;
 }
 
+// A remote caller names its own address, so the limiter's size has a bound, and filling it must not free a caller that has
+// used up its limit. Two maps, each in order of last use: a bucket that still holds a token is dropped first, and a used-up
+// one only when no other is left. A bucket not touched for two minutes has refilled in full, so it is dropped as idle.
+// The oldest key comes from one iterator kept per map: a new iterator walks every deleted slot again, so at the bound a
+// new key would cost a scan.
+export const MAX_BUCKETS = 10000;
+const IDLE_MS = 120000;
 class Buckets {
-  constructor(perMin) { this.perMin = perMin; this.m = new Map(); }
+  constructor(perMin, cap = MAX_BUCKETS) { this.perMin = perMin; this.cap = cap; this.open = new Map(); this.spent = new Map(); this.heads = new Map([[this.open, this.open.keys()], [this.spent, this.spent.keys()]]); this.swept = 0; }
+  get size() { return this.open.size + this.spent.size; }
+  has(key) { return this.open.has(key) || this.spent.has(key); }
+  sweep(t) {
+    if (t - this.swept < 1000) return;
+    this.swept = t;
+    for (const m of [this.open, this.spent]) for (const [k, b] of m) { if (t - b.at <= IDLE_MS) break; m.delete(k); }
+  }
+  oldest(m) {
+    let r = this.heads.get(m).next();
+    if (r.done) { this.heads.set(m, m.keys()); r = this.heads.get(m).next(); }
+    return r.value;
+  }
   take(key) {
-    const t = Date.now(); let b = this.m.get(key);
-    if (!b) { b = { tokens: this.perMin, at: t }; this.m.set(key, b); }
+    const t = Date.now(); this.sweep(t);
+    let b = this.open.get(key) ?? this.spent.get(key);
+    if (b) { this.open.delete(key); this.spent.delete(key); }
+    else {
+      if (this.size >= this.cap) { const m = this.open.size ? this.open : this.spent; m.delete(this.oldest(m)); }
+      b = { tokens: this.perMin, at: t };
+    }
     b.tokens = Math.min(this.perMin, b.tokens + ((t - b.at) / 60000) * this.perMin); b.at = t;
-    if (b.tokens < 1) return false; b.tokens -= 1; return true;
+    const ok = b.tokens >= 1; if (ok) b.tokens -= 1;
+    (b.tokens >= 1 ? this.open : this.spent).set(key, b);
+    return ok;
   }
 }
 
@@ -366,5 +392,6 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
     }
   });
   server.headersTimeout = 15000; server.requestTimeout = 30000;
+  Object.defineProperty(server, 'rateLimiter', { value: limiter });
   return server;
 }
