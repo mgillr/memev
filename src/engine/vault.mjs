@@ -82,7 +82,7 @@ export class Vault extends EventEmitter {
     const scan = this._scanNotes();
     this.graph.bulkLoad = true;
     const loaded = this.index.load();
-    const rebuild = !loaded || this.index.stats().notes === 0;
+    const rebuild = !loaded || (this.index.isEmpty ? this.index.isEmpty() : this.index.stats().notes === 0);
     // a first run reads each note once: the import indexes what it just read, in the path order a rebuild uses, when every note is new
     const allNew = rebuild && ![...scan.keys()].some((p) => this.log.heads.has(p));
     this.recover(scan, allNew ? (p, b) => { this.index.update(p, b); this._graphNote(p, b); } : null);

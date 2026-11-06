@@ -79,6 +79,7 @@ export class SegIndex {
   }
   get byPath() { const me = this; return { has(p) { return me.ov.byPath.has(p) || (!!me.seg && !me.deadPaths.has(p) && me.seg.ordinalsOf(p).length > 0); } }; }
   get docs() { const me = this; return { get size() { return me._N(); }, *values() { if (me.seg) for (let i = 0; i < me.seg.head.n; i++) if (!me.dead.has(i)) yield new LazyDoc(me.seg, i); yield* me.ov.docs.values(); } }; }
+  isEmpty() { return this._N() === 0; }
   _N() { return (this.seg ? this.seg.head.n - this.dead.size : 0) + this.ov.docs.size; }
   _Len() { return (this.seg ? this.seg.head.totalLen - this.deadLen : 0) + this.ov.totalLen; }
   docsOf(p, heading) { const out = []; if (this.seg && !this.deadPaths.has(p)) for (const i of this.seg.ordinalsOf(p)) { const d = new LazyDoc(this.seg, i); if (heading === undefined || heading === null || (d.heading || '') === heading) out.push(d); } return out.concat(this.ov.docsOf(p, heading)); }
