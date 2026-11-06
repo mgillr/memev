@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Loop 2 and 3 of the bus search: what the first read costs and what it keeps in memory, by way of holding the messages.
 //   node --expose-gc scripts/bench/speed/lab/bus-cold.mjs --messages 100000 --repeats 3
-// Each way is timed in this process in turn; numbers are thread CPU ms (the box is shared) and retained heap MB after a collection.
+// Each way runs in a process of its own, in turn; numbers are process CPU ms (the box is shared) and retained heap plus array buffers after a collection.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import v8 from 'node:v8';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
 
 const argv = process.argv.slice(2);
@@ -28,19 +30,31 @@ function genLog() {
   }
   return lines;
 }
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-bus-cold-'));
+const ONLY = arg('only', null);
+const dir = ONLY ? arg('dir') : fs.mkdtempSync(path.join(os.tmpdir(), 'memev-bus-cold-'));
+const flat = path.join(dir, 'flat.jsonl'); const side = path.join(dir, 'side.bin'); const heads = path.join(dir, 'heads.bin'); const colsFile = path.join(dir, 'cols.bin'); const colsTable = path.join(dir, 'cols.json');
+const segs = [];
+const parseFile = (f) => { const out = []; for (const line of fs.readFileSync(f, 'utf8').split('\n')) { if (!line.trim()) continue; try { const m = JSON.parse(line); if (m?.id && m.device && Number.isInteger(m.dseq)) out.push(m); } catch {} } return out; };
+if (!ONLY) {
 const lines = genLog();
 // one flat file, and the same lines in segments of the size the bus uses
-const flat = path.join(dir, 'flat.jsonl'); fs.writeFileSync(flat, `${lines.join('\n')}\n`);
-const segs = []; { let buf = []; let size = 0; for (const l of lines) { buf.push(l); size += l.length + 1; if (size >= SEG) { const f = path.join(dir, `seg${segs.length}.jsonl`); fs.writeFileSync(f, `${buf.join('\n')}\n`); segs.push(f); buf = []; size = 0; } } if (buf.length) { const f = path.join(dir, `seg${segs.length}.jsonl`); fs.writeFileSync(f, `${buf.join('\n')}\n`); segs.push(f); } }
-
-const parseFile = (f) => { const out = []; for (const line of fs.readFileSync(f, 'utf8').split('\n')) { if (!line.trim()) continue; try { const m = JSON.parse(line); if (m?.id && m.device && Number.isInteger(m.dseq)) out.push(m); } catch {} } return out; };
+fs.writeFileSync(flat, `${lines.join('\n')}\n`);
+{ let buf = []; let size = 0; for (const l of lines) { buf.push(l); size += l.length + 1; if (size >= SEG) { const f = path.join(dir, `seg${segs.length}.jsonl`); fs.writeFileSync(f, `${buf.join('\n')}\n`); segs.push(f); buf = []; size = 0; } } if (buf.length) { const f = path.join(dir, `seg${segs.length}.jsonl`); fs.writeFileSync(f, `${buf.join('\n')}\n`); segs.push(f); } }
 
 // a sidecar written once, for the sealed-segment candidates
-const side = path.join(dir, 'side.bin');
 { const all = parseFile(flat); fs.writeFileSync(side, v8.serialize(all)); }
-const heads = path.join(dir, 'heads.bin');
-{ const all = parseFile(flat); let off = 0; const rows = all.map((m) => { const { body, ...h } = m; const line = JSON.stringify(m); const at = off; off += Buffer.byteLength(line) + 1; return { ...h, _at: at, _len: Buffer.byteLength(line) }; }); fs.writeFileSync(heads, v8.serialize(rows)); }
+{ const all = parseFile(flat); let off = 0; const rows = all.map((m) => { const { body, ...h } = m; const line = JSON.stringify(m); const at = off; off += Buffer.byteLength(line) + 1; return { ...h, _at: at, _len: Buffer.byteLength(line) }; }); fs.writeFileSync(heads, v8.serialize(rows));
+  // columns: fixed-width arrays over a table of the strings that repeat
+  const table = new Map(); const idx = (s) => { const k = s === null ? '' : String(s); let i = table.get(k); if (i === undefined) { i = table.size; table.set(k, i); } return i; };
+  const n = all.length; const buf = new ArrayBuffer(n * 36); const dseq = new Float64Array(buf, 0, n); const tsMs = new Float64Array(buf, n * 8, n); const at = new Float64Array(buf, n * 16, n); const from = new Int32Array(buf, n * 24, n); const type = new Int16Array(buf, n * 28, n); const to = new Int32Array(buf, n * 30 - (n * 30) % 4, 0); void to; void type;
+  let o = 0; const fromTo = new Int32Array(n * 3);
+  all.forEach((m, i) => { dseq[i] = m.dseq; tsMs[i] = Date.parse(m.ts); at[i] = o; o += Buffer.byteLength(JSON.stringify(m)) + 1; fromTo[i * 3] = idx(m.from); fromTo[i * 3 + 1] = idx(m.to); fromTo[i * 3 + 2] = idx(m.ref); });
+  fs.writeFileSync(colsFile, Buffer.concat([Buffer.from(dseq.buffer, dseq.byteOffset, n * 8), Buffer.from(tsMs.buffer, tsMs.byteOffset, n * 8), Buffer.from(at.buffer, at.byteOffset, n * 8), Buffer.from(fromTo.buffer)]));
+  fs.writeFileSync(colsTable, JSON.stringify([...table.keys()]));
+}
+fs.writeFileSync(path.join(dir, 'segs.json'), JSON.stringify(segs));
+}
+if (ONLY) segs.push(...JSON.parse(fs.readFileSync(path.join(dir, 'segs.json'), 'utf8')));
 
 const WAYS = {
   // today's way
@@ -62,19 +76,37 @@ const WAYS = {
     }
     return out;
   },
+  // L2-C5 known: no split of the whole text, one slice a line
+  'parse, no split': () => {
+    const text = fs.readFileSync(flat, 'utf8'); const out = []; let at = 0;
+    while (at < text.length) {
+      let nl = text.indexOf('\n', at); if (nl < 0) nl = text.length;
+      if (text.charCodeAt(at) === 123 || text.slice(at, nl).trim()) { try { const m = JSON.parse(text.slice(at, nl)); if (m?.id && m.device && Number.isInteger(m.dseq)) out.push(m); } catch {} }
+      at = nl + 1;
+    }
+    return out;
+  },
   // L2-C4 snapshot of the parsed objects: what a sidecar buys if it holds everything
   'sidecar, whole objects': () => v8.deserialize(fs.readFileSync(side)),
   // L3-crazy sealed sidecar of headers only, bodies stay in the log and are read when shown; nothing is parsed or validated at the first read
   'sidecar, headers only': () => v8.deserialize(fs.readFileSync(heads)),
+  // L3-crazy, the assumption after that one fell: no message objects at all until one is shown
+  'sidecar, columns': () => { const b = fs.readFileSync(colsFile); const t = JSON.parse(fs.readFileSync(colsTable, 'utf8')); return { length: b.length / 36, b, t }; },
 };
 
 const cpu = (fn) => { const c = process.cpuUsage(); const t = performance.now(); const v = fn(); const u = process.cpuUsage(c); return { v, cpu: (u.user + u.system) / 1000, wall: performance.now() - t }; };
+if (ONLY) {
+  globalThis.gc(); const u0 = process.memoryUsage();
+  const r = cpu(WAYS[ONLY]);
+  globalThis.gc(); const u1 = process.memoryUsage();
+  console.log(JSON.stringify({ cpu: r.cpu, wall: r.wall, heap: (u1.heapUsed + u1.arrayBuffers - u0.heapUsed - u0.arrayBuffers) / 1048576, count: r.v.length }));
+  process.exit(0);
+}
 const rows = {};
-for (let n = 0; n < REPEATS; n++) for (const [name, fn] of Object.entries(WAYS)) {
-  globalThis.gc?.(); const h0 = process.memoryUsage().heapUsed; const ext0 = process.memoryUsage().external;
-  const r = cpu(fn);
-  globalThis.gc?.(); const heap = (process.memoryUsage().heapUsed - h0) / 1048576; const count = r.v.length;
-  (rows[name] ||= []).push({ cpu: r.cpu, wall: r.wall, heap, count });
+for (let n = 0; n < REPEATS; n++) for (const name of Object.keys(WAYS)) {
+  const c = spawnSync(process.execPath, ['--expose-gc', fileURLToPath(import.meta.url), '--only', name, '--dir', dir, '--messages', String(M)], { encoding: 'utf8' });
+  if (c.status) throw new Error(c.stderr);
+  (rows[name] ||= []).push(JSON.parse(c.stdout));
 }
 console.log(`messages ${M} flat ${(fs.statSync(flat).size / 1048576).toFixed(1)} MB segments ${segs.length} load ${os.loadavg()[0].toFixed(1)}`);
 for (const [name, rs] of Object.entries(rows)) { const q = (k) => rs.map((r) => r[k]).sort((a, b) => a - b); const c = q('cpu'); const h = q('heap'); console.log(`${name.padEnd(26)} cpu ${c[Math.floor(c.length / 2)].toFixed(0).padStart(6)} ms (${c[0].toFixed(0)} to ${c.at(-1).toFixed(0)})  retained ${h[Math.floor(h.length / 2)].toFixed(0).padStart(4)} MB  messages ${rs[0].count}`); }
