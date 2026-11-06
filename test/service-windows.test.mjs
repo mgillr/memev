@@ -13,7 +13,7 @@ const stubRun = (calls) => (cmd, args) => { calls.push({ cmd, args }); return { 
 
 test('MEM-078 AC01: With platform win32 injected, memev service install runs schtasks with /sc onlogon for the current user (stubbed)', async () => {
   const calls = [];
-  const env = { ...process.env, USERNAME: 'rider' };
+  const env = { ...process.env, MEMEV_NO_SERVICE: '', USERNAME: 'rider' };
   const r = await installService({ env, root: 'C:\\vault', platform: 'win32', run: stubRun(calls) });
   assert.equal(r.status, 'added', r.detail);
   const create = calls.find((c) => c.cmd === 'schtasks' && c.args[0] === 'create');
@@ -36,7 +36,7 @@ test('MEM-078 AC02: The daemon spawn options include windowsHide: true', async (
 
 test('MEM-078 AC03: memev service remove deletes the task', async () => {
   const calls = [];
-  const r = await removeService({ env: process.env, platform: 'win32', run: stubRun(calls), quiet: true });
+  const r = await removeService({ env: { ...process.env, MEMEV_NO_SERVICE: '' }, platform: 'win32', run: stubRun(calls), quiet: true });
   assert.equal(r.removed, true);
   const del = calls.find((c) => c.cmd === 'schtasks' && c.args[0] === 'delete');
   assert.ok(del, 'schtasks /delete was run');
@@ -46,7 +46,7 @@ test('MEM-078 AC03: memev service remove deletes the task', async () => {
 
 test('MEM-078: the task command quotes the launcher and the vault folder so a path with spaces still starts', async () => {
   const calls = [];
-  await installService({ env: { ...process.env, USERNAME: 'rider' }, root: 'C:\\Users\\A B\\vault', platform: 'win32', run: stubRun(calls) });
+  await installService({ env: { ...process.env, MEMEV_NO_SERVICE: '', USERNAME: 'rider' }, root: 'C:\\Users\\A B\\vault', platform: 'win32', run: stubRun(calls) });
   const create = calls.find((c) => c.cmd === 'schtasks' && c.args[0] === 'create');
   const tr = create.args[create.args.indexOf('/tr') + 1];
   assert.match(tr, /^"[^"]+memev\.cmd" serve --root "C:\\Users\\A B\\vault"$|^"[^"]+memev" serve --root "C:\\Users\\A B\\vault"$/);
