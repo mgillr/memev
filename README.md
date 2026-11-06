@@ -33,6 +33,7 @@ Coordinate people, AI systems and organisations around governed work and verifia
 <a href="docs/README.md">Documentation</a> &middot;
 <a href="docs/ARCHITECTURE.md">Architecture</a> &middot;
 <a href="docs/tiers/README.md">Tiers</a> &middot;
+<a href="docs/AI-ECONOMY-STRATEGY.md">AI economy strategy</a> &middot;
 <a href="docs/PRICING.md">Pricing</a> &middot;
 <a href="CHANGELOG.md">Changelog</a>
 </p>
