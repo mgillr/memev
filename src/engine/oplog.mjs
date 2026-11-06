@@ -71,7 +71,7 @@ export function recordHash(rec) {
 export class OpLog {
   constructor(dir, { segmentBytes = 16 * 1024 * 1024, snapshotEvery = 1000, fsync = true, deviceId = null, mergeContract = LOCAL_MERGE_CONTRACT, envelopes = true } = {}) {
     this.dir = dir; this.segmentBytes = segmentBytes; this.snapshotEvery = snapshotEvery; this.fsync = fsync;
-    this.heads = new Map(); this.seq = 0; this.sinceSnapshot = 0; this.fd = null; this.recovered = [];
+    this.heads = new Map(); this.headWatch = null; this.seq = 0; this.sinceSnapshot = 0; this.fd = null; this.recovered = [];
     // Each record names the device that wrote it and carries a hybrid logical clock, so logs from
     // several devices can later be merged in a deterministic order. Records written before this
     // (no dev, no hlc) stay valid: the hash covers only the fields a record has.
@@ -141,6 +141,7 @@ export class OpLog {
     this.seq = Math.max(this.seq, rec.seq);
     if (rec.hlc) this.observeClock(rec.hlc);
     if (rec.path) {
+      if (this.headWatch) { const h = this.heads.get(rec.path); this.headWatch(rec.path, !!h && !h.deleted, rec.type !== 'delete'); }
       if (rec.type === 'delete') this.heads.set(rec.path, { seq: rec.seq, hash: rec.hash, deleted: true });
       else this.heads.set(rec.path, { seq: rec.seq, hash: rec.hash, ch: rec.data?.ch ?? null });
     }

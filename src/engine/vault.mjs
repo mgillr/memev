@@ -50,6 +50,47 @@ export function checkPath(p) {
 /** The largest recall offset served: past it a page is empty and next is null, so one argument cannot ask the index to rank every match. */
 export const RECALL_OFFSET_MAX = 1000;
 
+const ASCII_ONLY = /^[\x00-\x7f]*$/;
+const foldName = (x) => (ASCII_ONLY.test(x) ? x.toLowerCase() : x.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC'));
+/**
+ * The fold of every live note and of every folder above one, with each fold's spellings. Folders and notes are kept apart because a
+ * folder only clashes with a folder and a note with a note. Its one promise: mayClash is true for every path _noCaseTwin would
+ * refuse. A true that is not a clash only costs the full read. A fold's first spelling shares the string the log's heads hold.
+ */
+class CaseNames {
+  constructor(heads) { this.folders = new Map(); this.notes = new Map(); for (const [p, h] of heads) if (!h.deleted) this.add(p); }
+  add(p) {
+    for (let i = p.indexOf('/'); i > 0; i = p.indexOf('/', i + 1)) {
+      const f = p.slice(0, i); const k = foldName(f); let m = this.folders.get(k);
+      if (!m) this.folders.set(k, m = new Map());
+      m.set(f, (m.get(f) || 0) + 1);
+    }
+    const k = foldName(p); const had = this.notes.get(k);
+    if (had === undefined) this.notes.set(k, p);
+    else if (typeof had === 'string') { if (had !== p) this.notes.set(k, new Set([had, p])); }
+    else had.add(p);
+  }
+  remove(p) {
+    for (let i = p.indexOf('/'); i > 0; i = p.indexOf('/', i + 1)) {
+      const f = p.slice(0, i); const k = foldName(f); const m = this.folders.get(k);
+      if (!m) continue;
+      const n = (m.get(f) || 0) - 1;
+      if (n > 0) m.set(f, n); else { m.delete(f); if (!m.size) this.folders.delete(k); }
+    }
+    const k = foldName(p); const had = this.notes.get(k);
+    if (had === p) this.notes.delete(k);
+    else if (had instanceof Set) { had.delete(p); if (!had.size) this.notes.delete(k); }
+  }
+  mayClash(p) {
+    for (let i = p.indexOf('/'); i > 0; i = p.indexOf('/', i + 1)) {
+      const f = p.slice(0, i); const m = this.folders.get(foldName(f));
+      if (m && (m.size > 1 || !m.has(f))) return true;
+    }
+    const had = this.notes.get(foldName(p));
+    return had !== undefined && had !== p;
+  }
+}
+
 export class Vault extends EventEmitter {
   constructor(root, opts = {}) { super(); this.root = path.resolve(root); this.opts = opts; this.state = path.join(this.root, STATE); }
 
@@ -87,6 +128,7 @@ export class Vault extends EventEmitter {
     if (process.env.MEMEV_RIG_STOPPED === '1' || RIG) for (const p of this.imported || []) { try { const b = this._read(p); if (b !== null) this.index.update(p, b, { mtime: Date.now() }); } catch {} }
     this._replayGraph();
     this.tuning = loadTuning(this);
+    this.commits.catchUp(this.log, path.join(this.state, 'commit.seq'));
     this.started = now();
     return this;
   }
@@ -127,10 +169,13 @@ export class Vault extends EventEmitter {
    * log would hold two histories over one body, and the vault syncs to such disks (issue 243). The fold (NFC, upper case, then
    * lower case, NFC again) makes final sigma, long s, the sharp s against SS and the Kelvin sign equal to their plain forms, as
    * APFS does; it is close to the disk's own table but not the table itself. Only a path with no live head is checked, so writing
-   * an existing note costs nothing extra; the check reads every live head once.
+   * an existing note costs nothing extra. CaseNames answers "could this clash?" from the fold of each live name, built on the first
+   * new note and kept current from the log; only a yes reads every live head, here, so the refusal and its wording have one source.
    */
   _noCaseTwin(p) {
     const h = this.log.heads.get(p); if (h && !h.deleted) return;
+    if (!this._caseNames) { const names = new CaseNames(this.log.heads); this._caseNames = names; this.log.headWatch = (q, was, is) => { if (was !== is) { if (is) names.add(q); else names.remove(q); } }; }
+    if (!this._caseNames.mayClash(p)) return;
     const fold = (x) => x.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC');
     const segs = p.split('/'); const want = []; let acc = '';
     for (const sg of segs) { acc = acc ? `${acc}/${sg}` : sg; want.push([acc, fold(acc)]); }
