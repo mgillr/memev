@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { CEILINGS, evaluate } from '../scripts/bench/speed/targets.mjs';
+import { CAUGHT, CEILINGS, evaluate, judgeOld } from '../scripts/bench/speed/targets.mjs';
 
 const TOOL = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'bench', 'speed', 'targets.mjs');
 const atCeiling = () => Object.fromEntries(Object.entries(CEILINGS).map(([k, [c]]) => [k, c]));
@@ -44,4 +44,17 @@ test('the command exits 1 on a failing file and 0 on a passing one, and runs no 
   fs.writeFileSync(f, JSON.stringify({ ...atCeiling(), a6_roster_ms: 2904 }));
   const bad = run(); assert.equal(bad.status, 1); assert.match(bad.stdout, /FAIL a6_roster_ms 2904/);
   fs.rmSync(d, { recursive: true, force: true });
+});
+
+test('against old code: every ceiling meant to catch it must fail there, and one that passes is named', () => {
+  const over = Object.fromEntries(Object.entries(CEILINGS).map(([k, [c]]) => [k, c + 1]));
+  assert.deepEqual(judgeOld(over).missed, []); assert.equal(judgeOld(over).ok, true);
+  for (const name of CAUGHT) {
+    const v = judgeOld({ ...over, [name]: CEILINGS[name][0] });
+    assert.equal(v.ok, false, name); assert.deepEqual(v.missed, [name]); assert.ok(v.passes.includes(name));
+  }
+  for (const name of CAUGHT) assert.equal(judgeOld({ ...over, [name]: undefined }).ok, false, `${name} with no number is not caught`);
+  const guard = Object.keys(CEILINGS).filter((k) => !CAUGHT.includes(k));
+  assert.equal(judgeOld({ ...over, ...Object.fromEntries(guard.map((k) => [k, 0])) }).ok, true, 'a guard the old code passes is no failure');
+  for (const name of CAUGHT) assert.ok(name in CEILINGS, name);
 });
