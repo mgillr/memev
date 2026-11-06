@@ -50,7 +50,7 @@ export function signByHand(root, { id = `k-legacy-${crypto.randomBytes(3).toStri
   fs.writeFileSync(path.join(root, 'contracts', 'keys', `${kid}.pub`), pub);
   fs.writeFileSync(path.join(root, 'contracts', 'signed', `${id}.json`), `${JSON.stringify(c, null, 2)}\n`);
   fs.writeFileSync(path.join(root, 'contracts', 'signed', `${id}.sig.json`), `${JSON.stringify(env, null, 2)}\n`);
-  return { id, contract: c };
+  return { id, contract: c, privateKeyPem: privateKey.export({ type: 'pkcs8', format: 'pem' }) };
 }
 
 /** The signed body of contract `id`, as written in the vault. */

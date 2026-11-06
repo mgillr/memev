@@ -403,6 +403,26 @@ export function attach(Vault) {
     return { sha };
   };
 
+  /**
+   * The base a signed record beside the body gives a locally signed contract with no base of its own: { sha } (null when there
+   * is no record), or { problem }. The record must be signed by the key that signed the contract and must name this contract's
+   * hash, so it cannot be moved to another contract or written by whoever can write into the folder.
+   */
+  P._baseRecord = function (id, contract) {
+    const raw = this._read(`${SIGNED}/${id}.base.txt`);
+    if (raw === null) return { sha: null };
+    const bad = { problem: 'base record changed or not valid for this contract' };
+    let a, env; try { a = JSON.parse(raw); env = JSON.parse(this._read(`${SIGNED}/${id}.sig.json`)); } catch { return bad; }
+    if (!a || typeof a !== 'object') return bad;
+    const { sig, ...body } = a;
+    const kid = sig?.signatures?.[0]?.keyid;
+    if (kid !== env?.signatures?.[0]?.keyid || !/^[0-9a-f]{16}$/.test(String(kid))) return bad;
+    const pub = this._read(`${KEYS}/${kid}.pub`);
+    if (!pub || !dsseVerify(body, sig, pub).ok || body.id !== id || body.contract_hash !== canonicalHash(contract)) return bad;
+    const sha = body.base?.sha;
+    return SHA40.test(String(sha)) ? { sha } : bad;
+  };
+
   P._contractOrigin = function (id) {
     const body = this._read(`${SIGNED}/${id}.json`);
     if (!body) return null;
@@ -462,6 +482,10 @@ export function attach(Vault) {
     } else if (c.base !== undefined && c.base !== null) {
       const sha = typeof c.base === 'object' ? c.base.sha : c.base;
       if (typeof sha === 'string' && SHA40.test(sha)) base = sha; else baseNote = 'the recorded base is not a 40-hex commit sha';
+    } else {
+      const rec = this._baseRecord(id, c);
+      if (rec.problem) return { id, ok: false, verdict: 'BLOCKED', signature: s.detail, detail: rec.problem, tasks: [] };
+      base = rec.sha;
     }
     const env = criterionEnv(base);
     // scope and red-green criteria compare with the base: without one, or with one this workdir's HEAD does not descend from,
