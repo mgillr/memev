@@ -475,7 +475,7 @@
       "tasks": 2,
       "criteria": 19,
       "spec": "specs/PGP-1.06-memev-ops-sr3-engine-decision.json",
-      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); superseded by PGP-1.06.2 when that is signed; this spec file is unchanged and stays on record"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); superseded by PGP-1.06.3 when that is signed; this spec file is unchanged and stays on record"
     },
     {
       "id": "PGP-1.06.2",
@@ -494,7 +494,26 @@
       "tasks": 2,
       "criteria": 23,
       "spec": "specs/PGP-1.06.2-memev-ops-sr3-engine-decision.json",
-      "status": "proposed and unsigned; supersedes PGP-1.06; signs after its red-team round"
+      "status": "replaced by PGP-1.06.3, never signed: its red-team record was refused because the record first committed different notes; this spec file stays on record"
+    },
+    {
+      "id": "PGP-1.06.3",
+      "kind": "docs",
+      "type": "superseding spec (version 2 of PGP-1.06)",
+      "area": "PGP",
+      "title": "memev-ops: SR-3.01 and SR-3.03 superseded by the call-out engine decision, SR-3.05 states the licences once, as changed by the owner decisions of 5 Nov 2026",
+      "repo": "memev-ops",
+      "branch": "docs/engine-decision-sr3",
+      "pull_request": "memev-ops #13",
+      "programme_tasks": "WP05-02, WP15-02 (ops side)",
+      "depends_on": [],
+      "vault_contracts": [
+        "WO-05-E"
+      ],
+      "tasks": 2,
+      "criteria": 23,
+      "spec": "specs/PGP-1.06.3-memev-ops-sr3-engine-decision.json",
+      "status": "proposed and unsigned; supersedes PGP-1.06; replaces PGP-1.06.2; signs after its red-team round"
     },
     {
       "id": "PG-01.1",
