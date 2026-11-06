@@ -127,7 +127,7 @@ export class SegIndex {
       const seg = new Seg(this._dir(g), built.cols, built.byPath); seg.cols(); await new Promise((res) => setImmediate(res));
       copy(); const st = this._state(seg); this._replay(st, Buffer.concat(tail).toString('utf8')); fs.renameSync(tmp, cur);
       const was = this.gen; const oldLog = this.logFd, oldSeg = this.seg; Object.assign(this, st); this.gen = g; this.logFd = fd; this.logEnd = at; this.foldP = null;
-      if (this.syncing) this.oldLog = oldLog; else fs.close(oldLog, () => {}); oldSeg.close();
+      if (this.syncing) this.oldLog = oldLog; else fs.close(oldLog, () => {}); oldSeg.close(); this._syncLog(); // the last bytes copied
       fs.open(this.root, 'r', (e, dfd) => { const rm = () => fs.rm(this._dir(was), { recursive: true, force: true }, () => {}); if (e) return rm(); return fs.fsync(dfd, () => fs.close(dfd, rm)); }); // a folder cannot be synced on Windows; the error is not checked for that reason
     } catch (e) { try { fs.closeSync(fd); } catch { /* already closed */ } throw e; }
   }
