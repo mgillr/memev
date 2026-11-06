@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { RecallIndex } from '../../../src/engine/index.mjs';
-import { SegIndex } from '../../../src/engine/segindex.mjs';
+import { SegIndex } from '../../../src/engine/segment-index.mjs';
 import { Vault } from '../../../src/engine/vault.mjs';
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..', '..');

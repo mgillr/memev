@@ -249,7 +249,7 @@ test('a close with nothing new writes nothing, and a snapshot of the old form st
 });
 
 test('converting an old index gives the same segment, byte for byte, as loading it whole', async () => {
-  const { RecallIndex } = await import('../src/engine/index.mjs'); const { writeSeg, overlayDocs } = await import('../src/engine/seg2.mjs'); const { convertOldIndex } = await import('../src/engine/segindex.mjs');
+  const { RecallIndex } = await import('../src/engine/index.mjs'); const { writeSeg, overlayDocs } = await import('../src/engine/segment.mjs'); const { convertOldIndex } = await import('../src/engine/segment-index.mjs');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-convert-')); const file = path.join(dir, 'index.jsonl'); const idx = new RecallIndex(file);
   for (let i = 0; i < 60; i++) idx.update(`notes/n${i % 40}.md`, `# Head ${i}\nProject: p${i % 3}\nwords about cache layer number ${i} and more ${i % 5}\n\n## Second\nreview-by: 2027-01-01\nother words here\n`, { mtime: '2026-01-01T00:00:00.000Z' });
   idx.dirty = true; idx.save();
@@ -304,7 +304,7 @@ test('the graph taken in behind the start reads the same as taken in at once, wh
 });
 
 test('a segment built straight from notes is the segment the overlay would have written', async () => {
-  const { RecallIndex } = await import('../src/engine/index.mjs'); const { writeSeg, overlayDocs } = await import('../src/engine/seg2.mjs'); const { SegIndex } = await import('../src/engine/segindex.mjs');
+  const { RecallIndex } = await import('../src/engine/index.mjs'); const { writeSeg, overlayDocs } = await import('../src/engine/segment.mjs'); const { SegIndex } = await import('../src/engine/segment-index.mjs');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-build-')); const notes = []; for (let i = 0; i < 50; i++) notes.push([`notes/n${i}.md`, `# Head ${i}\nProject: P${i % 3}\nwords about cache layer ${i} and more ${i % 5}\n\n## Second\nreview-by: 2027-01-0${1 + (i % 9)}\nflags: a, b\nother words here\n`]);
   const idx = new RecallIndex(path.join(dir, 'x.jsonl')); for (const [p, b] of notes) idx.update(p, b); writeSeg(path.join(dir, 'a'), overlayDocs(idx));
   const seg = new SegIndex(path.join(dir, 'index.jsonl')); seg.buildFrom(notes);

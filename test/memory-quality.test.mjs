@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Vault } from '../src/engine/vault.mjs';
 import { tokenize, RecallIndex } from '../src/engine/index.mjs';
+import { ROW, C_PATH, C_LEN, SEG_VERSION } from '../src/engine/segment.mjs';
 import { assess } from '../src/engine/quality.mjs';
 import { handle } from '../src/server/mcp.mjs';
 import { newVault, cleanup, OWNER } from './helpers/tmp.mjs';
@@ -37,26 +38,42 @@ test('Chinese, Japanese, Korean, Cyrillic, Greek, Arabic and accented Latin are 
   v.close();
 });
 
+// The same promise as when the index was one file, on the segment: a rebuild gives the sections, words and counts the note by note index holds, and rebuilding twice gives the same bytes.
 test('a rebuilt index is byte-identical to the one built note by note, and an old index is rebuilt', () => {
   const { root, v } = newVault();
   v.remember(OWNER, { text: '数据库迁移在周五之前完成，不要在周末部署', kind: 'decision', project: 'infra' });
   v.remember(OWNER, { text: 'Миграция базы данных завершена до пятницы', kind: 'fact', project: 'infra' });
   v.append(OWNER, { path: 'notes/log.md', text: '# Day one\nWe chose Ελληνικά labels for the dashboard' });
   v.append(OWNER, { path: 'notes/log.md', text: '## Day two\nRetry the 東京 deploy after the freeze' });
-  v.index.dirty = true; v.index.save();
-  const incremental = fs.readFileSync(path.join(root, '.memev', 'index.jsonl'));
+  v.index.dirty = true; v.index.save(); v.index.compact();
+  const dump = (index) => {
+    const seg = index.seg, c = seg.cols(), words = Array.from({ length: seg.head.n }, () => []);
+    for (const l of fs.readFileSync(path.join(seg.dir, 'dict.txt'), 'utf8').split('\n')) { if (!l) continue; const [w, df, row] = l.split('\t'); const e = { df: Number(df), row: Number(row) }; const ids = seg.ids(e), tfs = seg.tfs(e); for (let k = 0; k < e.df; k++) words[ids[k]].push([w, tfs[k]]); }
+    const out = []; for (let i = 0; i < seg.head.n; i++) { const m = seg.meta(i); out.push(JSON.stringify({ path: seg.paths[c[i * ROW + C_PATH] - 1], heading: seg.heading(i), line: m.line, len: c[i * ROW + C_LEN], rb: seg.rb(i), snippet: m.snippet, fl: m.fl, words: words[i] })); }
+    return out.sort().join('\n');
+  };
+  const files = (index) => Object.fromEntries(fs.readdirSync(index.seg.dir).filter((f) => f !== 'overlay.log').map((f) => [f, fs.readFileSync(path.join(index.seg.dir, f)).toString('base64')]));
+  const incremental = dump(v.index);
+  assert.match(incremental, /Ελληνικά|ελληνικά/i, 'the dump has the words');
   v.close();
   const v2 = new Vault(root, { git: false, fsync: false }).open(); v2.index.reset(); v2.reindexAll();
-  const rebuilt = fs.readFileSync(path.join(root, '.memev', 'index.jsonl'));
-  const norm = (b) => b.toString().split('\n').slice(1).map((l) => { if (!l) return l; const r = JSON.parse(l); delete r.mtime; return JSON.stringify(r); }).sort().join('\n');
-  assert.equal(norm(rebuilt), norm(incremental), 'same sections, words and counts');
-  v2.index.dirty = true; v2.index.save(); assert.ok(fs.readFileSync(path.join(root, '.memev', 'index.jsonl')).equals(rebuilt), 'saving twice gives the same bytes');
+  assert.equal(dump(v2.index), incremental, 'same sections, words and counts');
+  const once = files(v2.index); assert.ok(Object.keys(once).length >= 8, 'every file of the segment is compared');
+  v2.index.reset(); v2.reindexAll(); assert.deepEqual(files(v2.index), once, 'rebuilding twice gives the same bytes');
   v2.close();
-  fs.writeFileSync(path.join(root, '.memev', 'index.jsonl'), '{"version":2,"sections":0}\n');
-  assert.equal(new RecallIndex(path.join(root, '.memev', 'index.jsonl')).load(), false, 'a version 2 index is not trusted');
+  // a segment of another version is not trusted, and neither is an old file of an old version
+  const indexDir = path.join(root, '.memev', 'index.seg');
+  const gen = fs.readFileSync(path.join(indexDir, 'CURRENT'), 'utf8'); const headFile = path.join(indexDir, `gen-${gen}`, 'head.json');
+  fs.writeFileSync(headFile, JSON.stringify({ ...JSON.parse(fs.readFileSync(headFile, 'utf8')), version: SEG_VERSION - 1 }));
   const v3 = new Vault(root, { git: false, fsync: false }).open();
   assert.equal(v3.recall(OWNER, { query: '数据库', log: false })[0]?.path.startsWith('memory/decisions/'), true, 'reindexed on open');
   v3.close();
+  fs.rmSync(indexDir, { recursive: true, force: true });
+  fs.writeFileSync(path.join(root, '.memev', 'index.jsonl'), '{"version":2,"sections":0}\n');
+  assert.equal(new RecallIndex(path.join(root, '.memev', 'index.jsonl')).load(), false, 'a version 2 index is not trusted');
+  const v4 = new Vault(root, { git: false, fsync: false }).open();
+  assert.equal(v4.recall(OWNER, { query: '数据库', log: false })[0]?.path.startsWith('memory/decisions/'), true, 'reindexed on open');
+  v4.close();
 });
 
 test('the write gate refuses acknowledgements, noise, fragments and duplicates, and says why', () => {

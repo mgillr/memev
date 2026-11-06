@@ -10,7 +10,7 @@ import { performance } from 'node:perf_hooks';
 const has = (k) => process.argv.includes(`--${k}`);
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
 const CODE = arg('code', path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..', '..')); const INDEX = arg('index'), WORK = arg('work'); const REPEATS = Number(arg('repeats', 3)); const SIZES = arg('sizes', '500,5000,16000').split(',').map(Number);
-const { SegIndex } = await import(`${CODE}/src/engine/segindex.mjs`);
+const { SegIndex } = await import(`${CODE}/src/engine/segment-index.mjs`);
 const stat = (a) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); const q = (p) => Number(s[Math.min(s.length - 1, Math.floor((s.length - 1) * p))].toFixed(1)); return { n: s.length, p50: q(0.5), p95: q(0.95), max: q(1) }; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const timed = (fn) => { const t = performance.now(); fn(); return Number((performance.now() - t).toFixed(1)); };

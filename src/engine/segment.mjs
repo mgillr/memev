@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The on-disk segment behind the recall index: immutable files in one folder, read by offset, never parsed whole.
 // Fixed-width columns are little-endian typed arrays, so a query reads them without building objects.
-// All Node targets (x64 and arm64 on macOS, Linux, Windows) are little-endian; a big-endian host would have to swap.
+// The bytes follow the host, which on every usual Node target (x64 and arm64) is little-endian. head.json names the order, so a folder carried to a host of the other order is rebuilt from the notes.
 // Bump SEG_VERSION with any change of these files: an index of another version is rebuilt from the notes.
 //   head.json   counts, every 64th dictionary word with its byte offset; written last, so a folder without it is unfinished
 //   dict.txt    word, df, row of its first posting; sorted by JavaScript string order
@@ -12,6 +12,7 @@
 //   names.json  the paths and projects the ids refer to
 //   bypath.bin  u32 bucket count, path count, a hash table of path ids, then each path's section numbers
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
@@ -67,7 +68,7 @@ class SectionWriter {
 class DictWriter {
   constructor(dir) { this.dir = dir; this.ids = new Out(path.join(dir, 'ids.bin'), Uint32Array); this.tfs = new Out(path.join(dir, 'tfs.bin'), Uint16Array); this.dict = new TextOut(path.join(dir, 'dict.txt')); this.sparse = []; this.row = 0; this.terms = 0; }
   entry(w, df) { const l = Buffer.from(`${w}\t${df}\t${this.row}\n`); if (this.terms++ % 64 === 0) this.sparse.push([w, this.dict.bytes]); this.dict.write(l); this.row += df; }
-  close(n, totalLen, headBytes) { this.ids.close(); this.tfs.close(); this.dict.close(); const dir = this.dir; const t = path.join(dir, 'head.json.tmp'); fs.writeFileSync(t, JSON.stringify({ version: SEG_VERSION, n, totalLen, terms: this.terms, sparse: this.sparse, dictBytes: this.dict.bytes, postings: this.row, headBytes }), { mode: 0o600 }); syncFile(t); fs.renameSync(t, path.join(dir, 'head.json')); }
+  close(n, totalLen, headBytes) { this.ids.close(); this.tfs.close(); this.dict.close(); const dir = this.dir; const t = path.join(dir, 'head.json.tmp'); fs.writeFileSync(t, JSON.stringify({ version: SEG_VERSION, endian: os.endianness(), n, totalLen, terms: this.terms, sparse: this.sparse, dictBytes: this.dict.bytes, postings: this.row, headBytes }), { mode: 0o600 }); syncFile(t); fs.renameSync(t, path.join(dir, 'head.json')); }
 }
 
 /** Growing typed columns of one posting per row, in section order. No object per posting, so the collector has nothing to walk. */
@@ -100,7 +101,7 @@ export function* overlayDocs(ov) { for (const d of ov.docs.values()) { const ter
 
 export class Seg {
   constructor(dir, cols = null, byPath = null) {
-    this.dir = dir; this.head = JSON.parse(fs.readFileSync(path.join(dir, 'head.json'), 'utf8')); if (this.head.version !== SEG_VERSION) throw new Error(`segment version ${this.head.version}`);
+    this.dir = dir; this.head = JSON.parse(fs.readFileSync(path.join(dir, 'head.json'), 'utf8')); if (this.head.version !== SEG_VERSION || this.head.endian !== os.endianness()) throw new Error(`segment version ${this.head.version}, ${this.head.endian}`);
     this.fdD = fs.openSync(path.join(dir, 'dict.txt'), 'r'); this.fdI = fs.openSync(path.join(dir, 'ids.bin'), 'r'); this.fdT = fs.openSync(path.join(dir, 'tfs.bin'), 'r'); this.fdM = fs.openSync(path.join(dir, 'meta.jsonl'), 'r'); this.c = cols; this.h = null; this.byPath = byPath; this.paths = null;
   }
   close() { for (const f of [this.fdD, this.fdI, this.fdT, this.fdM]) fs.closeSync(f); }

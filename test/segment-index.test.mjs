@@ -9,8 +9,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { RecallIndex } from '../src/engine/index.mjs';
-import { SegIndex } from '../src/engine/segindex.mjs';
-import { Seg } from '../src/engine/seg2.mjs';
+import { SegIndex } from '../src/engine/segment-index.mjs';
+import { Seg } from '../src/engine/segment.mjs';
 import { Vault, initVault } from '../src/engine/vault.mjs';
 
 const HERE = fileURLToPath(import.meta.url);

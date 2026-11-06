@@ -10,8 +10,9 @@ import { Bus } from './bus.mjs';
 import crypto from 'node:crypto';
 import { sha256, readJson, writeJson, writePrivateJson, exists, now, stamp, slug, truncate, randomToken } from './util.mjs';
 import { OpLog } from './oplog.mjs';
-import { RecallIndex, tokenize, sections } from './index.mjs';
-import { SegIndex } from './segindex.mjs';
+import { tokenize, sections } from './index.mjs';
+import { SegIndex } from './segment-index.mjs';
+import { Health } from './health.mjs';
 import { Worker } from 'node:worker_threads';
 import { NoteState } from './notestate.mjs';
 import { TokenStore, allowed } from './tokens.mjs';
@@ -97,6 +98,7 @@ export class Vault extends EventEmitter {
   constructor(root, opts = {}) { super(); this.root = path.resolve(root); this.opts = opts; this.state = path.join(this.root, STATE); }
 
   open() {
+    const opening = performance.now(); this.health = new Health();
     if (!isVault(this.root)) throw new VaultError('not_a_vault', `${this.root} is not a Memev vault (memev init)`);
     const fileCfg = readJson(path.join(this.state, 'config.json'), {});
     this.config = { ...DEFAULT_CONFIG, ...fileCfg };
@@ -109,7 +111,7 @@ export class Vault extends EventEmitter {
     this.devices.ensureHost(this.host);
     this.devices.migrate(this.tokens); // existing installs: every token becomes its own device entry
     this.bus = new Bus({ root: this.root, devices: this.devices, commit: (p) => this.commits.add(p, 'bus'), config: this.config.bus || {} });
-    this.index = process.env.MEMEV_RIG_SEG === '1' ? new SegIndex(path.join(this.state, 'index.jsonl')) : new RecallIndex(path.join(this.state, 'index.jsonl'));
+    this.index = new SegIndex(path.join(this.state, 'index.jsonl'));
     this.graph = new Graph();
     this.tournament = new Tournament();
     this.feedback = new Map();
@@ -118,29 +120,28 @@ export class Vault extends EventEmitter {
     this.contractResults = new Map();
     this.commits = new CommitQueue(this.root, { enabled: this.opts.git !== false, delayMs: this.opts.commitDelayMs ?? 400 });
     this._seedBus();
-    const RIG = process.env.MEMEV_RIG_SEG === '1';
     this.notes = new NoteState(this.state).load();
     const scan = this._scanNotes();
     this.graph.bulkLoad = true;
+    let oldIndexMs = null; try { oldIndexMs = fs.statSync(path.join(this.state, 'index.jsonl')).mtimeMs; } catch { /* no old index file, the usual case */ }
     const loaded = this.index.load();
-    const rebuild = !loaded || (this.index.isEmpty ? this.index.isEmpty() : this.index.stats().notes === 0);
+    const rebuild = !loaded || this.index.isEmpty();
     // a first run reads each note once: the import indexes what it just read, in the path order a rebuild uses, when every note is new
     const allNew = rebuild && ![...scan.keys()].some((p) => this.log.heads.has(p));
-    if (allNew && this.index.buildFrom) { this.imported = []; this.recovered = []; this.skipped = []; this.log.group(() => this.index.buildFrom(this._firstRunNotes(scan))); }
+    if (allNew) { this.imported = []; this.recovered = []; this.skipped = []; this.log.group(() => this.index.buildFrom(this._firstRunNotes(scan))); }
     else {
-      this.recover(scan, allNew ? (p, b) => { this.index.update(p, b); this._graphNote(p, b); } : null);
-      if (rebuild) this.reindexAll(scan, allNew ? new Set(this.imported) : null);
+      this.recover(scan);
+      if (rebuild) this.index.buildFrom(this._rebuildNotes(scan));
       else this._restoreGraph(scan);
     }
     this.graph.bulkLoad = false;
     try { this.notes.opened(scan); } catch { this.notes.recs = null; } // a cache that cannot be written costs reads next time, never the vault
-    if (!rebuild && (process.env.MEMEV_RIG_STOPPED === '1' || RIG)) { let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch {} if (saved !== null) for (const [p, h] of this.log.heads) { try { if (h.seq > saved && !h.deleted) { const b = this._read(p); if (b !== null) { this.index.update(p, b, { mtime: Date.now() }); } } else if (h.seq > saved && h.deleted) this.index.remove(p); } catch {} } }
-    // RIG_FIX_STOPPED: a note imported at start reaches recall (main leaves it out until the next rebuild).
-    if (!rebuild && (process.env.MEMEV_RIG_STOPPED === '1' || RIG)) for (const p of this.imported || []) { try { const b = this._read(p); if (b !== null) this.index.update(p, b, { mtime: Date.now() }); } catch {} }
+    if (rebuild) this._saveIndexSeq();
+    else this._catchUpIndex(scan, loaded && oldIndexMs !== null && !fs.existsSync(path.join(this.state, 'index.jsonl')) ? oldIndexMs : null);
     this._replayGraph();
     this.tuning = loadTuning(this);
     this.commits.catchUp(this.log, path.join(this.state, 'commit.seq'));
-    this.started = now();
+    this.started = now(); this.health.opened(performance.now() - opening);
     return this;
   }
 
@@ -156,7 +157,7 @@ export class Vault extends EventEmitter {
     } catch {}
   }
 
-  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this.index.syncNow?.(); this._rigSeq(); this._saveGraph(); clearTimeout(this._idle); this.notes?.close(); try { this._sweepWorker?.terminate(); } catch {} this.devices?.saveSoon(); this.log.close(); }
+  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); clearTimeout(this._ist); this.index.save(); this.index.syncNow(); this._saveIndexSeq(); this._saveGraph(); clearTimeout(this._idle); this.notes?.close(); try { this._sweepWorker?.terminate(); } catch {} this.devices?.saveSoon(); this.log.close(); }
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
@@ -232,7 +233,34 @@ export class Vault extends EventEmitter {
     const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules' || e.isSymbolicLink()) continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) { if (r === 'work/archive') continue; walk(path.join(d, e.name), r); } else if (e.name.endsWith('.md')) out.push(r); } };
     walk(base, dir.replace(/\/$/, '')); return out.sort();
   }
-  reindexAll(scan = null, done = null) { for (const p of scan ? [...scan.keys()].sort() : this.allNotes()) { if (done?.has(p)) continue; const b = this._read(p); this.index.update(p, b); this._graphNote(p, b); } this.index.save(); }
+  reindexAll() { for (const p of this.allNotes()) { const b = this._read(p); this.index.update(p, b); this._graphNote(p, b); } this.index.save(); }
+  /** A rebuild at open: the notes in path order, each read once and taken into the graph as it passes on its way to the index. */
+  *_rebuildNotes(scan) { for (const p of [...scan.keys()].sort()) { const b = this._read(p); this._graphNote(p, b); yield [p, b]; } }
+  /**
+   * The index is saved a few seconds after a write, with the log position it holds in index.seq. Anything the log has past that position
+   * reaches the index here: a write just before a hard kill, and a note changed while stopped (recover has just logged it). An old index
+   * that was just converted has no position, so what is newer than its file is taken in; with neither, every note is. A note retention
+   * moved to the archive was taken out on purpose and stays out, so only the file at the note's own path counts.
+   */
+  _catchUpIndex(scan, convertedFromMs) {
+    let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch { /* none yet */ }
+    if (!Number.isSafeInteger(saved)) saved = convertedFromMs === null ? 0 : Infinity;
+    const late = new Set(this.imported);
+    for (const [p, h] of this.log.heads) if (h.seq > saved) late.add(p);
+    if (saved === Infinity) for (const [p, st] of scan) if (st && st.mtimeMs > convertedFromMs) late.add(p);
+    if (!late.size) { if (saved === Infinity) this._saveIndexSeq(); return; }
+    for (const p of late) {
+      try {
+        if (this.log.heads.get(p)?.deleted) { this.index.remove(p); continue; }
+        if (this._linked(p)) continue;
+        const st = fs.lstatSync(this.abs(p)); const b = this._read(p);
+        if (b !== null) this.index.update(p, b, { mtime: new Date(st.mtimeMs).toISOString() });
+      } catch { /* gone or moved since the log saw it */ }
+    }
+    this.index.save(); this.index.syncNow(); this._saveIndexSeq();
+  }
+  /** Where the index stands in the log. It is written only once the index holds that much on the disk; an older value only means a longer catch-up. */
+  _saveIndexSeq(seq = this.log.seq) { try { fs.writeFileSync(path.join(this.state, 'index.seq'), String(seq), { mode: 0o600 }); } catch { /* the next save writes it again */ } }
   /**
    * Every note the walk finds, with its lstat. The walk skips links, so a note in the result has no link on the way to it, and one
    * lstat per note stands in for checking each folder of each path. allNotes keeps its own walk for callers that want names only.
@@ -287,7 +315,7 @@ export class Vault extends EventEmitter {
    *   file differs otherwise   → edited by hand or by git: recorded as an external 'put' (the old
    *                              version stays in the log), never overwritten
    */
-  recover(scan = this._scanNotes(), onImport = null) {
+  recover(scan = this._scanNotes()) {
     const fixed = [], imported = [], skipped = [];
     // one path the file system cannot take (a NUL in it, a note where a folder must be, a folder where the note goes) is
     // skipped with its reason, so the rest of the vault opens; before, it threw and the vault never opened again (issue 230)
@@ -306,7 +334,7 @@ export class Vault extends EventEmitter {
         else { this._importExternal(p, cur, 'startup'); imported.push(p); }
       });
     }
-    this.log.group(() => { for (const p of [...scan.keys()].sort()) if (!this.log.heads.has(p)) each(p, () => { const b = this._read(p); this._importExternal(p, b, 'startup'); imported.push(p); onImport?.(p, b); }); });
+    this.log.group(() => { for (const p of [...scan.keys()].sort()) if (!this.log.heads.has(p)) each(p, () => { const b = this._read(p); this._importExternal(p, b, 'startup'); imported.push(p); }); });
     this.recovered = fixed; this.imported = imported; this.skipped = skipped;
     return fixed;
   }
@@ -437,8 +465,14 @@ export class Vault extends EventEmitter {
     this._indexSaveSoon();
     this.emit('change', { path: p, type: rec.type, seq: rec.seq, client });
   }
-  _rigSeq(seq = this.log.seq) { if (process.env.MEMEV_RIG_STOPPED === '1' || process.env.MEMEV_RIG_SEG === '1') { try { fs.writeFileSync(path.join(this.state, 'index.seq'), String(seq)); } catch {} } }
-  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); const seq = this.log.seq; if (this.index.whenSynced) this.index.whenSynced(() => this._rigSeq(seq)); else this._rigSeq(seq); this._saveGraphBehind(); try { this.notes.flush(); } catch {} }, 3000); this._ist.unref?.(); }
+  _indexSaveSoon() {
+    clearTimeout(this._ist);
+    this._ist = setTimeout(() => {
+      const t0 = performance.now();
+      this.index.save(); const seq = this.log.seq; this.index.whenSynced(() => this._saveIndexSeq(seq)); this._saveGraphBehind(); try { this.notes.flush(); } catch { /* the cache loses a line, which costs one read at the next start */ }
+      this.health.saveBlock(performance.now() - t0);
+    }, 3000); this._ist.unref?.();
+  }
 
   // ---- note operations
   get(identity, p) { p = checkPath(p); this._need(identity, 'read', p); const b = this._read(p); if (b === null) throw new VaultError('not_found', `no note ${p}`); return { path: p, body: b }; }
@@ -773,13 +807,15 @@ export class Vault extends EventEmitter {
    * (hard scope: that project's sections plus sections with no project; `all_projects` widens it to a
    * boost), and the review state (dropped sections and short-lived ones past their date are left out).
    */
-  _recallFilter(identity, { project = null, all_projects = false } = {}) {
+  _recallFilter(identity, { project = null, all_projects = false, dropPath = null } = {}) {
     const scope = all_projects ? 'all' : (this.config.recall?.scope ?? 'project');
     const pj = scope === 'project' && project ? slug(project) : null;
     const open = !identity.paths || identity.paths.includes('**');
     const today = new Date().toISOString().slice(0, 10);
-    const pc = new Map(), ac = new Map();
+    const pc = new Map(), ac = new Map(), dc = new Map(); const dropping = typeof dropPath === 'function';
     const fn = (d) => {
+      // what a caller never wants is left out before ranking, so it cannot take a place in the top and leave the page short
+      if (dropping) { let x = dc.get(d.path); if (x === undefined) { x = !!dropPath(d.path); dc.set(d.path, x); } if (x) return false; }
       const r = this.reviews.size ? (d.lookup ? d.lookup(this.reviews) : this.reviews.get(`${d.path}#${d.heading || ''}`)) : null;
       if (r?.action === 'drop') return false;
       const until = r?.action === 'keep' ? r.until : d.rb;
@@ -792,13 +828,14 @@ export class Vault extends EventEmitter {
     return fn;
   }
   /** Recall: the index, filtered to what the token may read and the project, annotated with graph context; the use is logged. */
-  recall(identity, { query, project = null, all_projects = false, limit = 6, offset = 0, client = null, session = null, log = true, rigDrop = null }) {
+  recall(identity, { query, project = null, all_projects = false, limit = 6, offset = 0, client = null, session = null, log = true, dropPath = null }) {
+    const t0 = performance.now();
     this._need(identity, 'read', null);
     const lim = limit == null ? 6 : Math.min(10, Math.max(1, Math.trunc(Number(limit)) || 1));
     const off = Math.max(0, Math.trunc(Number(offset)) || 0);
     // A far offset must not cost a full ranking: the index is asked for one page past the bound at most, and an offset
     // past the bound is an empty page. A client that follows next never gets there; next stops at the bound.
-    const top = this.index.query(query, { limit: Math.min(off, RECALL_OFFSET_MAX) + lim, project, boosts: this.tuning?.boosts, filter: rigDrop ? ((f) => (d) => !rigDrop(d.path) && f(d))(this._recallFilter(identity, { project, all_projects })) : this._recallFilter(identity, { project, all_projects }) });
+    const top = this.index.query(query, { limit: Math.min(off, RECALL_OFFSET_MAX) + lim, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects, dropPath }) });
     const total = top.total;
     const hits = off > RECALL_OFFSET_MAX ? [] : top.slice(off, off + lim);
     for (const h of hits) {
@@ -810,6 +847,7 @@ export class Vault extends EventEmitter {
     }
     if (log && hits.length) this._logUsage(identity, { client, session, query, items: hits.map((h) => `${h.path}#${h.heading || ''}`) });
     hits.total = total;
+    this.health.recall(performance.now() - t0);
     return hits;
   }
 
@@ -1075,7 +1113,7 @@ export class Vault extends EventEmitter {
     return {
       oplog: { bytes: this._dirBytes(oplogDir), segments: segs.length, archived: segs.filter((s) => s.archived).length, activeBytes: this._segBytes(oplogDir), archivedBytes: this._segBytes(path.join(oplogDir, 'archive')) },
       journal: { bytes: this._dirBytes(this.abs('work/sessions')), files: this._dirFiles(this.abs('work/sessions'), '.md') },
-      index: { bytes: (fs.existsSync(indexFile) ? fs.statSync(indexFile).size : 0) + this._dirBytes(`${indexFile.replace(/\.jsonl$/, '')}.seg`) + (fs.existsSync(`${indexFile.replace(/\.jsonl$/, '')}.overlay.jsonl`) ? fs.statSync(`${indexFile.replace(/\.jsonl$/, '')}.overlay.jsonl`).size : 0) },
+      index: { bytes: (fs.existsSync(indexFile) ? fs.statSync(indexFile).size : 0) + this._dirBytes(this.index.root) },
       git: { bytes: this._dirBytes(path.join(this.root, '.git', 'objects')) },
     };
   }
@@ -1133,7 +1171,7 @@ export class Vault extends EventEmitter {
     const archived = this.log.archiveSealed();
     const retained = this._journalRetention();
     this.index.save();
-    this.index.compact?.();
+    this.index.compact(); this._saveIndexSeq();
     this._saveGraph();
     const after = this.sizeReport();
     return { dryRun: false, before, after, archived, retained };
@@ -1141,7 +1179,7 @@ export class Vault extends EventEmitter {
 
   status() {
     const mu = process.memoryUsage();
-    return { version: VERSION, vault: this.root, started: this.started, oplog: this.log.stats(), index: this.index.stats(), graph: this.graph.stats(), memory: { rss_mb: Math.round(mu.rss / 1048576), heap_mb: Math.round(mu.heapUsed / 1048576) }, recovered: this.recovered?.length || 0, imported: this.imported?.length || 0, sweep: this.sweep ? { ...this.sweep } : null };
+    return { version: VERSION, vault: this.root, started: this.started, oplog: this.log.stats(), index: this.index.stats(), graph: this.graph.stats(), memory: { rss_mb: Math.round(mu.rss / 1048576), heap_mb: Math.round(mu.heapUsed / 1048576) }, recovered: this.recovered?.length || 0, imported: this.imported?.length || 0, sweep: this.sweep ? { ...this.sweep } : null, health: this.health.report(mu) };
   }
 }
 

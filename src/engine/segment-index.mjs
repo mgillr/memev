@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { RecallIndex, tokenize, INDEX_VERSION as OLD_VERSION } from './index.mjs';
 import { readLines } from './oplog.mjs';
-import { writeSeg, overlayDocs, Seg, foldFiles, foldInWorker, keySig, ROW, C_LEN, C_PATH, C_PROJ, C_RB, C_SIG } from './seg2.mjs';
+import { writeSeg, overlayDocs, Seg, foldFiles, foldInWorker, keySig, ROW, C_LEN, C_PATH, C_PROJ, C_RB, C_SIG } from './segment.mjs';
 
 /** The old index file's sections one at a time, into a segment: no index in memory. False when the file is not a whole index of the version this code reads. */
 export function convertOldIndex(file, dir) {
@@ -98,6 +98,7 @@ export class SegIndex {
     // A complete line that does not parse is not a kill's mark. The notes are the record: the index is rebuilt from them.
     try { this._replay(st, text); } catch { seg.close(); fs.rmSync(this.root, { recursive: true, force: true }); return false; }
     Object.assign(this, st); this.gen = g; this.logFd = fs.openSync(this._log(g), fs.existsSync(this._log(g)) ? 'r+' : 'w+', 0o600); fs.ftruncateSync(this.logFd, end); this.logEnd = end; this.dirty = false; this._sweep(g);
+    fs.rmSync(this.file, { force: true }); // a file an older version wrote while it ran: its writes are in the log, and the vault catches up from there
     return true;
   }
   _writeFromOverlay() {
