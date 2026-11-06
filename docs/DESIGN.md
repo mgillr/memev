@@ -16,7 +16,8 @@ log is ever rewritten.
 project for checkpoints, one per session for the journal. git commits every change.
 
 **Recall.** A BM25 index over note sections (about six bytes per section-term pair), updated per
-write and incrementally on appends, persisted to `.memev/index.jsonl`. Words are split by Unicode
+write and incrementally on appends, kept on disk as a segment with a small overlay log under
+`.memev/index.seg/` and read by offset, so nothing is loaded at start. Words are split by Unicode
 letter and digit, so every script is indexed: accents on Latin and Greek letters are folded, and
 Chinese, Japanese and Korean text is indexed as single characters plus overlapping pairs. ASCII text
 splits exactly as it did before. Sections are filtered before ranking: what the token may read, the

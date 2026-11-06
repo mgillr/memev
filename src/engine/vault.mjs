@@ -247,7 +247,8 @@ export class Vault extends EventEmitter {
     if (!Number.isSafeInteger(saved)) saved = convertedFromMs === null ? 0 : Infinity;
     const late = new Set(this.imported);
     for (const [p, h] of this.log.heads) if (h.seq > saved) late.add(p);
-    if (saved === Infinity) for (const [p, st] of scan) if (st && st.mtimeMs > convertedFromMs) late.add(p);
+    // the old index held no position: a note newer than its file may have missed it, and so may a delete
+    if (saved === Infinity) { for (const [p, st] of scan) if (st && st.mtimeMs > convertedFromMs) late.add(p); for (const [p, h] of this.log.heads) if (h.deleted && this.index.byPath.has(p)) late.add(p); }
     if (!late.size) { if (saved === Infinity) this._saveIndexSeq(); return; }
     for (const p of late) {
       try {

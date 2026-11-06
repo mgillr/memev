@@ -127,6 +127,18 @@ test('an old index converts once: same answers, the old file goes, and a kill be
   const v3 = open(root); assert.equal(fs.readFileSync(path.join(state, 'index.seg', 'CURRENT'), 'utf8'), gen, 'it converts once'); v3.close();
 });
 
+test('after a downgrade and an upgrade again, the index the older version kept is the one converted, and a journal it archived stays out', () => {
+  const { root, v } = newVault();
+  v.write(OWNER, { path: 'notes/a.md', body: '# A\nwords about a capybara\n' }); v.write(OWNER, { path: 'work/sessions/2020-01-01-old.md', body: '# Old\nwords about a wombat\n' }); v.close();
+  const state = path.join(root, '.memev'), file = path.join(state, 'index.jsonl');
+  // the older version ran: it kept its own file, wrote a note, and moved the old journal to the archive without a log record
+  const old = new RecallIndex(file); old.update('notes/a.md', fs.readFileSync(path.join(root, 'notes/a.md'), 'utf8')); old.dirty = true; old.save();
+  fs.mkdirSync(path.join(root, 'work/archive/sessions'), { recursive: true }); fs.renameSync(path.join(root, 'work/sessions/2020-01-01-old.md'), path.join(root, 'work/archive/sessions/2020-01-01-old.md'));
+  const v2 = open(root);
+  assert.equal(found(v2, 'capybara', 'notes/a.md'), true); assert.equal(found(v2, 'wombat', 'work/sessions/2020-01-01-old.md'), false, 'the archived journal stays out');
+  assert.equal(fs.existsSync(file), false); v2.close();
+});
+
 test('a note the old index never saw reaches recall through the conversion, as a hard kill before the upgrade leaves it', () => {
   const { root, v } = newVault();
   v.write(OWNER, { path: 'notes/a.md', body: '# A\nwords about a capybara\n' }); v.write(OWNER, { path: 'notes/c.md', body: '# C\nwords about a tapir\n' }); v.close();

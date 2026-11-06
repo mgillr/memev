@@ -83,12 +83,14 @@ export class SegIndex {
 
   load() {
     let g = null; try { g = Number(fs.readFileSync(path.join(this.root, 'CURRENT'), 'utf8')); } catch { /* no segment yet */ }
+    // The old file beside a segment means an older version ran here since and kept its own index, which is then the newer of the two: it is converted again.
+    if (g !== null && fs.existsSync(this.file)) { this._sweep(g); this.lastGen = Math.max(this.lastGen, g); fs.rmSync(path.join(this.root, 'CURRENT'), { force: true }); g = null; }
     if (g === null) {
       if (!fs.existsSync(this.file)) return false;
       // One conversion from the old file, which goes only once the new generation is published. A kill before that starts it over.
       fs.mkdirSync(this.root, { recursive: true, mode: 0o700 }); this._sweep(this.gen); const ng = ++this.lastGen;
       if (!convertOldIndex(this.file, this._dir(ng))) return false;
-      this._adopt(ng); fs.rmSync(this.file, { force: true }); return true;
+      this._adopt(ng); return true;
     }
     let seg; try { seg = new Seg(this._dir(g)); } catch { fs.rmSync(this.root, { recursive: true, force: true }); return false; } // another version or a lost folder: rebuilt from the notes
     const st = this._state(seg); let text = '';
@@ -98,7 +100,6 @@ export class SegIndex {
     // A complete line that does not parse is not a kill's mark. The notes are the record: the index is rebuilt from them.
     try { this._replay(st, text); } catch { seg.close(); fs.rmSync(this.root, { recursive: true, force: true }); return false; }
     Object.assign(this, st); this.gen = g; this.logFd = fs.openSync(this._log(g), fs.existsSync(this._log(g)) ? 'r+' : 'w+', 0o600); fs.ftruncateSync(this.logFd, end); this.logEnd = end; this.dirty = false; this._sweep(g);
-    fs.rmSync(this.file, { force: true }); // a file an older version wrote while it ran: its writes are in the log, and the vault catches up from there
     return true;
   }
   _writeFromOverlay() {
@@ -107,7 +108,7 @@ export class SegIndex {
     this._adopt(g);
   }
   // A whole new segment in generation g becomes the index, with an empty log: nothing shows until CURRENT names it.
-  _adopt(g) { this._closeFiles(); const log = this._log(g); fs.writeFileSync(log, '', { mode: 0o600 }); const seg = new Seg(this._dir(g)); this._publish(g); Object.assign(this, this._state(seg)); this.gen = g; this.logFd = fs.openSync(log, 'r+'); this.logEnd = 0; this.pending = []; this.dirty = false; this._sweep(g); }
+  _adopt(g) { this._closeFiles(); const log = this._log(g); fs.writeFileSync(log, '', { mode: 0o600 }); const seg = new Seg(this._dir(g)); this._publish(g); Object.assign(this, this._state(seg)); this.gen = g; this.logFd = fs.openSync(log, 'r+'); this.logEnd = 0; this.pending = []; this.dirty = false; this._sweep(g); fs.rmSync(this.file, { force: true }); } // the old file goes last: until then a kill starts the conversion over
   /**
    * Build the first segment straight from notes, one at a time, with the index's own code turning each into sections: nothing is held in
    * memory but the postings. `notes` yields [path, body]. Nothing shows until it is published, so a crash leaves no half index.

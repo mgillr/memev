@@ -35,6 +35,7 @@ const CONFIGS = {
   limited: (x) => ({ limit: 6, project: x.proj || 'billing', boosts, filter: withRev(limited, { project: x.proj || 'billing' }) }),
   wide: (x) => ({ limit: 10, project: x.proj || 'billing', boosts: null, filter: none(open, { project: x.proj || 'billing', all_projects: true }) }),
   remember: () => ({ limit: 5, prefix: 'memory/', filter: (d) => reviews.get(key(d))?.action !== 'drop' }),
+  hook: (x) => ({ limit: 4, project: x.proj, boosts: {}, filter: none(open, { project: x.proj, dropPath: (p) => p.startsWith('work/sessions/') || p.startsWith('contracts/drafts/') }) }),
   bare: () => ({ limit: 60 }),
 };
 const show = (r) => JSON.stringify(r) + r.total;

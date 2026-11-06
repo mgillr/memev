@@ -3,8 +3,8 @@
 // A1 and A8: wall time from spawning the real daemon to /healthz, to ready, and from SIGTERM to exit, on a vault the caller owns.
 // Never point it at a vault you want to keep: it opens the vault. Candidates alternate within one run, so a shared machine hits both.
 //   node scripts/bench/speed/start.mjs --root <copy> --runs 3 [--tree <checkout>]... [--env K=V]... [--prof <dir>] [--touch]
-// --tree may repeat; each tree is one candidate. --env applies to every candidate. --touch appends one note through the route before
-// each stop, so the stop has something to save. Prints one JSON line per run and a summary with min, median and max, and exits 1
+// --tree may repeat; each tree is one candidate. --env applies to every candidate. --touch appends to one note through the route before
+// each stop, --settle <ms> (300) later, so the stop has something to save and, past the commit delay, a commit in flight. Prints one JSON line per run and a summary with min, median and max, and exits 1
 // when any run did not reach health, so a broken daemon cannot read as a fast one.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -43,7 +43,11 @@ async function once(tree) {
   }
   if (health === null) { try { c.kill('SIGKILL'); } catch {} return { ok: false, err: err.slice(0, 2000), exit: c.exitCode }; }
   const rss = await rssMb(c.pid);
-  if (argv.includes('--touch')) { /* a change goes through the file and the next start; the stop itself is timed as is */ }
+  if (argv.includes('--touch')) {
+    const { clientToken } = await import(path.join(tree, 'src', 'cli', 'common.mjs'));
+    const r = await fetch(`http://127.0.0.1:${port}/v1/notes/${encodeURIComponent('notes/bench-touch.md')}`, { method: 'PATCH', headers: { 'content-type': 'application/json', authorization: `Bearer ${clientToken(root, 'cli')}`, 'x-memev-client': 'cli' }, body: JSON.stringify({ text: `## ${new Date().toISOString()}\na line for the stop to save\n` }) });
+    if (!r.ok) { c.kill('SIGTERM'); await new Promise((res) => c.once('exit', res)); return { ok: false, err: `touch: ${r.status}`, exit: null }; }
+  }
   await nap(Number(one('settle', 300)));
   const t1 = performance.now(); c.kill('SIGTERM');
   const code = await new Promise((r) => { if (c.exitCode !== null) r(c.exitCode); else c.once('exit', (x) => r(x)); });
