@@ -1,8 +1,65 @@
 {
-  "title": "PGP-1.06.2 memev-ops: SR-3.01 and SR-3.03 superseded by the call-out engine decision, SR-3.05 states the licences once",
+  "schema": "attest/1",
   "project": "memev",
-  "workdir": null,
-  "request": "Version 2 of PGP-1.06: it supersedes the signed contract k-pgp-1-06-memev-ops-sr-3-d345d7; that file is unchanged and stays on record. Reason: the owner decision of 5 Nov 2026 (docs/scope-one/DECISIONS.md, \"Owner decisions of 5 November 2026: the paid engine\") replaces one line of ADR 6: one private repository, memev-merge, is allowed as the package around crdt-merge, holding the provider shim, the integration of E4 and the signed programs, with no merge algorithm of its own. The changes from version 1 are: T1 requirement 2 and two T1 criteria, one that SR-3.03 states what the package is and one that it no longer says no such repository is created; T2 requirement 1 and the SR-3.05 text and criterion on counsel, which now record the owner's decision of 5 Nov 2026 to replace a lawyer's review with engineering controls, the remaining risk being his; and the marking of the 31 Oct tiers as superseded. PR 13 lands with this version, not version 1. SR-3.01 and SR-3.03 stay superseded and are not built or re-signed in their earlier form. Per-pull-request contract for memev-ops, branch docs/engine-decision-sr3. Proposed and unsigned; the signer signs after the red-team gate. Repository: memev-ops (paths relative to that repository; the contract lives in the memev contracts tree). Programme tasks WP05-02 and WP15-02 (ops side). Boundary with SO-2.13: this contract states licences and the call-out decision; the commercial service boundary stays in SO-2.13. The canonical seed-readiness manifest is the one in memev-ops (103 contracts); the memev copy holds a subset and is kept identical for SR-3.01 and SR-3.05. Owner decisions of 31 Oct 2026 apply (the engine decision confirmed by the owner, t542u): crdt-merge stays in its own repository (BSL 1.1 with its PATENTS file) and is reached only across the call-out boundary, never vendored, so inclusion cannot relicense it; the 31 Oct tiers (free core, Personal at $12/month or $120/year for up to 3 computers) are superseded by the owner decisions of 5 Nov 2026 and contract PL-1, and no criterion here tests a price; no Federated tier and no separate Personal trial; federation is planned, not available. Depends on contracts: none. Signed vault contract WO-05-E (cited by id only): SR-3.05 states the licences once; the signed text guard of the two licence pages stays as it is. ",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
   "tasks": [
     {
       "id": "T1",
@@ -14,16 +71,20 @@
         "The merge engine is crdt-merge, reached only across the call-out boundary; no new merge engine is built, and the private repository memev-merge is only the package around it, with no merge algorithm of its own (source: owner decisions of 31 Oct and 5 Nov 2026)"
       ],
       "description": "",
-      "scope": [
-        "contracts/seed-readiness/manifest.json",
-        "contracts/seed-readiness/specs/SR-3.01-engine-decision-what-merges-a.json",
-        "contracts/seed-readiness/specs/SR-3.03-the-text-merge-engine-built.json",
-        "contracts/seed-readiness/README.md",
-        "contracts/DEPENDENCIES.md",
-        "contracts/seed-readiness/AMENDMENTS.md"
-      ],
+      "scope": {
+        "allow": [
+          "contracts/seed-readiness/manifest.json",
+          "contracts/seed-readiness/specs/SR-3.01-engine-decision-what-merges-a.json",
+          "contracts/seed-readiness/specs/SR-3.03-the-text-merge-engine-built.json",
+          "contracts/seed-readiness/README.md",
+          "contracts/DEPENDENCIES.md",
+          "contracts/seed-readiness/AMENDMENTS.md"
+        ]
+      },
       "criteria": [
         {
+          "id": "T1-AC01",
+          "mandatory": true,
           "statement": "The manifest marks the superseded entries",
           "verifier": {
             "type": "grep",
@@ -32,6 +93,8 @@
           }
         },
         {
+          "id": "T1-AC02",
+          "mandatory": true,
           "statement": "The manifest gives the reason",
           "verifier": {
             "type": "grep",
@@ -40,6 +103,8 @@
           }
         },
         {
+          "id": "T1-AC03",
+          "mandatory": true,
           "statement": "SR-3.03 no longer names a memev-merge repository",
           "verifier": {
             "type": "command",
@@ -48,6 +113,8 @@
           }
         },
         {
+          "id": "T1-AC04",
+          "mandatory": true,
           "statement": "Exactly SR-3.01 and SR-3.03 carry a superseded status in the manifest",
           "verifier": {
             "type": "command",
@@ -56,6 +123,8 @@
           }
         },
         {
+          "id": "T1-AC05",
+          "mandatory": true,
           "statement": "Each superseded entry gives a reason that cites ADR 6",
           "verifier": {
             "type": "command",
@@ -64,6 +133,8 @@
           }
         },
         {
+          "id": "T1-AC06",
+          "mandatory": true,
           "statement": "SR-3.01 states the call-out approach",
           "verifier": {
             "type": "grep",
@@ -73,6 +144,8 @@
           }
         },
         {
+          "id": "T1-AC07",
+          "mandatory": true,
           "statement": "SR-3.03 states the call-out approach",
           "verifier": {
             "type": "grep",
@@ -82,6 +155,8 @@
           }
         },
         {
+          "id": "T1-AC08",
+          "mandatory": true,
           "statement": "The dependency table marks SR-3.01 superseded",
           "verifier": {
             "type": "grep",
@@ -91,6 +166,8 @@
           }
         },
         {
+          "id": "T1-AC09",
+          "mandatory": true,
           "statement": "The dependency table marks SR-3.03 superseded",
           "verifier": {
             "type": "grep",
@@ -100,6 +177,8 @@
           }
         },
         {
+          "id": "T1-AC10",
+          "mandatory": true,
           "statement": "SR-3.03 states that memev-merge is a package around crdt-merge with no merge algorithm of its own, and not an engine",
           "verifier": {
             "type": "grep",
@@ -108,6 +187,8 @@
           }
         },
         {
+          "id": "T1-AC11",
+          "mandatory": true,
           "statement": "SR-3.03 no longer says that no memev-merge repository is created, or that the repository is not built",
           "verifier": {
             "type": "command",
@@ -115,12 +196,16 @@
           }
         },
         {
+          "id": "T1-AC12",
+          "mandatory": true,
           "statement": "Changes stay in scope",
           "verifier": {
             "type": "scope"
           }
         },
         {
+          "id": "T1-AC13",
+          "mandatory": true,
           "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
           "verifier": {
             "type": "pushed"
@@ -143,12 +228,16 @@
         "Apache-2.0 core, BSL-1.1 crdt-merge, ACFA-RS under its own licence, commercial federated services; the BSL change date 2028-03-29 is not changed; the owner replaced the lawyer review with engineering controls and accepts the remaining risk (source: owner decisions of 31 Oct and 5 Nov 2026)"
       ],
       "description": "",
-      "scope": [
-        "contracts/seed-readiness/specs/SR-3.05-one-licence-for-the-engine.json",
-        "contracts/seed-readiness/manifest.json"
-      ],
+      "scope": {
+        "allow": [
+          "contracts/seed-readiness/specs/SR-3.05-one-licence-for-the-engine.json",
+          "contracts/seed-readiness/manifest.json"
+        ]
+      },
       "criteria": [
         {
+          "id": "T2-AC01",
+          "mandatory": true,
           "statement": "The spec names ACFA-RS",
           "verifier": {
             "type": "grep",
@@ -157,6 +246,8 @@
           }
         },
         {
+          "id": "T2-AC02",
+          "mandatory": true,
           "statement": "The spec keeps the change date unchanged",
           "verifier": {
             "type": "grep",
@@ -165,6 +256,8 @@
           }
         },
         {
+          "id": "T2-AC03",
+          "mandatory": true,
           "statement": "The spec cites the signed vault contract WO-05-E by id",
           "verifier": {
             "type": "grep",
@@ -173,6 +266,8 @@
           }
         },
         {
+          "id": "T2-AC04",
+          "mandatory": true,
           "statement": "The spec names all four licences: the Apache-2.0 core, BSL for crdt-merge, ACFA-RS and the commercial federated services",
           "verifier": {
             "type": "command",
@@ -181,6 +276,8 @@
           }
         },
         {
+          "id": "T2-AC05",
+          "mandatory": true,
           "statement": "The spec still checks the notice section that states the licences once",
           "verifier": {
             "type": "grep",
@@ -189,6 +286,8 @@
           }
         },
         {
+          "id": "T2-AC06",
+          "mandatory": true,
           "statement": "The manifest row of SR-3.05 names ACFA-RS",
           "verifier": {
             "type": "grep",
@@ -197,6 +296,8 @@
           }
         },
         {
+          "id": "T2-AC07",
+          "mandatory": true,
           "statement": "SR-3.05 records the owner's decision of 5 Nov 2026 in place of a lawyer's review, with the remaining risk his",
           "verifier": {
             "type": "grep",
@@ -205,6 +306,8 @@
           }
         },
         {
+          "id": "T2-AC08",
+          "mandatory": true,
           "statement": "SR-3.05 no longer asks for counsel's review",
           "verifier": {
             "type": "command",
@@ -212,12 +315,16 @@
           }
         },
         {
+          "id": "T2-AC09",
+          "mandatory": true,
           "statement": "Changes stay in scope",
           "verifier": {
             "type": "scope"
           }
         },
         {
+          "id": "T2-AC10",
+          "mandatory": true,
           "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
           "verifier": {
             "type": "pushed"
@@ -229,5 +336,23 @@
         "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
       ]
     }
-  ]
+  ],
+  "id": "k-pgp-1-06-3-memev-ops-sr--c3c422",
+  "title": "PGP-1.06.3 memev-ops: SR-3.01 and SR-3.03 superseded by the call-out engine decision, SR-3.05 states the licences once",
+  "workdir": null,
+  "created": "2026-11-06T09:15:38.119Z",
+  "version": 2,
+  "supersedes": "k-pgp-1-06-memev-ops-sr-3-d345d7",
+  "request": "Version 2 of PGP-1.06, under the id PGP-1.06.3 because the record of PGP-1.06.2 was refused: it supersedes the signed contract k-pgp-1-06-memev-ops-sr-3-d345d7; that file is unchanged and stays on record. Reason: the owner decision of 5 Nov 2026 (docs/scope-one/DECISIONS.md, \"Owner decisions of 5 November 2026: the paid engine\") replaces one line of ADR 6: one private repository, memev-merge, is allowed as the package around crdt-merge, holding the provider shim, the integration of E4 and the signed programs, with no merge algorithm of its own. The changes from version 1 are: T1 requirement 2 and two T1 criteria, one that SR-3.03 states what the package is and one that it no longer says no such repository is created; T2 requirement 1 and the SR-3.05 text and criterion on counsel, which now record the owner's decision of 5 Nov 2026 to replace a lawyer's review with engineering controls, the remaining risk being his; and the marking of the 31 Oct tiers as superseded. PR 13 lands with this version, not version 1. SR-3.01 and SR-3.03 stay superseded and are not built or re-signed in their earlier form. Per-pull-request contract for memev-ops, branch docs/engine-decision-sr3. Proposed and unsigned; the signer signs after the red-team gate. Repository: memev-ops (paths relative to that repository; the contract lives in the memev contracts tree). Programme tasks WP05-02 and WP15-02 (ops side). Boundary with SO-2.13: this contract states licences and the call-out decision; the commercial service boundary stays in SO-2.13. The canonical seed-readiness manifest is the one in memev-ops (103 contracts); the memev copy holds a subset and is kept identical for SR-3.01 and SR-3.05. Owner decisions of 31 Oct 2026 apply (the engine decision confirmed by the owner, t542u): crdt-merge stays in its own repository (BSL 1.1 with its PATENTS file) and is reached only across the call-out boundary, never vendored, so inclusion cannot relicense it; the 31 Oct tiers (free core, Personal at $12/month or $120/year for up to 3 computers) are superseded by the owner decisions of 5 Nov 2026 and contract PL-1, and no criterion here tests a price; no Federated tier and no separate Personal trial; federation is planned, not available. Depends on contracts: none. Signed vault contract WO-05-E (cited by id only): SR-3.05 states the licences once; the signed text guard of the two licence pages stays as it is. ",
+  "provenance": {
+    "record": "contracts/programme/redteam/PGP-1.06.3.json",
+    "review": "NOT AN INDEPENDENT REVIEW: the second seat wrote the draft and signed the round, the lead reviewed it, on the owner's decision of 6 Nov 2026",
+    "spec_sha256": "982651d58c4e24f04eb6e23714dee7f039374b01b6e53cf0a3966d61ef16eee1",
+    "spec": "contracts/programme/specs/PGP-1.06.3-memev-ops-sr3-engine-decision.json"
+  },
+  "origin": "local",
+  "base": {
+    "sha": "1c38f939bfc568ca07ed026dd16c6cb942da95e0",
+    "recorded_at": "2026-11-06T09:15:38.772Z"
+  }
 }
