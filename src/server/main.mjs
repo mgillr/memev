@@ -56,4 +56,5 @@ server.listen(port, bind, async () => {
   // a start trusts a note's stat, so every note's bytes are checked once behind it
   vault.on('sweep', (s) => { console.error(`[memev] sweep ${s.state}: ${s.hashed} notes in ${s.cycle_ms ?? '?'} ms, ${s.changed} changed${s.error ? `, ${s.error}` : ''}`); });
   vault.startSweep();
+  vault.startIdleWork();
 });

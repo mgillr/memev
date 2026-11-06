@@ -80,6 +80,7 @@ export class Vault extends EventEmitter {
     const RIG = process.env.MEMEV_RIG_SEG === '1';
     this.notes = new NoteState(this.state).load();
     const scan = this._scanNotes();
+    this.graph.bulkLoad = true;
     const loaded = this.index.load();
     const rebuild = !loaded || this.index.stats().notes === 0;
     // a first run reads each note once: the import indexes what it just read, in the path order a rebuild uses, when every note is new
@@ -87,6 +88,7 @@ export class Vault extends EventEmitter {
     this.recover(scan, allNew ? (p, b) => { this.index.update(p, b); this._graphNote(p, b); } : null);
     if (rebuild) this.reindexAll(scan, allNew ? new Set(this.imported) : null);
     else this._restoreGraph(scan);
+    this.graph.bulkLoad = false;
     this.notes.opened(scan);
     if (!rebuild && (process.env.MEMEV_RIG_STOPPED === '1' || RIG)) { let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch {} if (saved !== null) for (const [p, h] of this.log.heads) { try { if (h.seq > saved && !h.deleted) { const b = this._read(p); if (b !== null) { this.index.update(p, b, { mtime: Date.now() }); } } else if (h.seq > saved && h.deleted) this.index.remove(p); } catch {} } }
     // RIG_FIX_STOPPED: a note imported at start reaches recall (main leaves it out until the next rebuild).
@@ -109,7 +111,7 @@ export class Vault extends EventEmitter {
     } catch {}
   }
 
-  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this._rigSeq(); this._saveGraph(); this.notes.close(); try { this._sweepWorker?.terminate(); } catch {} this.devices?.saveSoon(); this.log.close(); }
+  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this._rigSeq(); this._saveGraph(); clearTimeout(this._idle); this.notes?.close(); try { this._sweepWorker?.terminate(); } catch {} this.devices?.saveSoon(); this.log.close(); }
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
@@ -209,12 +211,16 @@ export class Vault extends EventEmitter {
    * and unchanged, and from the text of the rest. A note gone from disk has no line in that order, so it cannot linger.
    */
   _restoreGraph(scan) {
-    const { recs, mentions } = this.notes; const changed = new Set([...(this.recovered || []), ...(this.imported || [])]);
+    const { recs } = this.notes; const mentions = this.notes.mentions.map((t) => (t ? { id: t[0], name: t[1], kind: t[2] } : t)); const changed = new Set([...(this.recovered || []), ...(this.imported || [])]);
+    const keep = (r) => r.secs.every((s) => s[1].every((m) => mentions[m]));
+    let run = [];
     for (const p of [...scan.keys()].sort()) {
       const r = recs.get(p); const h = this.log.heads.get(p);
-      if (r?.secs && h && r.ch === h.ch && !changed.has(p) && this._sameStat(scan.get(p), r)) { try { this.graph.addMentions(p, r.secs.map(([hd, ms]) => [hd, ms.map((m) => { const t = mentions[m]; return { id: t[0], name: t[1], kind: t[2] }; })])); continue; } catch { this.graph.removeNote(p); } }
+      if (r?.secs && h && r.ch === h.ch && !changed.has(p) && this._sameStat(scan.get(p), r) && keep(r)) { if (r.secs.length) run.push([p, r.secs]); continue; }
+      if (run.length) { this.graph.restore(mentions, run); run = []; }
       try { this._graphNote(p, this._read(p)); } catch {}
     }
+    if (run.length) this.graph.restore(mentions, run);
   }
 
   /**
@@ -246,6 +252,11 @@ export class Vault extends EventEmitter {
     this.log.group(() => { for (const p of [...scan.keys()].sort()) if (!this.log.heads.has(p)) each(p, () => { const b = this._read(p); this._importExternal(p, b, 'startup'); imported.push(p); onImport?.(p, b); }); });
     this.recovered = fixed; this.imported = imported; this.skipped = skipped;
     return fixed;
+  }
+  /** Finish what a start left for later, a slice at a time, so the thread stays free. */
+  startIdleWork() {
+    const step = () => { if (this.graph.step(5)) { this._idle = setTimeout(step, 1); this._idle.unref?.(); } };
+    step();
   }
   /**
    * The background check of every note against the log, for what a stat cannot show: a file system with a coarse or unusable changed
@@ -735,8 +746,7 @@ export class Vault extends EventEmitter {
     const hits = off > RECALL_OFFSET_MAX ? [] : top.slice(off, off + lim);
     for (const h of hits) {
       const key = `${h.path}#${h.heading || ''}`;
-      const ents = this.graph.sectionEnts.get(key) || [];
-      h.related = ents.slice(0, 5).map((id) => this.graph.entities.get(id)?.name).filter(Boolean);
+      h.related = this.graph.relatedNames(h.path, h.heading || '', 5);
       const claims = [...this.graph.claims.values()].filter((c) => c.evidence.some((e) => e.path === h.path));
       if (claims.length) h.claims = claims.slice(0, 3).map((c) => ({ id: c.id, claim: `${c.subject} ${c.predicate}${c.object ? ` ${c.object}` : ''}`, status: Graph.assess(c).status }));
       const u = this.graph.usage.get(key); if (u) h.used = u.count;

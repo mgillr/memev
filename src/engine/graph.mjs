@@ -76,45 +76,117 @@ export function mentionsOf(secs) {
 
 export class Graph {
   constructor() {
-    this.entities = new Map();      // id -> { id, name, kind, sections:Set }
-    this.sectionEnts = new Map();   // sectionKey -> [entity ids]
-    this.notesSections = new Map(); // path -> [sectionKeys]
-    this.noteEnts = new Map();      // path -> [[entity ids] per section], to undo co-occurrence exactly
-    this.cooc = new Map();          // "a|b" -> weight
+    this._entities = new Map();     // id -> { id, name, kind, sections:Set }
+    this._sectionEnts = new Map();  // sectionKey -> [entity ids]
+    this._notesSections = new Map();// path -> [sectionKeys]
+    this._noteEnts = new Map();     // path -> [[entity ids] per section], to undo co-occurrence exactly
+    this.adj = new Map();           // entity id -> Map(entity id -> weight), both ways: co-occurrence
+    this.pairs = 0;                 // distinct co-occurring pairs
+    this.pending = new Map();       // path -> sections not taken into the maps above yet, in the order they will be (see restore)
+    this.firstNames = null;         // id -> the name it will have, while pending
+    this.mentionTable = null;       // what numbers in a restored record mean
+    this.bulkLoad = false;
     this.edges = [];                // explicit edges { from, to, type, by, seq, why }
     this.claims = new Map();        // id -> claim
     this.usage = new Map();         // itemKey -> { count, last: [{ seq, ts, client, session, query }] }
   }
 
   // ---- derived: from the notes
+  // Taking every note into these maps costs more than the rest of a start together when notes name many entities, and a start needs
+  // none of it: recall asks only about the sections it found (relatedNames), from the saved records. Until step has taken a note in
+  // it waits in `pending`, in order, so the maps end as they would have, and a change to a waiting note only changes what waits.
+  // Every other reader goes through the accessors below, which finish the work first, so nothing ever sees part of a graph.
+  get entities() { this.finish(); return this._entities; }
+  get sectionEnts() { this.finish(); return this._sectionEnts; }
+  get notesSections() { this.finish(); return this._notesSections; }
+  get noteEnts() { this.finish(); return this._noteEnts; }
+  /** Every pair as "a|b" -> weight. */
+  get cooc() { this.finish(); const out = new Map(); for (const [a, m] of this.adj) for (const [b, w] of m) if (a < b) out.set(`${a}|${b}`, w); return out; }
+
+  /** A start's notes in path order, from saved records ([[heading,[mention numbers]]...]). mentions: the table of { id, name, kind }. */
+  restore(mentions, notes) {
+    this.mentionTable = mentions;
+    const names = this.firstNames ||= new Map();
+    for (const [p, secs] of notes) {
+      for (const s of secs) for (const m of s[1]) { const t = mentions[m]; if (!names.has(t.id)) names.set(t.id, t.name); }
+      this.pending.set(p, secs);
+    }
+  }
+  /** Sections of a note read during a start: they wait with the rest. */
+  _wait(p, found) {
+    // copies, never views of the note's text: a first run holds every note here for a while
+    const kept = found.map(([h, ents]) => [own(h), ents.map((e) => ({ id: own(e.id), name: own(e.name), kind: e.kind }))]);
+    const was = this.pending.get(p); if (was) { for (const x of kept) was.push(x); } else this.pending.set(p, kept);
+    const names = this.firstNames ||= new Map();
+    for (const [, ents] of kept) for (const e of ents) if (!names.has(e.id)) names.set(e.id, e.name);
+  }
+  /** Take notes in for up to budgetMs. True while any remain. */
+  step(budgetMs = 5) {
+    const end = performance.now() + budgetMs; let n = 0;
+    for (const [p, secs] of this.pending) {
+      this.pending.delete(p); this._take(p, secs);
+      if ((++n & 15) === 0 && performance.now() >= end) break;
+    }
+    if (this.pending.size) return true;
+    if (!this.bulkLoad) { this.firstNames = null; this.mentionTable = null; }
+    return false;
+  }
+  finish() { while (this.pending.size) this.step(1000); }
+  _take(p, secs) { const M = this.mentionTable; for (const [h, ents] of secs) this._add(p, [[h, typeof ents[0] === 'number' ? ents.map((m) => M[m]) : ents]], true); }
+  /** Names of the entities in the sections called `heading` of note p, as recall shows them. Never makes a start's work finish first. */
+  relatedNames(p, heading, limit) {
+    const w = this.pending.get(p);
+    if (!w) return (this._sectionEnts.get(`${p}#${heading}`) || []).slice(0, limit).map((id) => this._entities.get(id)?.name).filter(Boolean);
+    const seen = new Map(); const M = this.mentionTable;
+    for (const [h, ents] of w) if (h === heading) for (const e of ents) { const t = typeof e === 'number' ? M[e] : e; if (!seen.has(t.id)) seen.set(t.id, this.firstNames.get(t.id) ?? t.name); }
+    return [...seen.values()].slice(0, limit);
+  }
+
   indexNote(p, body) { this.removeNote(p); return this.indexSections(p, sections(body)); }
   /** Add sections to a note's entry (an append adds only its new sections). Returns what it found, for the saved note state. */
   indexSections(p, secs) { const found = mentionsOf(secs); this.addMentions(p, found); return found; }
   /** A section that names no entity leaves no trace: every reader takes a missing section as an empty one. */
-  addMentions(p, found) {
-    const keys = this.notesSections.get(p) || []; const lists = this.noteEnts.get(p) || [];
+  addMentions(p, found) { if (this.bulkLoad || this.pending.size) { if (found.length) this._wait(p, found); return; } this._add(p, found, false); }
+  _add(p, found, fresh) {
+    const keys = this._notesSections.get(p) || []; const lists = this._noteEnts.get(p) || [];
     for (const [heading, ents] of found) {
-      const key = own(`${p}#${heading}`);
+      const key = fresh ? `${p}#${heading}` : own(`${p}#${heading}`); // fresh: from the saved state or already copied, no view of any note's text
       for (const e of ents) {
-        if (!this.entities.has(e.id)) this.entities.set(own(e.id), { id: own(e.id), name: own(e.name), kind: e.kind, sections: new Set() });
-        this.entities.get(e.id).sections.add(key);
+        let x = this._entities.get(e.id);
+        if (!x) { const id = fresh ? e.id : own(e.id); x = { id, name: fresh ? e.name : own(e.name), kind: e.kind, sections: new Set() }; this._entities.set(id, x); }
+        x.sections.add(key);
       }
       // ids are the entity map's own strings, never views of the note text
-      const ids = ents.map((e) => this.entities.get(e.id).id);
-      for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) { const k = ids[i] < ids[j] ? `${ids[i]}|${ids[j]}` : `${ids[j]}|${ids[i]}`; this.cooc.set(k, (this.cooc.get(k) || 0) + 1); }
-      if (!this.sectionEnts.has(key)) { keys.push(key); this.sectionEnts.set(key, ids); }
-      else this.sectionEnts.set(key, [...new Set([...this.sectionEnts.get(key), ...ids])]);
+      const ids = ents.map((e) => this._entities.get(e.id).id);
+      this._coocAdd(ids);
+      if (!this._sectionEnts.has(key)) { keys.push(key); this._sectionEnts.set(key, ids); }
+      else this._sectionEnts.set(key, [...new Set([...this._sectionEnts.get(key), ...ids])]);
       lists.push(ids);
     }
-    if (keys.length || lists.length) { this.notesSections.set(p, keys); this.noteEnts.set(p, lists); }
+    if (keys.length || lists.length) { this._notesSections.set(p, keys); this._noteEnts.set(p, lists); }
+  }
+  _coocAdd(ids) {
+    const adj = this.adj;
+    for (let i = 0; i < ids.length; i++) {
+      const a = ids[i]; let ma = adj.get(a); if (!ma) adj.set(a, ma = new Map());
+      for (let j = i + 1; j < ids.length; j++) { const b = ids[j]; const w = ma.get(b); if (w === undefined) this.pairs++; const n = (w || 0) + 1; ma.set(b, n); let mb = adj.get(b); if (!mb) adj.set(b, mb = new Map()); mb.set(a, n); }
+    }
+  }
+  _coocSub(ids) {
+    const adj = this.adj;
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+      const a = ids[i], b = ids[j]; const ma = adj.get(a), mb = adj.get(b); const w = ma?.get(b); if (w === undefined) continue;
+      if (w > 1) { ma.set(b, w - 1); mb.set(a, w - 1); } else { ma.delete(b); mb.delete(a); this.pairs--; if (!ma.size) adj.delete(a); if (!mb.size) adj.delete(b); }
+    }
   }
   removeNote(p) {
-    for (const key of this.notesSections.get(p) || []) {
-      for (const id of this.sectionEnts.get(key) || []) { const e = this.entities.get(id); if (e) { e.sections.delete(key); if (!e.sections.size) this.entities.delete(id); } }
-      this.sectionEnts.delete(key);
+    this.pending.delete(p);
+    for (const key of this._notesSections.get(p) || []) {
+      for (const id of this._sectionEnts.get(key) || []) { const e = this._entities.get(id); if (e) { e.sections.delete(key); if (!e.sections.size) this._entities.delete(id); } }
+      this._sectionEnts.delete(key);
     }
-    for (const ids of this.noteEnts.get(p) || []) for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) { const k = ids[i] < ids[j] ? `${ids[i]}|${ids[j]}` : `${ids[j]}|${ids[i]}`; const w = (this.cooc.get(k) || 0) - 1; if (w > 0) this.cooc.set(k, w); else this.cooc.delete(k); }
-    this.notesSections.delete(p); this.noteEnts.delete(p);
+    for (const ids of this._noteEnts.get(p) || []) this._coocSub(ids);
+    this._notesSections.delete(p); this._noteEnts.delete(p);
   }
 
   // ---- logged: applied from operations (live and on replay)
@@ -411,7 +483,8 @@ export class Graph {
     const id = this.entities.has(entityOrKey) ? entityOrKey : slug(entityOrKey);
     if (view && !view.entity(id)) return [];
     let out = [];
-    for (const [k, w] of this.cooc) { const [a, b] = k.split('|'); if (a === id) out.push({ entity: b, weight: w, via: 'co_occurs' }); else if (b === id) out.push({ entity: a, weight: w, via: 'co_occurs' }); }
+    this.finish();
+    for (const [b, w] of this.adj.get(id) || []) out.push({ entity: b, weight: w, via: 'co_occurs' });
     for (const e of this.edges) if (!e.retracted && (e.from === id || e.to === id)) out.push({ entity: e.from === id ? e.to : e.from, weight: 3, via: e.type, why: e.why, seq: e.seq });
     if (view) out = out.filter((n) => view.entity(n.entity));
     return out.sort((x, y) => y.weight - x.weight).slice(0, limit).map((n) => ({ ...n, name: this.entities.get(n.entity)?.name || n.entity }));
@@ -434,5 +507,5 @@ export class Graph {
   }
   sharedSections(a, b) { const A = this.entities.get(a)?.sections, B = this.entities.get(b)?.sections; if (!A || !B) return []; return [...A].filter((k) => B.has(k)); }
 
-  stats() { return { entities: this.entities.size, co_occurrences: this.cooc.size, explicit_edges: this.edges.filter((e) => !e.retracted).length, claims: this.claims.size, used_items: this.usage.size }; }
+  stats() { return { entities: this.entities.size, co_occurrences: (this.finish(), this.pairs), explicit_edges: this.edges.filter((e) => !e.retracted).length, claims: this.claims.size, used_items: this.usage.size }; }
 }

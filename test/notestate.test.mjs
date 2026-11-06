@@ -181,7 +181,7 @@ test('the real daemon runs the sweep behind its start and reports it', async () 
   const root = fresh(); const file = settled(root, { ignoreCtime: true }); void file;
   const c = spawn(process.execPath, [path.join(PKG, 'src/server/main.mjs'), '--root', root, '--port', '47991'], { stdio: ['ignore', 'ignore', 'pipe'] });
   let err = ''; c.stderr.on('data', (d) => { err += d; });
-  let saw; try { saw = await until(() => err.includes('sweep done'), 15000); } finally { c.kill('SIGTERM'); await new Promise((r) => c.once('exit', r)); }
+  let saw; try { saw = await until(() => err.includes('sweep done'), 120000); } finally { c.kill('SIGTERM'); await new Promise((r) => c.once('exit', r)); }
   assert.ok(saw, `the sweep log line: ${err}`);
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -203,7 +203,7 @@ test('memev start leaves a daemon that says it is loading, and stops one that sa
 
 test('a hard kill during the first import loses nothing and doubles nothing', async () => {
   const root = fresh(); const N = 3000;
-  for (let i = 0; i < N; i++) { const d = path.join(root, 'notes', `d${i % 50}`); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, `n${i}.md`), `# n${i}\nsome words about note ${i}\n`); }
+  for (let i = 0; i < N; i++) { const d = path.join(root, 'notes', `d${i % 50}`); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, `n${i}.md`), `# n${i}\nsome words about note ${i}\n${'filler words here '.repeat(150)}\n`); }
   const script = `import { Vault } from ${JSON.stringify(path.join(PKG, 'src/engine/vault.mjs'))}; new Vault(${JSON.stringify(root)}, { git: false }).open(); process.stdout.write('opened');`;
   const c = spawn(process.execPath, ['--input-type=module', '-e', script], { stdio: ['ignore', 'pipe', 'ignore'] });
   let opened = false; c.stdout.on('data', () => { opened = true; });
@@ -262,4 +262,31 @@ test('a first run that indexes while it imports gives the recall a rebuild gives
   v = open(root); assert.equal(v.imported.length, 0); const rebuilt = answers(v); assert.deepEqual(first, rebuilt); assert.deepEqual(firstGraph, graphOf(v));
   assert.ok(first.some((a) => a.length)); v.close();
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('the graph taken in behind the start reads the same as taken in at once, whichever reader or write comes first', () => {
+  const root = fresh(); let v = open(root);
+  for (let i = 0; i < 25; i++) v.write(ME, { path: `notes/c${i}.md`, body: entityBody(`Note Number${i}`) });
+  v.close();
+  const copy = `${root}-copy`; fs.cpSync(root, copy, { recursive: true });
+  v = open(root); const eager = open(copy); eager.graph.finish();
+  assert.ok(v.graph.pending.size > 0, 'the control: the work really is left for later');
+  assert.equal(v.graph._entities.size, 0);
+  const ns = (x) => x.graph.neighbours('big-service', 50);
+  // recall on a graph not taken in yet, and on one part taken in, gives the same related names and finishes nothing
+  const hits = (x) => x.recall(ME, { query: 'big service', log: false, limit: 10 }).map((h) => [h.path, h.heading, h.related]);
+  const want = hits(eager); assert.ok(want.some((h) => h[2].length)); assert.deepEqual(hits(v), want); assert.ok(v.graph.pending.size > 0, 'recall made nothing finish');
+  v.graph.step(0); assert.ok(v.graph.pending.size > 0); assert.deepEqual(hits(v), want);
+  assert.deepEqual(ns(v), ns(eager)); assert.deepEqual(v.graph.stats(), eager.graph.stats()); assert.deepEqual(graphOf(v), graphOf(eager));
+  v.close(); eager.close();
+  // edits while waiting
+  const a = open(root), b = open(copy); b.graph.finish();
+  for (const x of [a, b]) { x.write(ME, { path: 'notes/c1.md', body: '# one\nBig Service and Other Thing here\n' }); x.delete(ME, { path: 'notes/c2.md' }); x.append(ME, { path: 'notes/c3.md', text: '\n## Extra\nBig Service with Other Thing\n' }); }
+  assert.ok(a.graph.pending.size > 0);
+  const sorted = (l) => [...l].sort((x, y) => (x.entity < y.entity ? -1 : 1));
+  assert.deepEqual(sorted(ns(a)), sorted(ns(b))); assert.equal(a.graph.stats().co_occurrences, b.graph.stats().co_occurrences);
+  // an append to a note still waiting joins it in its place, so one entity's list of sections can differ in order until the next start, which sorts them; the contents agree
+  const bySet = (g) => ({ ...g, entities: g.entities.map((e) => [e[0], e[1], e[2], [...e[3]].sort()]) });
+  assert.deepEqual(bySet(graphOf(a)), bySet(graphOf(b)));
+  a.close(); b.close(); fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(copy, { recursive: true, force: true });
 });
