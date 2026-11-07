@@ -56,7 +56,7 @@ function walk(dir, rel, items) {
 
 function gitLogSubjects(dir) {
   try {
-    const out = execFileSync('git', ['log', '--pretty=%s', '-n', '50'], { cwd: dir, encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    const out = execFileSync('git', ['log', '--pretty=%s', '-n', '50'], { windowsHide: true, cwd: dir, encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
     if (!out) return null;
     const lines = out.split('\n').filter(Boolean);
     if (!lines.length) return null;

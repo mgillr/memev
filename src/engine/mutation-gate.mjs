@@ -531,7 +531,7 @@ function cleanEnv(extra = {}) {
   return Object.assign(env, { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '' });
 }
 function git(cwd, args) {
-  const r = spawnSync('git', args, { cwd, env: cleanEnv({ GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0' }), encoding: 'utf8', maxBuffer: 512 << 20 });
+  const r = spawnSync('git', args, { windowsHide: true, cwd, env: cleanEnv({ GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0' }), encoding: 'utf8', maxBuffer: 512 << 20 });
   return { ok: r.status === 0, out: r.stdout || '', err: `${r.stderr || ''}${r.error ? r.error.message : ''}`.trim() };
 }
 function unquote(p) {
@@ -702,7 +702,7 @@ function seedCopy(root, dest, base) {
     if (fs.existsSync(path.join(common, f))) { fs.mkdirSync(path.dirname(path.join(gd, f)), { recursive: true }); fs.copyFileSync(path.join(common, f), path.join(gd, f)); }
   }
   const pack = spawnSync('git', ['pack-objects', '--revs', '-q', path.join(gd, 'objects', 'pack', 'pack')],
-    { cwd: root, env: cleanEnv({ GIT_OPTIONAL_LOCKS: '0' }), input: `${base}\n`, encoding: 'utf8' });
+    { windowsHide: true, cwd: root, env: cleanEnv({ GIT_OPTIONAL_LOCKS: '0' }), input: `${base}\n`, encoding: 'utf8' });
   if (pack.status !== 0) throw new Error(`could not make a self-contained copy (pack the base): ${pack.stderr || pack.error?.message}`);
   const branch = git(root, ['symbolic-ref', '-q', 'HEAD']).out.trim();
   if (branch) { must(git(dest, ['symbolic-ref', 'HEAD', branch]), 'HEAD'); must(git(dest, ['update-ref', branch, base]), 'branch'); }
@@ -732,7 +732,7 @@ function exec(ctx, cwd, env, limitMs) {
     const t0 = Date.now();
     const win = process.platform === 'win32';
     const child = spawn(win ? process.env.ComSpec || 'cmd.exe' : '/bin/sh', win ? ['/d', '/s', '/c', ctx.cmd] : ['-c', ctx.cmd],
-      { cwd, env, detached: !win, stdio: ['ignore', 'pipe', 'pipe'], windowsVerbatimArguments: win });
+      { windowsHide: true, cwd, env, detached: !win, stdio: ['ignore', 'pipe', 'pipe'], windowsVerbatimArguments: win });
     ctx.children.add(child);
     let out = '', timedOut = false, done = false, grace = null;
     const keep = (d) => { out += d; if (out.length > 1 << 20) out = out.slice(-(1 << 19)); };
@@ -797,7 +797,7 @@ function writeIn(work, file, text) {
   fs.writeFileSync(target, text);
 }
 function parses(file) {
-  const r = spawnSync(process.execPath, ['--check', file], { cwd: path.dirname(file), env: cleanEnv(), encoding: 'utf8', timeout: CHECK_LIMIT_MS });
+  const r = spawnSync(process.execPath, ['--check', file], { windowsHide: true, cwd: path.dirname(file), env: cleanEnv(), encoding: 'utf8', timeout: CHECK_LIMIT_MS });
   return r.status === 0;
 }
 // The pass count a test runner printed (node --test's TAP or spec summary, or mocha's), or null.

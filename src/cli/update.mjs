@@ -84,7 +84,7 @@ export function installFromTarball(tarball, env = process.env, { sha256: expecte
   const work = fs.mkdtempSync(path.join(cfgDir, 'update-'));
   try {
     fs.mkdirSync(path.join(work, 'src'), { recursive: true });
-    execFileSync('tar', ['-xzf', tarball, '-C', path.join(work, 'src')]);
+    execFileSync('tar', ['-xzf', tarball, '-C', path.join(work, 'src')], { windowsHide: true });
     // the tarball is the set npm publishes: package/ at the top, or the files at the top
     let top = path.join(work, 'src', 'package');
     if (!exists(path.join(top, 'package.json'))) top = path.join(work, 'src');
@@ -118,7 +118,7 @@ export async function command(cmd, pos, flags, { root, env }) {
   if (await healthy(root)) {
     // restart through the new launcher, the way the installers do, so the daemon runs the new code
     // instead of the old code that ran this update
-    const res = spawnSync(r.launcher, ['restart', '--root', root], { env, stdio: 'inherit' });
+    const res = spawnSync(r.launcher, ['restart', '--root', root], { windowsHide: true, env, stdio: 'inherit' });
     if (res.status === 0) console.log(`Daemon restarted; it now runs memev ${r.version}.`);
     else console.log('Run memev restart to use the new version.');
   } else {

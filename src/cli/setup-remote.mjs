@@ -324,7 +324,7 @@ export class Session {
   _defaultExecute(argv) {
     const bin = path.join(PKG, 'bin', 'memev.mjs');
     return new Promise((resolve) => {
-      const child = spawn(process.execPath, [bin, ...argv], {
+      const child = spawn(process.execPath, [bin, ...argv], { windowsHide: true,
         env: { ...process.env, MEMEV_ROOT: this.root },
         stdio: ['ignore', 'pipe', 'pipe'],
       });

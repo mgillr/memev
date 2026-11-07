@@ -56,7 +56,7 @@ export function fetchBackupAddress(remote, env = process.env, { timeoutMs = 3000
   try { assertBackupRemote(backup); } catch (e) { return { ok: false, error: e.message }; }
   if (exists(path.join(backup, 'address.json'))) return { ok: true, rec: backupAddress(remote) };
   const dir = backupCacheDir(env);
-  const run = (args) => spawnSync('git', args, { cwd: dir, encoding: 'utf8', timeout: timeoutMs, env: { ...env, GIT_TERMINAL_PROMPT: '0' } });
+  const run = (args) => spawnSync('git', args, { windowsHide: true, cwd: dir, encoding: 'utf8', timeout: timeoutMs, env: { ...env, GIT_TERMINAL_PROMPT: '0' } });
   const last = (r) => (r.stderr || '').trim().split('\n').pop();
   if (!exists(path.join(dir, 'HEAD'))) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });

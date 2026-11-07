@@ -85,7 +85,7 @@ export function privateFiles({ state, names, env = process.env, platform = proce
 export function launcherNode(file, env = process.env) {
   const text = fs.readFileSync(file, 'utf8');
   const rec = /^REC='((?:[^']|'\\'')*)'$/m.exec(text)?.[1].replace(/'\\''/g, "'") ?? /^(?:exec |@)"([^"]+)"/m.exec(text)?.[1] ?? null;
-  const version = (f) => { const r = spawnSync(f, ['--version'], { encoding: 'utf8', timeout: 10000 }); return r.status === 0 ? r.stdout.trim() : null; };
+  const version = (f) => { const r = spawnSync(f, ['--version'], { windowsHide: true, encoding: 'utf8', timeout: 10000 }); return r.status === 0 ? r.stdout.trim() : null; };
   let onPath = null, onPathVersion = null;
   if (/^REC=/m.test(text)) {
     onPath = String(env.PATH || '').split(path.delimiter).filter(Boolean).map((d) => path.join(d, 'node')).find((f) => exists(f)) || null;

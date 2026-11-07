@@ -12,7 +12,7 @@ import { configDir, exists, readJson, writeJson, slug, run as spawn } from '../e
 import { git } from '../engine/git.mjs';
 import { config, saveConfig, out } from './common.mjs';
 
-const sh = (cmd, args, opts = {}) => { const r = spawn(cmd, args, { timeout: opts.timeout || 60000, stdio: opts.inherit ? 'inherit' : 'pipe', env: { ...process.env, ...(opts.env || {}) }, input: opts.input }); return { ok: r.ok, out: r.stdout.trim(), err: r.stderr.trim(), status: r.status }; };
+const sh = (cmd, args, opts = {}) => { const r = spawn(cmd, args, { windowsHide: true, timeout: opts.timeout || 60000, stdio: opts.inherit ? 'inherit' : 'pipe', env: { ...process.env, ...(opts.env || {}) }, input: opts.input }); return { ok: r.ok, out: r.stdout.trim(), err: r.stderr.trim(), status: r.status }; };
 // gh takes the host as GH_HOST: only `gh auth` has a --hostname flag that repo, api and deploy-key commands do not
 const ghOn = (host) => (args, opts = {}) => sh('gh', args, host && host !== 'github.com' ? { ...opts, env: { ...(opts.env || {}), GH_HOST: host } } : opts);
 const has = (bin) => sh(process.platform === 'win32' ? 'where' : 'which', [bin]).ok;
