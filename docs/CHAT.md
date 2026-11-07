@@ -31,6 +31,9 @@ app.
   and come from the lead (or from you at the terminal). A message to `all` stays on the bus.
 - The bridge ignores its own posts, and it remembers the ids of the messages it sent, so nothing it
   sends comes back in and nothing loops.
+- What you write becomes a bus message, and the bus is part of the vault: it is committed like the
+  rest of the vault, and goes to its backup if you set one up. It is as private as the vault itself
+  (see [the bus](BUS.md)).
 - A message that looks like a password or key is not passed on, and you are told why on the phone.
 - At most 30 messages an hour go to the phone (set with `--limit`). Past that limit a message is not
   sent and not retried later, and the lead is told once.
@@ -85,7 +88,9 @@ What the bridge enforces, in `src/bridge/guards.mjs`:
   group, invite, contact, chat-list or history events. A group invite sent to you is ignored.
 - **No contact sync or history.** Full history sync is off. The bridge keeps no contacts and no
   messages. WhatsApp still sends a linked device a short recent history when it links. The library
-  receives it, but the bridge acts on none of it and stores none of it.
+  receives it, but the bridge acts on none of it and stores none of it. The library's own protocol
+  state, kept with the link in the auth folder, may hold encryption sessions and address mappings
+  for accounts it has met. The bridge reads none of it.
 - **No presence.** You do not show as online, so your phone keeps its notifications.
 - **A rate limit,** 30 an hour by default. Each message goes out on its own, never in bulk.
 

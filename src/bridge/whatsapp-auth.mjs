@@ -27,8 +27,11 @@ export function privateAuthState(root, lib) {
   const dir = authDir(root);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); try { fs.chmodSync(dir, 0o700); } catch {}
   const read = (name) => { const t = readPrivate(path.join(dir, fileFor(name))); if (t == null) return null; try { return JSON.parse(t, BufferJSON.reviver); } catch { return null; } };
-  const write = (name, value) => writePrivate(path.join(dir, fileFor(name)), JSON.stringify(value, BufferJSON.replacer));
-  const remove = (name) => fs.rmSync(path.join(dir, fileFor(name)), { force: true });
+  // once the person turned WhatsApp off the folder is gone: a late key or credential update from a
+  // socket that is still closing writes nothing, so nothing comes back after disable
+  const gone = () => !fs.existsSync(dir);
+  const write = (name, value) => { if (gone()) return; writePrivate(path.join(dir, fileFor(name)), JSON.stringify(value, BufferJSON.replacer)); };
+  const remove = (name) => { if (gone()) return; fs.rmSync(path.join(dir, fileFor(name)), { force: true }); };
   const creds = read('creds') || initAuthCreds();
   return {
     state: {

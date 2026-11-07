@@ -4,7 +4,8 @@
 // Memev only messages the person, in their own "message yourself" chat, and only acts on what the
 // person writes there. The guards are in guards.mjs; this file only wires them to the library.
 import { RateLimiter, guardedSender, checkWhatsAppDestination, acceptWhatsAppInbound, whatsappSelf, isSelfChat, narrowSocket, ChatGuardError } from './guards.mjs';
-import { privateAuthState, savedCreds, removeAuth } from './whatsapp-auth.mjs';
+import fs from 'node:fs';
+import { privateAuthState, savedCreds, removeAuth, authDir } from './whatsapp-auth.mjs';
 import { loadBaileys } from './whatsapp-install.mjs';
 import { noteStatus, readState } from './state.mjs';
 import { now } from '../engine/util.mjs';
@@ -78,13 +79,14 @@ export class WhatsAppPlugin {
     await this._connect(lib);
   }
   async _connect(lib) {
+    if (!fs.existsSync(authDir(this.root))) throw new ChatGuardError('not_linked', 'WhatsApp is off or not linked on this computer');
     const auth = privateAuthState(this.root, lib);
     this.self = whatsappSelf(auth.state.creds);
     if (!this.self) throw new ChatGuardError('not_linked', 'WhatsApp is not linked: memev chat whatsapp link');
     const make = lib.makeWASocket || lib.default;
     const sock = narrowSocket(make(socketConfig(lib, auth, () => this.self)));
     this.sock = sock;
-    sock.ev.on('creds.update', () => { auth.saveCreds().catch((e) => this.log(`whatsapp creds: ${e.message}`)); });
+    sock.ev.on('creds.update', () => { if (!this.stopped) auth.saveCreds().catch((e) => this.log(`whatsapp creds: ${e.message}`)); });
     sock.ev.on('messages.upsert', (u) => { this.inbound(u).catch((e) => this.log(`whatsapp inbound: ${e.code || e.message}`)); });
     sock.ev.on('connection.update', (u) => {
       if (u.connection === 'open') noteStatus(this.root, 'whatsapp', { connected: now(), error: null });

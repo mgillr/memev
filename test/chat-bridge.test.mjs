@@ -208,6 +208,15 @@ test('WhatsApp: turning it on needs the warning accepted; turning it off removes
   assert.equal(whatsappLinked(r.root), false);
 });
 
+test('WhatsApp: after disable, a late key or credential update from the closing socket writes nothing back', async () => {
+  const { root, sock } = await waBridge();
+  const a = privateAuthState(root, fakeBaileys());
+  disableChannel(root, 'whatsapp');
+  await a.state.keys.set({ 'pre-key': { 9: { k: 1 } } }); await a.saveCreds();
+  sock.emit('creds.update', {}); await flush();
+  assert.ok(!fs.existsSync(channelDir(root, 'whatsapp')), 'the state stays removed');
+});
+
 test('WhatsApp library pin: the shipped manifest and lockfile pin one exact version with its integrity, every package from the registry', () => {
   assert.deepEqual(checkPin(), []);
   const lock = JSON.parse(fs.readFileSync(path.join(ADDON_DIR, 'pinned-lock.json'), 'utf8'));
