@@ -103,15 +103,17 @@ const cursorRuleRemove = (t) => {
   return rest ? `${rest}\n` : '';
 };
 const tomlEsc = (s) => JSON.stringify(s);
-// Codex config.toml: a second [mcp_servers.memev] table would make the file ambiguous, so when the user
-// already has one I leave it exactly as-is instead of appending Memev's marked block.
-function upsertCodexToml(t, block) {
+// Codex and Grok Build config.toml: a second [mcp_servers.memev] table would make the file ambiguous, so when
+// the user already has one I leave it exactly as-is instead of appending Memev's marked block.
+function upsertMcpToml(t, block) {
   const base = removeBlock(t, [TOML_START, TOML_END]);
   if (MEMEV_TABLE.test(base)) return base;
   return addBlock(base, block, [TOML_START, TOML_END]);
 }
 // The user table is still there after the edit: say so, so the skip is never a silent no-op.
-const codexTomlSkipNote = (b) => (b && MEMEV_TABLE.test(removeBlock(b, [TOML_START, TOML_END])) ? 'Codex already has a [mcp_servers.memev] table in config.toml, so Memev left it as-is' : null);
+const tomlSkipNote = (app) => (b) => (b && MEMEV_TABLE.test(removeBlock(b, [TOML_START, TOML_END])) ? `${app} already has a [mcp_servers.memev] table in config.toml, so Memev left it as-is` : null);
+// The marked stdio table both TOML apps take: command, then args (on win32 node.exe and the runtime script).
+const mcpTomlBlock = (win, bin, id) => `${TOML_START}\n[mcp_servers.memev]\ncommand = ${tomlEsc(win ? win.node : bin)}\nargs = [${[...(win ? [win.script] : []), 'mcp', '--client', id].map(tomlEsc).join(', ')}]\n${TOML_END}`;
 
 const json = (file, apply, remove, note) => ({ file, kind: 'json', apply, remove, note });
 const text = (file, apply, remove, note) => ({ file, kind: 'text', apply, remove, note });
@@ -245,7 +247,7 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
       ] },
     { id: 'codex', name: 'Codex CLI', mode: 'hooks', detect: () => exists(path.join(home, '.codex')),
       edits: () => [
-        text(path.join(home, '.codex', 'config.toml'), (t) => upsertCodexToml(t, `${TOML_START}\n[mcp_servers.memev]\ncommand = ${tomlEsc(win ? win.node : bin)}\nargs = [${[...(win ? [win.script] : []), 'mcp', '--client', 'codex'].map(tomlEsc).join(', ')}]\n${TOML_END}`), (t) => removeBlock(t, [TOML_START, TOML_END]), codexTomlSkipNote),
+        text(path.join(home, '.codex', 'config.toml'), (t) => upsertMcpToml(t, mcpTomlBlock(win, bin, 'codex')), (t) => removeBlock(t, [TOML_START, TOML_END]), tomlSkipNote('Codex')),
         json(path.join(home, '.codex', 'hooks.json'), (j) => setGroupHooks(j, {
           SessionStart: { matcher: 'startup|resume|clear|compact', command: hookCmd(launcher, 'session-start', 'codex'), timeout: 10 },
           UserPromptSubmit: { command: hookCmd(launcher, 'prompt', 'codex'), timeout: 10 },
@@ -301,6 +303,13 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
         // Copilot CLI reads its user-level instructions from copilot-instructions.md in the same folder
         return [json(path.join(copilotHome, 'mcp-config.json'), setServer('mcpServers', entry), delServer('mcpServers')), mdBlock(path.join(copilotHome, 'copilot-instructions.md'))];
       } },
+    // Grok Build (xAI's terminal agent, command grok) reads stdio MCP servers from [mcp_servers.<name>] tables
+    // (command, args) in the global ~/.grok/config.toml (docs.x.ai/build/features/mcp-servers). It has hooks, but for every
+    // event but PreToolUse its docs say stdout is ignored (docs.x.ai/build/features/hooks), so a hook cannot carry the protocol
+    // or the card: the app stays in instructions mode and gets them from the MCP instructions.
+    { id: 'grok-build', name: 'Grok Build', mode: 'instructions', detect: () => exists(path.join(home, '.grok')),
+      edits: () => [text(path.join(home, '.grok', 'config.toml'), (t) => upsertMcpToml(t, mcpTomlBlock(win, bin, 'grok-build')), (t) => removeBlock(t, [TOML_START, TOML_END]), tomlSkipNote('Grok Build'))],
+      note: 'Grok Build also reads ~/.claude.json, so when Claude Code is connected too it may list memev twice; grok mcp list shows the servers it loaded.' },
   ];
   return defs;
 }
@@ -492,7 +501,7 @@ export const RESTART = {
   'claude-code': 'Start a new Claude Code session', codex: 'Start a new Codex CLI session', 'gemini-cli': 'Start a new Gemini CLI session',
   cursor: 'Open a new Cursor chat', 'claude-desktop': 'Quit and reopen Claude Desktop', windsurf: 'Quit and reopen Windsurf',
   vscode: 'Reload the VS Code window (Developer: Reload Window)', zed: 'Quit and reopen Zed',
-  opencode: 'Quit and reopen OpenCode', 'copilot-cli': 'Start a new Copilot CLI session',
+  opencode: 'Quit and reopen OpenCode', 'copilot-cli': 'Start a new Copilot CLI session', 'grok-build': 'Start a new Grok Build session',
 };
 // Apps whose session-start hook brings the protocol, so their MCP instructions need not repeat it.
 export const HOOK_CLIENTS = new Set(clientDefs({}, 'memev').filter((d) => d.mode === 'hooks').map((d) => d.id));
@@ -543,7 +552,7 @@ export async function command(cmd, pos, flags, { env, root }) {
       const unsup = detect(env, launcher).filter((c) => c.found && !c.supported);
       if (unsup.length) { console.log(`Found ${unsup.map((c) => c.name).join(', ')} but Memev does not support ${unsup.length > 1 ? 'them' : 'it'} yet (see docs/CLIENTS.md to ask for it).`); return 0; }
     }
-    if (!res.length) console.log('No AI apps found. Install one (Codex, Cursor, Gemini CLI, Windsurf, VS Code, Zed, OpenCode, GitHub Copilot CLI, or a Claude product) and run memev connect again.');
+    if (!res.length) console.log('No AI apps found. Install one (Codex, Cursor, Gemini CLI, Windsurf, VS Code, Zed, OpenCode, GitHub Copilot CLI, Grok Build, or a Claude product) and run memev connect again.');
     for (const r of res) {
       if (r.status === 'added') out.ok(`${r.name}: connected (${r.mode === 'hooks' ? 'hooks + MCP + instructions' : 'MCP + instructions'})`);
       else if (r.status === 'already') out.ok(`${r.name}: already connected`);

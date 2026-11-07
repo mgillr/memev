@@ -84,10 +84,11 @@ export function pidAlive(pid) { if (!pid) return false; try { process.kill(pid, 
 // CODEX_CLI, GEMINI_CLI and WINDSURF_CLI are unverified, I could not confirm those apps set them.
 export const ENV_MARKERS = { CLAUDECODE: 'claude-code', CODEX_CLI: 'codex', GEMINI_CLI: 'gemini-cli', WINDSURF_CLI: 'windsurf' };
 const MARKER_OF = Object.fromEntries(Object.entries(ENV_MARKERS).map(([k, id]) => [id, k]));
-const KNOWN_APPS = new Set(['claude-code', 'codex', 'gemini-cli', 'cursor', 'claude-desktop', 'windsurf']);
+const KNOWN_APPS = new Set(['claude-code', 'codex', 'gemini-cli', 'cursor', 'claude-desktop', 'windsurf', 'grok-build']);
 // Keyed by the parent's raw process name, case-sensitive: the claude-code CLI binary is named
 // claude, the desktop app's binary is named Claude, and only the former maps to claude-code.
-const PARENT_NAME_AS_APP = { claude: 'claude-code' };
+// Grok Build's binary is named grok; it also loads servers from ~/.claude.json, so a memev it starts may claim claude-code.
+const PARENT_NAME_AS_APP = { claude: 'claude-code', grok: 'grok-build' };
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
 
 /** The name of the parent process, or null when it cannot be read. */
