@@ -2,8 +2,9 @@
 // The hook is spawned the way an app runs it (node bin/memev.mjs hook <event>), against a stub daemon on loopback.
 // The output comparison builds MEMEV_CONTRACT_BASE with git archive and is skipped when that is unset. The start-up comparison
 // builds SR-1.29's own base, read from the base field of its spec, so it measures SR-1.29's change under any later contract's base.
-// It runs whenever that commit is in the clone; it is skipped with a reason only when the commit is absent and no contract is being
-// verified, and it fails when a contract is being verified and the field or the commit is missing.
+// It runs whenever that commit is in the clone. It is skipped with a reason only when the spec names a base, that commit is absent
+// and no contract is being verified. It fails when the spec is missing, unreadable or has no base, and when a contract is being
+// verified and the commit is missing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -17,9 +18,11 @@ const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOAD_LOG = path.join(REPO, 'test', 'helpers', 'load-log.mjs');
 const BASE = process.env.MEMEV_CONTRACT_BASE || '';
 const SR129_SPEC = path.join(REPO, 'contracts', 'seed-readiness', 'specs', 'SR-1.29-a-hook-starts-without-loading-the-whole.json');
-const SR129_BASE = (() => { try { return JSON.parse(fs.readFileSync(SR129_SPEC, 'utf8')).base || ''; } catch { return ''; } })();
+// '' when the spec is missing, unreadable or has no base: the start-up test then fails, never skips
+const SR129_BASE = (() => { try { const b = JSON.parse(fs.readFileSync(SR129_SPEC, 'utf8')).base; return typeof b === 'string' ? b : ''; } catch { return ''; } })();
 const haveCommit = (sha) => /^[0-9a-f]{40}$/.test(sha) && spawnSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: REPO }).status === 0;
-const STARTUP_SKIP = haveCommit(SR129_BASE) || BASE ? false : `SR-1.29's base ${SR129_BASE ? SR129_BASE.slice(0, 12) + ' is not in this clone' : 'is not recorded in its spec'}`;
+// skipped only in a clone that lacks SR-1.29's base commit (a shallow checkout) while no contract is being verified
+const STARTUP_SKIP = SR129_BASE && !haveCommit(SR129_BASE) && !BASE ? `SR-1.29's base ${SR129_BASE.slice(0, 12)} is not in this clone` : false;
 const EVENTS = { 'session-start': { source: 'startup' }, prompt: { prompt: 'what did I decide about the cache' }, 'pre-compact': {}, stop: {} };
 
 // the stub answers the hook's routes after delayMs (the health check at once) and records each request

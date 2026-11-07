@@ -108,10 +108,11 @@ test('another denylisted login in the owner slot still fails', () => {
   assert.equal(r.code, 1, r.out);
 });
 
-test('with no origin, or an origin off GitHub, the owner merge subject fails closed', () => {
+test('with no origin, an origin off GitHub, or a GitHub origin for another repository, the owner merge subject fails closed', () => {
   const subject = `Merge pull request #7 from ${OWNER_WORD}/fix-branch`;
   assert.equal(history(['base', subject], null).code, 1);
   assert.equal(history(['base', subject], `https://example.org/${OWNER_WORD}/memev.git`).code, 1);
+  assert.equal(history(['base', subject], `https://github.com/${OWNER_WORD}/other-repo.git`).code, 1);
 });
 
 test('the owner word is still found in the branch segment, the message body and a subject of another form', () => {

@@ -32,12 +32,13 @@ const OK_HOME = new Set(['you', 'me', 'user', 'username', 'name', 'runner', 'exa
 // URL inside another URL (after = or ?) is not it either.
 const REPO_URL = /(?<=^|[\s"'`(<\[])https:\/\/github\.com\/([a-z0-9-]+)\/memev(?=\.git(?![a-z0-9])|[/\s"'`)>]|$)/g;
 const ROOT_HOME = new RegExp(`(^|[\\s"'(])/${'root'}/`);
-// The account that owns this repository, read at run time from the origin remote's GitHub URL and never written here. It is null
-// when there is no origin or the origin is not on GitHub; then nothing is blanked and the scan fails closed.
+// The account that owns this repository, read at run time from the origin remote's GitHub URL for memev and never written here. It
+// is null when there is no origin, or the origin is not github.com/<owner>/memev; then nothing is blanked and the scan fails closed.
+// The origin is the clone's own config, so this only decides what a clone accepts in its own history; CI checks out from GitHub.
 function repoOwner() {
   let url = '';
   try { url = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return null; }
-  const m = /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@(?:ssh\.)?github\.com(?::443)?\/)([A-Za-z0-9-]+)\/[A-Za-z0-9._-]+\/?$/.exec(url);
+  const m = /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@(?:ssh\.)?github\.com(?::443)?\/)([A-Za-z0-9-]+)\/memev(?:\.git)?\/?$/i.exec(url);
   return m ? m[1].toLowerCase() : null;
 }
 const OWNER = repoOwner();
