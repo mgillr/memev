@@ -508,12 +508,30 @@ export function connectAll({ env = process.env, launcher, force = false, platfor
   return detect(env, launcher, platform).filter((c) => c.found && c.supported && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform, project, allowTools }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
 }
 
+/** Connect exactly the named apps, in the order given (a repeated name counts once). Every name is checked
+ *  before any file changes: an unknown name throws and nothing is connected. A named app is connected even
+ *  when it was declined before (naming it is the yes); a found app that is not supported is reported, never
+ *  changed. */
+export function connectSelected(ids, { env = process.env, launcher, dryRun = false, platform = process.platform, project = null, allowTools } = {}) {
+  const list = [...new Set(ids.map(String))];
+  if (!list.length) throw new Error('name at least one app (memev clients lists them)');
+  if (list.includes('all')) throw new Error('all connects every app: use it alone');
+  const known = detect(env, launcher, platform);
+  const unknown = list.filter((id) => !known.some((c) => c.id === id));
+  if (unknown.length) throw new Error(`unknown app${unknown.length > 1 ? 's' : ''}: ${unknown.join(', ')} (memev clients lists the apps)`);
+  return list.map((id) => {
+    const c = known.find((x) => x.id === id);
+    if (!c.supported) return { id, name: c.name, status: 'unsupported', reason: c.found ? 'found, not supported yet' : 'not supported yet' };
+    try { return connect(id, { env, launcher, dryRun, platform, project, allowTools }); } catch (e) { return { id, name: c.name, status: 'failed', reason: e.message }; }
+  });
+}
+
 export function launcherPath(env = process.env) { return path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev'); }
 
 export async function command(cmd, pos, flags, { env, root }) {
   const launcher = launcherPath(env);
   if (!exists(launcher)) { const { installRuntime } = await import('./main.mjs'); installRuntime(env); }
-  const target = pos[0] || 'all';
+  const target = pos.length > 1 ? 'several' : (pos[0] || 'all');
   if (cmd === 'clients') {
     for (const c of detect(env, launcher)) console.log(`  ${c.connected ? '\u2713' : c.found ? '\u00b7' : ' '} ${c.name.padEnd(15)} ${c.found ? (c.supported ? (c.connected ? `connected (${c.mode === 'hooks' ? 'hooks + MCP' : 'MCP + instructions'})` : c.declined ? 'found, disconnected by you' : 'found, not connected') : 'found, not supported yet') : 'not found'}`);
     return 0;
@@ -527,10 +545,12 @@ export async function command(cmd, pos, flags, { env, root }) {
     return 0;
   }
   if (cmd === 'connect') {
-    if (target !== 'all') {
+    if (target !== 'all' && target !== 'several') {
       const c = detect(env, launcher).find((x) => x.id === target);
       if (c && c.found && !c.supported) { out.info(`${c.name}: found, not supported yet (see docs/CLIENTS.md to ask for it)`); return 0; }
     }
+    // memev connect claude-code cursor vscode: exactly those apps, checked before anything changes
+    if (target === 'several' && pos.includes('all')) throw new Error('memev connect all connects every app: use it alone, or name the apps');
     // the stored consent (the init question or an earlier --allow-tools) keeps applying: a plain connect
     // re-adds the entries after a disconnect, and the flag still forces them on or off
     const v = flags['no-allow-tools'] ? false : flags['allow-tools'];
@@ -538,7 +558,9 @@ export async function command(cmd, pos, flags, { env, root }) {
     const ob = await import('./onboarding.mjs');
     if (explicit !== undefined && !flags['dry-run']) ob.setAllowTools(env, explicit);
     const allowTools = explicit ?? (ob.allowToolsSettings(env).enabled || undefined);
-    const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, project: flags.project, allowTools }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project, allowTools })];
+    const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, project: flags.project, allowTools })
+      : target === 'several' ? connectSelected(pos, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project, allowTools })
+      : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project, allowTools })];
     if (!res.length) {
       const unsup = detect(env, launcher).filter((c) => c.found && !c.supported);
       if (unsup.length) { console.log(`Found ${unsup.map((c) => c.name).join(', ')} but Memev does not support ${unsup.length > 1 ? 'them' : 'it'} yet (see docs/CLIENTS.md to ask for it).`); return 0; }
@@ -548,6 +570,7 @@ export async function command(cmd, pos, flags, { env, root }) {
       if (r.status === 'added') out.ok(`${r.name}: connected (${r.mode === 'hooks' ? 'hooks + MCP + instructions' : 'MCP + instructions'})`);
       else if (r.status === 'already') out.ok(`${r.name}: already connected`);
       else if (r.status === 'would-change') out.info(`${r.name}: would change ${r.files.join(', ') || 'nothing'}`);
+      else if (r.status === 'unsupported') out.info(`${r.name}: ${r.reason} (see docs/CLIENTS.md to ask for it)`);
       else out.bad(`${r.name}: ${r.reason}`);
       if (r.status === 'needs-manual' && r.file) out.info(`add it by hand: memev connect ${r.id} --print shows what to paste`);
       if (r.manual) out.warn(r.manual);
