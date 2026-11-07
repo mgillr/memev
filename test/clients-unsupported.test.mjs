@@ -10,7 +10,7 @@ import { detect, connectAll } from '../src/cli/clients.mjs';
 
 after(() => cleanup());
 
-const NAMES = { roo: 'Roo', continue: 'Continue', 'jetbrains-ai': 'JetBrains AI', goose: 'Goose' };
+const NAMES = { roo: 'Roo', 'jetbrains-ai': 'JetBrains AI' };
 
 // The directory each app's docs name, on the platform this run is on. The tests plant exactly these,
 // so a lookup that points anywhere else fails the run.
@@ -23,20 +23,18 @@ function appDirs(sb) {
     : xdg;
   return {
     roo: path.join(home, '.roo'),
-    continue: path.join(home, '.continue'),
     'jetbrains-ai': path.join(appData, 'JetBrains'),
-    goose: win ? path.join(sb.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(xdg, 'goose'),
   };
 }
 
-test('MEM-046 AC01: with fake config dirs for Roo, Continue and Goose, the checklist lists each as found but not supported yet', () => {
+test('MEM-046 AC01: with fake config dirs for Roo and JetBrains AI, the checklist lists each as found but not supported yet', () => {
   const sb = sandbox();
   try {
     const dirs = appDirs(sb);
-    for (const id of ['roo', 'continue', 'goose']) fs.mkdirSync(dirs[id], { recursive: true });
+    for (const id of ['roo', 'jetbrains-ai']) fs.mkdirSync(dirs[id], { recursive: true });
     const r = sb.run(['init', '--port', String(sb.port), '--local-only']);
     assert.equal(r.code, 0, r.out + r.err);
-    for (const id of ['roo', 'continue', 'goose']) {
+    for (const id of ['roo', 'jetbrains-ai']) {
       assert.match(r.out, new RegExp(`${NAMES[id]}: found, not supported yet`), `${NAMES[id]} is listed as found, not supported yet\n${r.out}`);
     }
     assert.match(r.out, /docs\/CLIENTS\.md/, 'the line points to docs/CLIENTS.md');
@@ -124,12 +122,12 @@ test('memev clients lists a found unsupported app as found, not supported yet', 
   const sb = sandbox();
   try {
     const dirs = appDirs(sb);
-    fs.mkdirSync(dirs.goose, { recursive: true });
+    fs.mkdirSync(dirs.roo, { recursive: true });
     const i = sb.run(['init', '--port', String(sb.port), '--local-only']);
     assert.equal(i.code, 0, i.out + i.err);
     const c = sb.run(['clients']);
     assert.equal(c.code, 0, c.out + c.err);
-    assert.match(c.out, /Goose\s+found, not supported yet/, c.out);
+    assert.match(c.out, /Roo\s+found, not supported yet/, c.out);
   } finally { sb.stop(); }
 });
 
@@ -137,15 +135,15 @@ test('memev connect for a found unsupported app says found, not supported yet an
   const sb = sandbox();
   try {
     const dirs = appDirs(sb);
-    const f = path.join(dirs.continue, 'config.json');
+    const f = path.join(dirs.roo, 'config.json');
     fs.mkdirSync(path.dirname(f), { recursive: true });
     fs.writeFileSync(f, '{"theme":"dark"}');
     const before = fs.readFileSync(f);
     const i = sb.run(['init', '--port', String(sb.port), '--local-only']);
     assert.equal(i.code, 0, i.out + i.err);
-    const c = sb.run(['connect', 'continue']);
+    const c = sb.run(['connect', 'roo']);
     assert.equal(c.code, 0, c.out + c.err);
-    assert.match(c.out, /Continue: found, not supported yet/, c.out);
-    assert.ok(fs.readFileSync(f).equals(before), 'the Continue config is unchanged');
+    assert.match(c.out, /Roo: found, not supported yet/, c.out);
+    assert.ok(fs.readFileSync(f).equals(before), 'the Roo config is unchanged');
   } finally { sb.stop(); }
 });

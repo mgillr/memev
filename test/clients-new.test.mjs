@@ -158,3 +158,47 @@ test('SR-2.09.2 T2: Cline follows CLINE_DATA_DIR, as Cline itself does', () => {
   assert.deepEqual(j.mcpServers.memev.args, ['mcp', '--client', 'cline']);
   assert.equal(fs.existsSync(path.join(home, '.cline', 'data', 'settings', 'cline_mcp_settings.json')), false);
 });
+
+test('SR-2.09.2 T2: Goose gets a memev extension under its extensions map, with its own keys, and disconnect restores config.yaml', () => {
+  const { home, env, w } = fixtureHome();
+  const file = w('.config/goose/config.yaml', 'GOOSE_PROVIDER: openai\nextensions:\n  developer:\n    bundled: true\n    enabled: true\n    name: developer\n    type: builtin\n# my note\nslash_commands: []\n');
+  const original = fs.readFileSync(file);
+  const r = connectAll({ env, launcher: '/x/memev', platform: 'linux' }).find((x) => x.id === 'goose');
+  assert.equal(r && r.status, 'added');
+  const t = fs.readFileSync(file, 'utf8');
+  assert.match(t, /^extensions:\n  # memev:start\n  memev:\n    type: stdio\n    name: memev\n    enabled: true\n    cmd: "\/x\/memev"\n    args: \["mcp", "--client", "goose"\]\n    envs: \{\}\n    env_keys: \[\]\n    timeout: 300\n  # memev:end\n  developer:/m);
+  assert.match(t, /# my note\nslash_commands: \[\]/);
+  assert.match(fs.readFileSync(path.join(home, '.config', 'goose', '.goosehints'), 'utf8'), /<!-- memev:start -->/);
+  disconnect('goose', { env });
+  assert.deepEqual(fs.readFileSync(file), original, 'config.yaml is back to its original bytes');
+});
+
+test('SR-2.09.2 T2: Goose with no extensions key gets the key inside the markers, and loses it again on disconnect', () => {
+  const { env, w } = fixtureHome();
+  const file = w('.config/goose/config.yaml', 'GOOSE_PROVIDER: openai\n');
+  const original = fs.readFileSync(file);
+  connectAll({ env, launcher: '/x/memev', platform: 'linux' });
+  assert.match(fs.readFileSync(file, 'utf8'), /# memev:start\nextensions:\n  memev:\n/);
+  disconnect('goose', { env });
+  assert.deepEqual(fs.readFileSync(file), original);
+});
+
+test('SR-2.09.2 T2: Continue gets a memev item in its mcpServers list at the list\'s own indent, and disconnect restores config.yaml', () => {
+  const { env, w } = fixtureHome();
+  const file = w('.continue/config.yaml', 'name: Local\nversion: 1.0.0\nschema: v1\nmcpServers:\n- name: sqlite\n  type: stdio\n  command: npx\n');
+  const original = fs.readFileSync(file);
+  const r = connectAll({ env, launcher: '/x/memev', platform: 'linux' }).find((x) => x.id === 'continue');
+  assert.equal(r && r.status, 'added');
+  assert.match(fs.readFileSync(file, 'utf8'), /^mcpServers:\n# memev:start\n- name: memev\n  type: stdio\n  command: "\/x\/memev"\n  args: \["mcp", "--client", "continue"\]\n# memev:end\n- name: sqlite/m);
+  disconnect('continue', { env });
+  assert.deepEqual(fs.readFileSync(file), original);
+});
+
+test('SR-2.09.2 T2: Continue with mcpServers written inline as [] is left as it is, with a note', () => {
+  const { env, w } = fixtureHome();
+  const file = w('.continue/config.yaml', 'name: Local\nversion: 1.0.0\nschema: v1\nmcpServers: []\n');
+  const original = fs.readFileSync(file);
+  const r = connectAll({ env, launcher: '/x/memev', platform: 'linux' }).find((x) => x.id === 'continue');
+  assert.deepEqual(fs.readFileSync(file), original);
+  assert.match(JSON.stringify(r), /written inline/);
+});

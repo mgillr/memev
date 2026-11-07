@@ -113,6 +113,41 @@ function upsertCodexToml(t, block) {
 // The user table is still there after the edit: say so, so the skip is never a silent no-op.
 const codexTomlSkipNote = (b) => (b && MEMEV_TABLE.test(removeBlock(b, [TOML_START, TOML_END])) ? 'Codex already has a [mcp_servers.memev] table in config.toml, so Memev left it as-is' : null);
 
+// YAML is edited as text, with no parser dependency. Memev's lines sit between two comment markers under the named
+// top-level key. When Memev had to add that key, the key sits inside the markers too, so removing the block removes it.
+const YAML_START = '# memev:start', YAML_END = '# memev:end';
+function yamlUnder(t, key, lines) {
+  const base = removeYamlBlock(t);
+  const re = new RegExp(`^${key}:[ \\t]*(\\{\\}|\\[\\])?[ \\t]*(#.*)?$`, 'm');
+  const m = re.exec(base);
+  if (!m) {
+    const body = [YAML_START, `${key}:`, ...lines.map((l) => `  ${l}`), YAML_END].join('\n');
+    return `${base}${base && !base.endsWith('\n') ? '\n' : ''}${body}\n`;
+  }
+  if (m[1]) return null; // an inline {} or [] the user wrote: left alone, with a note
+  const after = base.slice(m.index + m[0].length);
+  // The children's own indent: the first non-blank line after the key, if it is a child (indented, or a list item at
+  // column 0). A key with no children yet takes two spaces.
+  const next = /\n([ \t]*)(\S)/.exec(after);
+  const indent = next && (next[1].length || next[2] === '-') ? next[1] : '  ';
+  const block = [YAML_START, ...lines, YAML_END].map((l) => `${indent}${l}`).join('\n');
+  const at = m.index + m[0].length;
+  return `${base.slice(0, at)}\n${block}${base.slice(at)}`;
+}
+function removeYamlBlock(t) {
+  const lines = t.split('\n'); const out = []; let skip = false;
+  for (const l of lines) {
+    if (!skip && l.trim() === YAML_START) { skip = true; continue; }
+    if (skip) { if (l.trim() === YAML_END) skip = false; continue; }
+    out.push(l);
+  }
+  return out.join('\n');
+}
+const yamlEdit = (key, lines, name) => [
+  (t) => { const r = yamlUnder(t, key, lines); return r === null ? removeYamlBlock(t) : r; },
+  (t) => removeYamlBlock(t),
+  (b) => (b && yamlUnder(b, key, lines) === null ? `${name} has ${key} written inline as {} or [], so Memev left the file as it is; add memev there by hand: memev connect --print` : null),
+];
 const json = (file, apply, remove, note) => ({ file, kind: 'json', apply, remove, note });
 const text = (file, apply, remove, note) => ({ file, kind: 'text', apply, remove, note });
 // The Memev tools a consented Claude Code may call without a prompt each time: the memory tools the hooks
@@ -212,6 +247,7 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
   const win = winSpawn(env, platform);
   const launcher = win ? `"${win.node}" "${win.script}"` : `"${bin}"`;
   const stdio = (id) => win ? { command: win.node, args: [win.script, 'mcp', '--client', id] } : { command: bin, args: ['mcp', '--client', id] };
+  const gooseDir = win ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(env.XDG_CONFIG_HOME || path.join(home, '.config'), 'goose');
   // With consent, Claude Code is told it may call Memev's memory tools without a prompt each time: the
   // per-tool entries in permissions.allow (the write and contract tools are left to prompt). Added when
   // allowTools is true, removed when false; disconnect always takes them out again.
@@ -324,6 +360,21 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
     { id: 'junie', name: 'Junie', mode: 'instructions', detect: () => exists(path.join(home, '.junie')),
       edits: () => [json(path.join(home, '.junie', 'mcp', 'mcp.json'), setServer('mcpServers', stdio('junie')), delServer('mcpServers')),
         mdBlock(path.join(home, '.junie', 'AGENTS.md'))] },
+    // Goose keeps extensions as a map in config.yaml, with its own keys (cmd, envs, env_keys), and reads .goosehints.
+    { id: 'goose', name: 'Goose', mode: 'instructions', detect: () => exists(gooseDir),
+      edits: () => {
+        const ys = (x) => JSON.stringify(x);
+        const lines = ['memev:', '  type: stdio', '  name: memev', '  enabled: true', `  cmd: ${ys(win ? win.node : bin)}`,
+          `  args: [${[...(win ? [win.script] : []), 'mcp', '--client', 'goose'].map(ys).join(', ')}]`, '  envs: {}', '  env_keys: []', '  timeout: 300'];
+        return [text(path.join(gooseDir, ...(win ? ['config'] : []), 'config.yaml'), ...yamlEdit('extensions', lines, 'Goose')), mdBlock(path.join(gooseDir, '.goosehints'))];
+      }, manual: 'Goose reads config.yaml when a session starts, so start a new Goose session.' },
+    // Continue keeps mcpServers as a list in ~/.continue/config.yaml, which it writes itself on first use; MCP runs in agent mode.
+    { id: 'continue', name: 'Continue', mode: 'instructions', detect: () => exists(path.join(home, '.continue', 'config.yaml')),
+      edits: () => {
+        const ys = (x) => JSON.stringify(x);
+        const lines = ['- name: memev', '  type: stdio', `  command: ${ys(win ? win.node : bin)}`, `  args: [${[...(win ? [win.script] : []), 'mcp', '--client', 'continue'].map(ys).join(', ')}]`];
+        return [text(path.join(home, '.continue', 'config.yaml'), ...yamlEdit('mcpServers', lines, 'Continue'))];
+      }, manual: 'Continue uses MCP servers in agent mode only; its rules stay in config.yaml, so the protocol arrives through the MCP instructions.' },
     { id: 'copilot-cli', name: 'GitHub Copilot CLI', mode: 'instructions', detect: () => exists(env.COPILOT_HOME || path.join(home, '.copilot')),
       edits: () => {
         const copilotHome = env.COPILOT_HOME || path.join(home, '.copilot');
@@ -350,9 +401,7 @@ export function unsupportedDefs(env) {
   const win = process.platform === 'win32';
   return [
     { id: 'roo', name: 'Roo', detect: () => exists(path.join(home, '.roo')) },
-    { id: 'continue', name: 'Continue', detect: () => exists(path.join(home, '.continue')) },
     { id: 'jetbrains-ai', name: 'JetBrains AI', detect: () => exists(path.join(appData, 'JetBrains')) },
-    { id: 'goose', name: 'Goose', detect: () => exists(win ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(xdg, 'goose')) },
   ];
 }
 
