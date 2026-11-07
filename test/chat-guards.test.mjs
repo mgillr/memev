@@ -8,56 +8,59 @@ import {
   RateLimiter, guardedSender, newPairingCode, pairingMatches, ChatGuardError,
 } from '../src/bridge/guards.mjs';
 
-const CREDS = { me: { id: '447700900123:14@s.whatsapp.net', lid: '987654321012345:14@lid', name: 'Me' } };
+// A WhatsApp address (JID) is user@server; built from its parts here, since it is not an e-mail address
+const PN = 's.whatsapp.net', GROUP = 'g.us', BCAST = 'broadcast', NEWS = 'newsletter', LID = 'lid';
+const J = (user, server) => [user, server].join('@');
+const CREDS = { me: { id: J('447700900123:14', PN), lid: J('987654321012345:14', LID), name: 'Me' } };
 const SELF = whatsappSelf(CREDS);
 const refused = (fn, code) => assert.throws(fn, (e) => e instanceof ChatGuardError && (code ? e.code === code : true));
 
 test('the own account is the user part of creds.me, without the device part', () => {
-  assert.deepEqual(SELF, { pnUser: '447700900123', lidUser: '987654321012345', jid: '447700900123@s.whatsapp.net' });
+  assert.deepEqual(SELF, { pnUser: '447700900123', lidUser: '987654321012345', jid: J('447700900123', PN) });
   assert.equal(whatsappSelf({}), null);
-  assert.equal(whatsappSelf({ me: { id: '1203630@g.us' } }), null, 'a group is never the own account');
+  assert.equal(whatsappSelf({ me: { id: J('1203630', GROUP) } }), null, 'a group is never the own account');
 });
 
 test('outbound WhatsApp: the own chat is the one destination', () => {
-  assert.equal(checkWhatsAppDestination('447700900123@s.whatsapp.net', SELF), '447700900123@s.whatsapp.net');
+  assert.equal(checkWhatsAppDestination(J('447700900123', PN), SELF), J('447700900123', PN));
 });
-test('outbound WhatsApp: another person is refused', () => refused(() => checkWhatsAppDestination('447700900999@s.whatsapp.net', SELF), 'refused_other_user'));
-test('outbound WhatsApp: a group is refused', () => refused(() => checkWhatsAppDestination('120363012345678901@g.us', SELF), 'refused_group'));
-test('outbound WhatsApp: a broadcast list is refused', () => refused(() => checkWhatsAppDestination('1699999999@broadcast', SELF), 'refused_broadcast'));
+test('outbound WhatsApp: another person is refused', () => refused(() => checkWhatsAppDestination(J('447700900999', PN), SELF), 'refused_other_user'));
+test('outbound WhatsApp: a group is refused', () => refused(() => checkWhatsAppDestination(J('120363012345678901', GROUP), SELF), 'refused_group'));
+test('outbound WhatsApp: a broadcast list is refused', () => refused(() => checkWhatsAppDestination(J('1699999999', BCAST), SELF), 'refused_broadcast'));
 test('outbound WhatsApp: Status is refused', () => refused(() => checkWhatsAppDestination('status@broadcast', SELF), 'refused_status'));
-test('outbound WhatsApp: a channel (newsletter) is refused', () => refused(() => checkWhatsAppDestination('120363111111111111@newsletter', SELF), 'refused_newsletter'));
+test('outbound WhatsApp: a channel (newsletter) is refused', () => refused(() => checkWhatsAppDestination(J('120363111111111111', NEWS), SELF), 'refused_newsletter'));
 test('outbound WhatsApp: the own number with a device part, the hidden id, junk and no link are refused', () => {
-  refused(() => checkWhatsAppDestination('447700900123:14@s.whatsapp.net', SELF), 'refused_other_user');
-  refused(() => checkWhatsAppDestination('987654321012345@lid', SELF), 'refused_lid');
+  refused(() => checkWhatsAppDestination(J('447700900123:14', PN), SELF), 'refused_other_user');
+  refused(() => checkWhatsAppDestination(J('987654321012345', LID), SELF), 'refused_lid');
   refused(() => checkWhatsAppDestination('447700900123', SELF), 'refused_other');
   refused(() => checkWhatsAppDestination(undefined, SELF), 'refused_other');
-  refused(() => checkWhatsAppDestination('447700900123@s.whatsapp.net', null), 'not_linked');
+  refused(() => checkWhatsAppDestination(J('447700900123', PN), null), 'not_linked');
 });
 
 test('address kinds', () => {
   assert.equal(classifyJid('status@broadcast'), 'status');
-  assert.equal(classifyJid('1@broadcast'), 'broadcast');
-  assert.equal(classifyJid('1@g.us'), 'group');
-  assert.equal(classifyJid('1@newsletter'), 'newsletter');
-  assert.equal(classifyJid('1@lid'), 'lid');
-  assert.equal(classifyJid('1@s.whatsapp.net'), 'user');
-  assert.ok(isSelfChat('987654321012345@lid', SELF) && isSelfChat('447700900123@s.whatsapp.net', SELF));
-  assert.ok(!isSelfChat('447700900999@s.whatsapp.net', SELF) && !isSelfChat('447700900123@g.us', SELF));
+  assert.equal(classifyJid(J('1', BCAST)), 'broadcast');
+  assert.equal(classifyJid(J('1', GROUP)), 'group');
+  assert.equal(classifyJid(J('1', NEWS)), 'newsletter');
+  assert.equal(classifyJid(J('1', LID)), 'lid');
+  assert.equal(classifyJid(J('1', PN)), 'user');
+  assert.ok(isSelfChat(J('987654321012345', LID), SELF) && isSelfChat(J('447700900123', PN), SELF));
+  assert.ok(!isSelfChat(J('447700900999', PN), SELF) && !isSelfChat(J('447700900123', GROUP), SELF));
 });
 
-const wa = (key, text = 'hello') => ({ key: { id: 'ABC1', fromMe: true, remoteJid: '447700900123@s.whatsapp.net', ...key }, message: { conversation: text } });
+const wa = (key, text = 'hello') => ({ key: { id: 'ABC1', fromMe: true, remoteJid: J('447700900123', PN), ...key }, message: { conversation: text } });
 test('inbound WhatsApp: the person writing in the own chat is accepted, by number or hidden id', () => {
   assert.deepEqual(acceptWhatsAppInbound(wa({}), SELF, new Set()), { id: 'ABC1', text: 'hello' });
-  assert.ok(acceptWhatsAppInbound(wa({ remoteJid: '987654321012345@lid', remoteJidAlt: '447700900123@s.whatsapp.net' }), SELF, new Set()));
+  assert.ok(acceptWhatsAppInbound(wa({ remoteJid: J('987654321012345', LID), remoteJidAlt: J('447700900123', PN) }), SELF, new Set()));
   assert.ok(acceptWhatsAppInbound({ key: wa({}).key, message: { extendedTextMessage: { text: 'with a link' } } }, SELF, new Set()));
 });
 test('inbound WhatsApp: another chat, a group, Status, a broadcast and a channel are ignored', () => {
-  for (const remoteJid of ['447700900999@s.whatsapp.net', '120363012345678901@g.us', 'status@broadcast', '1699999999@broadcast', '120363111111111111@newsletter']) {
+  for (const remoteJid of [J('447700900999', PN), J('120363012345678901', GROUP), 'status@broadcast', J('1699999999', BCAST), J('120363111111111111', NEWS)]) {
     assert.equal(acceptWhatsAppInbound(wa({ remoteJid }), SELF, new Set()), null, remoteJid);
     assert.equal(acceptWhatsAppInbound(wa({ remoteJid, fromMe: false }), SELF, new Set()), null, remoteJid);
   }
-  assert.equal(acceptWhatsAppInbound(wa({ participant: '447700900999@s.whatsapp.net' }), SELF, new Set()), null, 'a participant means a group');
-  assert.equal(acceptWhatsAppInbound(wa({ remoteJidAlt: '447700900999@s.whatsapp.net' }), SELF, new Set()), null, 'both forms must be the own chat');
+  assert.equal(acceptWhatsAppInbound(wa({ participant: J('447700900999', PN) }), SELF, new Set()), null, 'a participant means a group');
+  assert.equal(acceptWhatsAppInbound(wa({ remoteJidAlt: J('447700900999', PN) }), SELF, new Set()), null, 'both forms must be the own chat');
 });
 test('inbound WhatsApp: a message not written by the account is ignored', () => {
   assert.equal(acceptWhatsAppInbound(wa({ fromMe: false }), SELF, new Set()), null);
@@ -66,7 +69,7 @@ test('inbound WhatsApp: Memev\'s own message is dropped, so it cannot loop', () 
   assert.equal(acceptWhatsAppInbound(wa({}), SELF, new Set(['ABC1'])), null);
 });
 test('inbound WhatsApp: no text (media, an invite) is nothing to pass on', () => {
-  assert.equal(acceptWhatsAppInbound({ key: wa({}).key, message: { groupInviteMessage: { groupJid: '1@g.us' } } }, SELF, new Set()), null);
+  assert.equal(acceptWhatsAppInbound({ key: wa({}).key, message: { groupInviteMessage: { groupJid: J('1', GROUP) } } }, SELF, new Set()), null);
   assert.equal(acceptWhatsAppInbound(wa({}, '   '), SELF, new Set()), null);
 });
 
