@@ -99,12 +99,20 @@ const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
  * The launcher every app runs on macOS and Linux. It uses node from PATH when that is Node 22 or newer, and otherwise
  * the Node recorded at install, so a Node upgrade that removes the old binary does not stop Memev in every app.
  */
-export function launcherScript(node, target) {
+/**
+ * Folders an installer bundles tools in (its own git, for example), from MEMEV_TOOLS_PATH at install: each must be an absolute
+ * path to an existing folder. The launcher puts them first on PATH, so the core run by an AI app or the login service uses them too.
+ */
+export function toolsPath(env = process.env) {
+  return String(env.MEMEV_TOOLS_PATH || '').split(path.delimiter).filter((d) => d && path.isAbsolute(d) && fs.existsSync(d) && fs.statSync(d).isDirectory());
+}
+
+export function launcherScript(node, target, tools = []) {
   return `#!/bin/sh
 # node from PATH when it is Node 22 or newer, otherwise the Node recorded at install
 REC=${sq(node)}
 JS=${sq(target)}
-N=$(command -v node 2>/dev/null)
+${tools.length ? `# the tools the installer bundled come first on PATH\nPATH=${sq(tools.join(':'))}:"$PATH"; export PATH\n` : ''}N=$(command -v node 2>/dev/null)
 if [ -n "$N" ] && [ "$N" != "$REC" ]; then
   V=$("$N" --version 2>/dev/null); V=\${V#v}; V=\${V%%.*}
   case "$V" in ''|*[!0-9]*) ;; *) [ "$V" -ge 22 ] && exec "$N" "$JS" "$@" ;; esac
@@ -147,6 +155,12 @@ export function recordedNode(env = process.env) {
   return process.execPath;
 }
 
+/** The Windows launcher: the bundled tools first on PATH, inside setlocal so the caller's PATH is untouched. */
+export function windowsLauncher(node, target, tools = []) {
+  const pre = tools.length ? `@setlocal\r\n@set "PATH=${tools.join(';')};%PATH%"\r\n` : '';
+  return `${pre}@"${node}" "${target}" %*\r\n`;
+}
+
 export function installRuntime(env = process.env) {
   const dir = path.join(configDir(env), 'runtime', VERSION);
   if (path.resolve(PKG) !== path.resolve(dir)) {
@@ -156,8 +170,8 @@ export function installRuntime(env = process.env) {
   const bin = path.join(configDir(env), 'bin');
   fs.mkdirSync(bin, { recursive: true });
   const target = path.join(dir, 'bin', 'memev.mjs');
-  if (process.platform === 'win32') fs.writeFileSync(path.join(bin, 'memev.cmd'), `@"${process.execPath}" "${target}" %*\r\n`);
-  else writeAtomic(path.join(bin, 'memev'), launcherScript(recordedNode(env), target), 0o755);
+  if (process.platform === 'win32') fs.writeFileSync(path.join(bin, 'memev.cmd'), windowsLauncher(process.execPath, target, toolsPath(env)));
+  else writeAtomic(path.join(bin, 'memev'), launcherScript(recordedNode(env), target, toolsPath(env)), 0o755);
   return { dir, launcher: path.join(bin, process.platform === 'win32' ? 'memev.cmd' : 'memev') };
 }
 
