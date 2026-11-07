@@ -54,6 +54,71 @@ Checked 2026-10-28 against the pages named in the sources below; the limits chan
 
 Sources: https://platform.openai.com/docs/guides/developer-mode (write actions on Plus and Pro) and https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt-beta (full write MCP on Business, Enterprise, Edu; Pro developer mode is read and fetch).
 
+## Grok
+
+Grok on the web (grok.com) and in the Grok apps for iOS and Android takes a custom connector URL.
+xAI says connectors are available to all Grok users. On the web: open `grok.com/connectors`, choose
+**New Connector**, then **Custom**, and paste the connector URL from `memev cloud url`. On iOS and
+Android, connectors are under **Settings > Connectors**; xAI does not say whether a custom server can
+be added there, so add it on the web first. Grok calls the server from xAI's cloud and rejects
+`localhost` and private addresses (127.0.0.1, 10.x, 172.16.x, 192.168.x), so the address has to be a
+public https one: a Cloudflare tunnel or a Tailscale Funnel, not a tailnet-only `tailscale serve`.
+On a Grok Business or Enterprise team, an admin adds the connector first at `console.x.ai` (team >
+**Grok Business > Connectors** > **+ Add Connector** > **Other**), then members connect at
+`grok.com/connectors`.
+
+Untested live: these steps come from xAI's pages, not from a run against a Memev vault.
+
+Grok inside the X app is not supported: xAI lists connectors for Grok on the web, iOS and Android only.
+
+Grok Build, xAI's terminal agent, is a local app: `memev connect` sets it up (see [CLIENTS.md](CLIENTS.md)).
+
+Sources: https://docs.x.ai/grok/connectors, https://docs.x.ai/grok/connectors/custom-mcp-tunneling,
+https://docs.x.ai/grok/connector-management and https://x.ai/news/grok-connectors (6 May 2026).
+
+## Microsoft Copilot
+
+The Copilot app (copilot.microsoft.com, the Copilot app on Windows, and Copilot on iOS and Android)
+is not supported. Its connectors link a fixed list of services (OneDrive, Outlook.com, Google Drive,
+Gmail, Google Calendar and Google Contacts), and Microsoft documents no way to add a custom connector
+or MCP server. Source:
+https://support.microsoft.com/en-us/microsoft-copilot/connecting-microsoft-copilot-to-other-services
+
+GitHub Copilot CLI and Copilot in VS Code are local apps: `memev connect` sets them up (see [CLIENTS.md](CLIENTS.md)).
+
+## Microsoft 365 Copilot (organisation admin)
+
+Microsoft 365 Copilot reaches an MCP server only through an admin. There are two routes; both call
+from Microsoft's cloud, so the vault needs a public https address, as for Grok. Untested live: the
+steps come from Microsoft's pages, not from a run against a Memev vault.
+
+**Microsoft 365 admin center (custom federated connector).** Needs the Global Administrator or AI
+Administrator role, and a developer name, website, privacy policy and terms of use URL for the form.
+
+1. In the [Microsoft 365 admin center](https://admin.microsoft.com/), open **Copilot** > **Connectors**, then the **Gallery** tab.
+2. Under **Created by your org**, on the **Create a new connector** tile, select **Add**.
+3. On the **Custom connector** page, under **Connect to MCP server**, select **Add**.
+4. Enter a display name (Memev), a description of what the vault holds, and as **Base URL** the
+   connector URL from `memev cloud url`. The connector takes Microsoft Entra SSO, OAuth 2.0 (a client
+   registered in the Teams Developer Portal) or No Auth; the connector URL carries its own token, so
+   it is the No Auth case.
+5. **Save**, then roll it out from **Your Connections** with **Staged rollout** or **Deploy to all users**.
+   Users need a Microsoft 365 Copilot licence, and the **Allow agents and plugins built by your
+   organization** setting (**Agents** > **Settings** > **Agent and plugin access**) must be on.
+
+The connector URL is one credential for everyone the connector is rolled out to, so every one of
+them reads and writes the same vault. Use it only for a vault the whole group shares.
+
+Source: https://learn.microsoft.com/en-us/microsoft-365/copilot/connectors/set-up-custom-federated-connectors
+
+**Copilot Studio (an agent).** In the agent: **Tools** > **Add a tool** > **New tool** > **Model
+Context Protocol**, then a server name, a description and the **Server URL**. Copilot Studio supports
+the Streamable HTTP transport only, which is what Memev serves. For authentication choose **None**
+with the connector URL, or **OAuth 2.0** > **Dynamic discovery** with the plain MCP URL, since Memev
+publishes its OAuth metadata and takes dynamic client registration. Power Platform data policies
+apply to the server. Source:
+https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent
+
 Every app and computer has its own credential; there is no shared key. `memev devices` lists them:
 
 ```sh
