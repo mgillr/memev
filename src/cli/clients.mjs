@@ -356,87 +356,87 @@ function moreApps(env, platform, stdio) {
   const otermDir = env.OTERM_DATA_DIR || path.join(platform === 'win32' || platform === 'darwin' ? appData : (env.XDG_DATA_HOME || path.join(home, '.local', 'share')), 'oterm');
   const mcpJson = (file, id, key = 'mcpServers', extra = {}) => json(file, setServer(key, { ...extra, ...stdio(id) }), delServer(key));
   return [
-    // https://qwenlm.github.io/qwen-code-docs/en/users/features/mcp : "~/.qwen/settings.json" (~ is your home directory)
+    // qwenlm.github.io/qwen-code-docs/en/users/features/mcp : "~/.qwen/settings.json" (~ is your home directory)
     { id: 'qwen-code', name: 'Qwen Code', mode: 'instructions', detect: () => exists(path.join(home, '.qwen')),
       edits: () => [mcpJson(path.join(home, '.qwen', 'settings.json'), 'qwen-code')] },
-    // https://www.kimi.com/code/docs/en/kimi-code-cli/customization/mcp.html : "~/.kimi-code/mcp.json (or $KIMI_CODE_HOME/mcp.json)"
+    // www.kimi.com/code/docs/en/kimi-code-cli/customization/mcp.html : "~/.kimi-code/mcp.json (or $KIMI_CODE_HOME/mcp.json)"
     { id: 'kimi-code', name: 'Kimi Code CLI', mode: 'instructions', detect: () => exists(kimiHome),
       edits: () => [mcpJson(path.join(kimiHome, 'mcp.json'), 'kimi-code')] },
-    // https://docs.factory.com/cli/configuration/mcp : "~/.factory/mcp.json", type "stdio"
+    // docs.factory.com/cli/configuration/mcp : "~/.factory/mcp.json", type "stdio"
     { id: 'factory-droid', name: 'Factory Droid', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.factory')),
       edits: () => [mcpJson(path.join(home, '.factory', 'mcp.json'), 'factory-droid', 'mcpServers', { type: 'stdio' })] },
-    // https://docs.augmentcode.com/cli/integrations : "~/.augment/settings.json"
+    // docs.augmentcode.com/cli/integrations : "~/.augment/settings.json"
     { id: 'augment', name: 'Augment (Auggie CLI)', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.augment')),
       edits: () => [mcpJson(path.join(home, '.augment', 'settings.json'), 'augment')] },
-    // https://docs.tabnine.com/main/getting-started/tabnine-agent/mcp-intro-and-setup/mcp-server-config : "~/.tabnine/agent/settings.json" (macOS/Linux)
+    // docs.tabnine.com/main/getting-started/tabnine-agent/mcp-intro-and-setup/mcp-server-config : "~/.tabnine/agent/settings.json" (macOS/Linux)
     { id: 'tabnine', name: 'Tabnine CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.tabnine', 'agent')),
       edits: () => [mcpJson(path.join(home, '.tabnine', 'agent', 'settings.json'), 'tabnine')] },
-    // https://platform.iflow.cn/en/cli/configuration/settings : "~/.iflow/settings.json" (~ represents your home directory)
+    // platform.iflow.cn/en/cli/configuration/settings : "~/.iflow/settings.json" (~ represents your home directory)
     { id: 'iflow', name: 'iFlow CLI', mode: 'instructions', detect: () => exists(path.join(home, '.iflow')),
       edits: () => [mcpJson(path.join(home, '.iflow', 'settings.json'), 'iflow')] },
-    // https://docs.warp.dev/knowledge-and-collaboration/mcp : global "~/.warp/.mcp.json"
+    // docs.warp.dev/knowledge-and-collaboration/mcp : global "~/.warp/.mcp.json"
     { id: 'warp', name: 'Warp', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.warp')),
       edits: () => [mcpJson(path.join(home, '.warp', '.mcp.json'), 'warp')],
       manual: 'If Warp asks you to approve the change to its MCP config, approve it; memev then starts on its own.' },
-    // https://docs.mistral.ai/vibe/code/cli/configuration : "~/.vibe/config.toml" (VIBE_HOME moves it); one [[mcp_servers]] table per server
+    // docs.mistral.ai/vibe/code/cli/configuration : "~/.vibe/config.toml" (VIBE_HOME moves it); one [[mcp_servers]] table per server
     { id: 'mistral-vibe', name: 'Mistral Vibe', mode: 'instructions', detect: () => exists(vibeHome),
       edits: () => { const e = stdio('mistral-vibe'); return [text(path.join(vibeHome, 'config.toml'), (t) => upsertVibeToml(t, `${TOML_START}\n[[mcp_servers]]\nname = "memev"\ntransport = "stdio"\ncommand = ${tomlEsc(e.command)}\nargs = [${e.args.map(tomlEsc).join(', ')}]\n${TOML_END}`), (t) => removeBlock(t, [TOML_START, TOML_END]), vibeSkipNote)]; } },
-    // https://lmstudio.ai/blog/mcp : "~/.lmstudio/mcp.json on macOS and Linux", "%USERPROFILE%/.lmstudio/mcp.json on Windows";
-    // https://lmstudio.ai/docs/app/mcp : "follows Cursor's mcp.json notation"
+    // lmstudio.ai/blog/mcp : "~/.lmstudio/mcp.json on macOS and Linux", "%USERPROFILE%/.lmstudio/mcp.json on Windows";
+    // lmstudio.ai/docs/app/mcp : "follows Cursor's mcp.json notation"
     { id: 'lmstudio', name: 'LM Studio', mode: 'instructions', detect: () => exists(path.join(home, '.lmstudio')),
       edits: () => [mcpJson(path.join(home, '.lmstudio', 'mcp.json'), 'lmstudio')],
       manual: 'LM Studio asks before each tool call; allow the memev tools when it asks.' },
-    // https://docs.anythingllm.com/mcp-compatibility/overview : "anythingllm_mcp_servers.json ... in your AnythingLLM storage plugins directory";
-    // https://docs.anythingllm.com/installation-desktop/storage : the storage folder per OS
+    // docs.anythingllm.com/mcp-compatibility/overview : "anythingllm_mcp_servers.json ... in your AnythingLLM storage plugins directory";
+    // docs.anythingllm.com/installation-desktop/storage : the storage folder per OS
     { id: 'anythingllm', name: 'AnythingLLM', mode: 'instructions', detect: () => exists(anythingStorage),
       edits: () => [mcpJson(path.join(anythingStorage, 'plugins', 'anythingllm_mcp_servers.json'), 'anythingllm')] },
-    // https://ggozad.github.io/oterm/app_config/ : config.json in the data folder (OTERM_DATA_DIR, else XDG_DATA_HOME/oterm on Linux)
-    // https://ggozad.github.io/oterm/mcp/ : "Add MCP servers under the mcpServers key"
+    // ggozad.github.io/oterm/app_config/ : config.json in the data folder (OTERM_DATA_DIR, else XDG_DATA_HOME/oterm on Linux)
+    // ggozad.github.io/oterm/mcp/ : "Add MCP servers under the mcpServers key"
     { id: 'oterm', name: 'oterm', mode: 'instructions', detect: () => exists(otermDir),
       edits: () => [mcpJson(path.join(otermDir, 'config.json'), 'oterm')] },
-    // https://dev.meta.ai/docs/muse-code/extending.md : mcp_servers, transport stdio, mode optional skips a server that cannot start;
-    // https://dev.meta.ai/docs/muse-code/configuration.md : "~/.config/muse/settings.json", which "must set schema_version: 1"
+    // dev.meta.ai/docs/muse-code/extending.md : mcp_servers, transport stdio, mode optional skips a server that cannot start;
+    // dev.meta.ai/docs/muse-code/configuration.md : "~/.config/muse/settings.json", which "must set schema_version: 1"
     { id: 'muse-code', name: 'Muse Code', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.config', 'muse')),
       edits: () => [json(path.join(home, '.config', 'muse', 'settings.json'), (j) => { j.schema_version ??= 1; return setServer('mcp_servers', { transport: 'stdio', ...stdio('muse-code'), mode: 'optional' })(j); }, delServer('mcp_servers'))] },
-    // https://zcode.z.ai/en/docs/mcp-services : user native "~/.zcode/cli/config.json", key "mcp.servers"
+    // zcode.z.ai/en/docs/mcp-services : user native "~/.zcode/cli/config.json", key "mcp.servers"
     { id: 'zcode', name: 'ZCode', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.zcode')),
       edits: () => [json(path.join(home, '.zcode', 'cli', 'config.json'),
         (j) => { j.mcp = j.mcp && typeof j.mcp === 'object' ? j.mcp : {}; setServer('servers', stdio('zcode'))(j.mcp); return j; },
         (j) => { if (j.mcp && typeof j.mcp === 'object') { delServer('servers')(j.mcp); if (!Object.keys(j.mcp).length) delete j.mcp; } return j; })] },
-    // https://ravitemer.github.io/mcphub.nvim/mcp/servers_json.html : "~/.config/mcphub/servers.json", key mcpServers
+    // ravitemer.github.io/mcphub.nvim/mcp/servers_json.html : "~/.config/mcphub/servers.json", key mcpServers
     { id: 'mcphub-nvim', name: 'MCPHub (Neovim)', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.config', 'mcphub')),
       edits: () => [mcpJson(path.join(home, '.config', 'mcphub', 'servers.json'), 'mcphub-nvim')] },
-    // https://www.codebuddy.ai/docs/cli/mcp : ~/.codebuddy/.mcp.json, then ~/.codebuddy/mcp.json, then ~/.codebuddy.json;
+    // www.codebuddy.ai/docs/cli/mcp : ~/.codebuddy/.mcp.json, then ~/.codebuddy/mcp.json, then ~/.codebuddy.json;
     // "reads the first existing file", so Memev edits that one (JSONC allowed)
     { id: 'codebuddy', name: 'CodeBuddy Code', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.codebuddy')),
       edits: () => {
         const files = [path.join(home, '.codebuddy', '.mcp.json'), path.join(home, '.codebuddy', 'mcp.json'), path.join(home, '.codebuddy.json')];
         return [json(files.find((f) => exists(f)) || files[0], setServer('mcpServers', { type: 'stdio', ...stdio('codebuddy') }), delServer('mcpServers'))];
       } },
-    // https://docs.qoder.com/cli/mcp-reference : user level "~/.qoder/settings.json", key mcpServers
+    // docs.qoder.com/cli/mcp-reference : user level "~/.qoder/settings.json", key mcpServers
     { id: 'qoder', name: 'Qoder CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.qoder')),
       edits: () => [mcpJson(path.join(home, '.qoder', 'settings.json'), 'qoder')] },
-    // https://docs.cline.bot/mcp/configuring-mcp-servers : "CLI: ~/.cline/data/settings/cline_mcp_settings.json (override with the
-    // CLINE_MCP_SETTINGS_PATH env var)"; https://docs.cline.bot/getting-started/config : ~/.cline/ is shared by the IDE, CLI and SDK
+    // docs.cline.bot/mcp/configuring-mcp-servers : "CLI: ~/.cline/data/settings/cline_mcp_settings.json (override with the
+    // CLINE_MCP_SETTINGS_PATH env var)"; docs.cline.bot/getting-started/config : ~/.cline/ is shared by the IDE, CLI and SDK
     { id: 'cline', name: 'Cline', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.cline')),
       edits: () => [mcpJson(env.CLINE_MCP_SETTINGS_PATH || path.join(home, '.cline', 'data', 'settings', 'cline_mcp_settings.json'), 'cline', 'mcpServers', { disabled: false })],
       manual: 'In the Cline extension for VS Code, check MCP Servers, Configure: the extension keeps its own MCP settings file, which its docs do not name.' },
-    // https://kiro.dev/docs/mcp/configuration/ : "User Level: ~/.kiro/settings/mcp.json", for the IDE, the CLI and the web
+    // kiro.dev/docs/mcp/configuration/ : "User Level: ~/.kiro/settings/mcp.json", for the IDE, the CLI and the web
     { id: 'kiro', name: 'Kiro', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.kiro')),
       edits: () => [mcpJson(path.join(home, '.kiro', 'settings', 'mcp.json'), 'kiro')],
       manual: 'In the Kiro IDE, turn on the MCP support setting if it is off.' },
-    // https://junie.jetbrains.com/docs/junie-cli-mcp-configuration.html : "User scope: ~/.junie/mcp/mcp.json", the IDE plugin and CLI share it
+    // junie.jetbrains.com/docs/junie-cli-mcp-configuration.html : "User scope: ~/.junie/mcp/mcp.json", the IDE plugin and CLI share it
     { id: 'junie', name: 'Junie', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.junie')),
       edits: () => [mcpJson(path.join(home, '.junie', 'mcp', 'mcp.json'), 'junie')] },
-    // https://ampcode.com/docs/cli/settings : ~/.config/amp/settings.json or settings.jsonc, on Windows %USERPROFILE%\.config\amp\...;
-    // https://ampcode.com/docs/customize/mcp : the "amp.mcpServers" key with command and args
+    // ampcode.com/docs/cli/settings : ~/.config/amp/settings.json or settings.jsonc, on Windows %USERPROFILE%\.config\amp\...;
+    // ampcode.com/docs/customize/mcp : the "amp.mcpServers" key with command and args
     { id: 'amp', name: 'Amp', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'amp')),
       edits: () => {
         const dir = path.join(home, '.config', 'amp');
         const f = exists(path.join(dir, 'settings.json')) || !exists(path.join(dir, 'settings.jsonc')) ? path.join(dir, 'settings.json') : path.join(dir, 'settings.jsonc');
         return [mcpJson(f, 'amp', 'amp.mcpServers')];
       } },
-    // https://kilo.ai/docs/automate/mcp/using-in-kilo-code : "Global Configuration: ~/.config/kilo/kilo.jsonc" (or kilo.json),
+    // kilo.ai/docs/automate/mcp/using-in-kilo-code : "Global Configuration: ~/.config/kilo/kilo.jsonc" (or kilo.json),
     // on Windows C:\Users\<username>\.config\kilo\kilo.jsonc; key mcp, type local, the command as one array
     { id: 'kilo-code', name: 'Kilo Code', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'kilo')),
       edits: () => {
@@ -446,13 +446,13 @@ function moreApps(env, platform, stdio) {
         return [json(f, setServer('mcp', { type: 'local', command: [e.command, ...e.args], enabled: true }), delServer('mcp'))];
       },
       manual: 'Kilo asks before each Memev tool call; to allow them, add "permission": { "memev_*": "allow" } to kilo.jsonc.' },
-    // https://github.com/aws/amazon-q-developer-cli/blob/main/docs/agent-format.md : the legacy file "~/.aws/amazonq/mcp.json for global";
+    // github.com/aws/amazon-q-developer-cli/blob/main/docs/agent-format.md : the legacy file "~/.aws/amazonq/mcp.json for global";
     // .../docs/default-agent-behavior.md : the default agent "includes MCP servers from the legacy global configuration file".
     // The CLI is now Kiro CLI; this is for installs that remain.
     { id: 'amazon-q-cli', name: 'Amazon Q Developer CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.aws', 'amazonq')),
       edits: () => [mcpJson(path.join(home, '.aws', 'amazonq', 'mcp.json'), 'amazon-q-cli')],
       note: 'Custom agents read their own mcpServers; the default agent reads this file.' },
-    // https://docs.openhands.dev/openhands/usage/cli/mcp-servers : "~/.openhands/mcp.json", key mcpServers
+    // docs.openhands.dev/openhands/usage/cli/mcp-servers : "~/.openhands/mcp.json", key mcpServers
     { id: 'openhands', name: 'OpenHands CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.openhands')),
       edits: () => [mcpJson(path.join(home, '.openhands', 'mcp.json'), 'openhands')] },
   ];

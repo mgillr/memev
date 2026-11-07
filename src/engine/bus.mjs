@@ -700,7 +700,10 @@ export class Bus {
     const names = this._names(who.seat);
     // only what lies past this seat's read position can be fresh, so that is all this looks at (a seat that has kept up looks at nothing)
     const above = this._pastRead(view, st);
-    const fresh = above.filter((m) => this._toMe(who, m, names) && this._visible(who, m));
+    // a session's own sub-seat (app@machine/2 ...) starts fresh: what was on the bus before the seat existed is not news to it
+    const since = who.seat.includes('/') && who.rec?.created ? Date.parse(who.rec.created) : NaN;
+    const born = (m) => Number.isNaN(since) || !(Date.parse(m.ts) < since);
+    const fresh = above.filter((m) => this._toMe(who, m, names) && this._visible(who, m) && born(m));
     const cap = capped || limit != null;
     const isPriority = (m) => m.type === 'task' || (m.type === 'hold' && m.operator);
     let shownMsgs = fresh; let notShown = 0;
