@@ -310,7 +310,7 @@ test('MEM-142 AC06: allowlist enforces scoped commands', async () => {
 
   const allowed = [
     ['doctor'], ['status'], ['deployment', 'show'], ['deployment', 'set', 'local'],
-    ['deployment', 'set', 'container'], ['license', 'status'], ['license', 'install', 'key.lic'],
+    ['deployment', 'set', 'on-prem'], ['license', 'status'], ['license', 'install', 'key.lic'],
     ['devices', 'list'], ['ready'], ['setup', 'remote', 'log'],
   ];
   if (foundApp) allowed.push(['connect', foundApp.id]);
