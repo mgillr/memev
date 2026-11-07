@@ -156,7 +156,8 @@ export function renderBus(u, { lead = false } = {}) {
 
 // Which address the limiter counts. Only the socket's, because a caller sets its own headers, with one exception: Cloudflare
 // overwrites cf-connecting-ip, so through a running Cloudflare tunnel, whose connector reaches this server on loopback, that
-// header is the caller. Every caller through a relay or Tailscale arrives from the one loopback address and shares a bucket.
+// header is the caller. Every caller through a relay or Tailscale arrives from the one loopback address, so those with no valid
+// token share a bucket.
 export function callerAddress(req, tunnel) {
   const peer = String(req.socket.remoteAddress);
   const cf = req.headers['cf-connecting-ip'];
@@ -181,13 +182,20 @@ export function createServer(vault, { tunnelKey = () => null, activeTunnel = () 
       // a local caller also gets the vault's id, so the CLI can tell this vault's daemon from another one on the same port
       if (req.method === 'GET' && url.pathname === '/healthz') return send(200, local ? { ok: true, name: 'memev', version: VERSION, vault_id: vault.config?.vault_id ?? null } : { ok: true });
       let token = null; let route = url.pathname;
+      const lookup = () => vault.tokens.verify(token) || (token ? oauth.verify(token) : null);
+      let known; // what the limiter looked up, so a request looks its token up once
       const cm = /^\/c\/(mv_[0-9a-f]{8}_[0-9a-f]{32,})(\/.*)$/.exec(url.pathname);
       if (cm) { token = cm[1]; route = cm[2]; }
       else { const a = String(req.headers.authorization || ''); if (a.startsWith('Bearer ')) token = a.slice(7).trim(); }
       if (!local) {
         if (!vault.config.remote?.enabled) return send(403, { error: 'remote_off', error_description: 'remote access is switched off on this vault (memev cloud on)' });
         const ipKey = sha256(callerAddress(req, activeTunnel())).slice(0, 16);
-        if (!limiter.take(`ip:${ipKey}`) || (token && !limiter.take(`t:${token.slice(3, 11)}`))) return send(429, { error: 'rate_limited' }, { 'retry-after': '30' });
+        // One bucket for each request. A token that verifies is counted by that token alone, so a stranger who spends a shared
+        // address cannot refuse its holder. Everything else is counted by the address: no token, a token that does not verify,
+        // which adds no bucket of its own, and the open routes, whatever they carry.
+        const openRoute = url.pathname.startsWith('/oauth/') || url.pathname.startsWith('/.well-known/') || route === '/v1/invite-redeem';
+        if (!openRoute) known = lookup();
+        if (!limiter.take(known ? `t:${known.id}` : `ip:${ipKey}`)) return send(429, { error: 'rate_limited' }, { 'retry-after': '30' });
         fs.appendFile(audit, `${JSON.stringify({ ts: now(), ip: ipKey, route: route.slice(0, 64), method: req.method, token: token ? token.slice(3, 11) : null })}\n`, () => {});
       }
       // OAuth 2.1 for cloud AI apps: discovery, dynamic client registration, authorization code
@@ -285,7 +293,7 @@ export function createServer(vault, { tunnelKey = () => null, activeTunnel = () 
           return send(expired ? 410 : 409, { error: expired ? 'expired' : 'refused', error_description: e.message });
         }
       }
-      const identity = vault.tokens.verify(token) || (token ? oauth.verify(token) : null);
+      const identity = known === undefined ? lookup() : known;
       if (!identity) return send(401, { error: 'unauthorized', error_description: 'a valid bearer token is required' }, { 'www-authenticate': 'Bearer' });
       // SO-F-01: every authenticated request resolves to a subject and a scope, and the scope is held against this vault's own
       const resolved = resolveRequest(identity, { target: vaultScope(vault.config) });

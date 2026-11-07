@@ -97,9 +97,13 @@ longer needed.
 
 Remote requests always need a token issued for remote use, are rate limited (120 a minute by
 default, per caller, and at most 10,000 callers are held) and are logged to `.memev/access.jsonl`.
-A caller is its socket address, whatever headers it sends. The exception is a running Cloudflare tunnel,
-which overwrites `cf-connecting-ip`, so there that header is the caller. Everyone through a relay or
-Tailscale, or a reverse proxy of your own, arrives from one address and shares one limit.
+A request with a valid token is counted by that token alone. Any other request is counted by its address:
+no token, a token that does not verify, and the OAuth and invite routes whatever they carry. The address
+is the socket's, whatever headers the caller sends. The exception is a running Cloudflare tunnel, which
+overwrites `cf-connecting-ip`, so there that header is the address. Everyone through a relay or Tailscale,
+or a reverse proxy of your own, arrives from one address. So a stranger on that route can use up that one
+address limit, and then others with no token, and OAuth sign-in, token refresh and invites on that route,
+wait for it to refill. A computer or app with a valid token is not affected and keeps its own limit.
 A computer's signed request can be used once, also across a restart: what was used is kept in
 `.memev/nonces.json`. If that file is found damaged it is set aside as `nonces.json.damaged-<time>`, the
 vault keeps running, a request signed before that moment is refused and a fresh one is served. The known

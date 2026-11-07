@@ -4,6 +4,7 @@
 // these tests are literals: read from the source, a cap of Infinity would pass them.
 import { test, after, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -12,6 +13,7 @@ import { freePort } from './helpers/cli.mjs';
 import { initVault } from '../src/engine/vault.mjs';
 import { readJson, writeJson } from '../src/engine/util.mjs';
 import { createServer } from '../src/server/http.mjs';
+import { deviceKeygen, signRequest } from '../src/engine/devices.mjs';
 
 const T0 = Date.UTC(2026, 10, 6, 12);
 const open = [];
@@ -200,4 +202,99 @@ test('daemon keys by the running tunnel', { skip: process.platform === 'win32' }
     assert.deepEqual(seen, OVER, 'through Cloudflare one caller is one caller');
     assert.equal(await hit('203.0.113.2'), 401, 'and another is another');
   });
+});
+
+const LIST = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+const randomToken = () => `mv_${crypto.randomBytes(4).toString('hex')}_${crypto.randomBytes(16).toString('hex')}`;
+const statuses = async (n, send) => { const out = []; for (let i = 0; i < n; i++) out.push((await send(i)).status); return out; };
+const listening = async (server) => { if (!server.listening) await new Promise((r) => server.listen(0, '127.0.0.1', r)); return `http://127.0.0.1:${server.address().port}`; };
+const JSON_HEADERS = { 'content-type': 'application/json' };
+
+test('a stranger spending the address bucket through a shared peer does not get a valid token holder refused, and rotating random tokens still lands on the address', async () => {
+  // Tailscale or a relay: every caller is the one loopback peer. Nobody here sends a header the limiter believes.
+  const server = frozen(5, ['Date'], { activeTunnel: () => 'tailscale' });
+  const { v } = open.at(-1);
+  const url = await listening(server);
+  const connector = v.devices.enroll(v.tokens, { kind: 'cloud-connector', label: 'cloud app' }).token;
+  const key = deviceKeygen();
+  const computer = v.devices.enroll(v.tokens, { kind: 'remote-computer', label: 'laptop', pubkey: key.publicKey, policy: { can_enroll: true } }).token;
+  const shared = { 'x-forwarded-for': '198.51.100.40' };
+
+  // the stranger, with no credential at all, spends the address
+  const stranger = await statuses(7, () => fetch(`${url}/healthz/x`, { headers: shared }));
+
+  const holder = await fetch(`${url}/c/${connector}/mcp`, { method: 'POST', headers: { ...JSON_HEADERS, ...shared }, body: LIST });
+  assert.equal(holder.status, 200, 'a connector with a valid token, on the address the stranger spent');
+  assert.deepEqual(stranger, [401, 401, 401, 401, 401, 429, 429], 'the stranger is refused');
+  const signed = await fetch(`${url}/mcp`, { method: 'POST', headers: { ...JSON_HEADERS, ...shared, authorization: `Bearer ${computer}`, ...signRequest(key.privateKeyPem, { method: 'POST', path: '/mcp', body: LIST }) }, body: LIST });
+  assert.equal(signed.status, 200, 'a computer with a valid token and its signature');
+
+  // a token that does not verify buys nothing: still the address, and no bucket of its own
+  const size = server.rateLimiter.size;
+  assert.deepEqual(await statuses(6, () => fetch(`${url}/healthz/x`, { headers: { ...shared, authorization: `Bearer ${randomToken()}` } })), [429, 429, 429, 429, 429, 429], 'rotating random tokens');
+  assert.deepEqual(await statuses(3, () => fetch(`${url}/c/${randomToken()}/mcp`, { method: 'POST', headers: { ...JSON_HEADERS, ...shared }, body: LIST })), [429, 429, 429], 'and in the connector address');
+  assert.equal(server.rateLimiter.size, size, 'a token that does not verify adds no bucket');
+
+  // a valid token is limited by its own bucket, which the stranger cannot touch
+  assert.deepEqual(await statuses(5, () => fetch(`${url}/c/${connector}/mcp`, { method: 'POST', headers: { ...JSON_HEADERS, ...shared }, body: LIST })), [200, 200, 200, 200, 429], 'the holder is limited by its own bucket: it had used one of its five above');
+});
+
+test('a known token id cannot lock out its owner', async () => {
+  const server = frozen(5, ['Date'], { activeTunnel: () => 'cloudflare' });
+  const { v } = open.at(-1);
+  const url = await listening(server);
+  const { token } = v.devices.enroll(v.tokens, { kind: 'cloud-connector', label: 'cloud app' });
+  const id = token.split('_')[1];
+  for (let i = 0; i < 5; i++) await fetch(`${url}/healthz/x`, { headers: { 'cf-connecting-ip': '198.51.100.1', authorization: `Bearer mv_${id}_${crypto.randomBytes(16).toString('hex')}` } });
+  const res = await fetch(`${url}/c/${token}/mcp`, { method: 'POST', headers: { ...JSON_HEADERS, 'cf-connecting-ip': '198.51.100.2' }, body: LIST });
+  assert.equal(res.status, 200);
+});
+
+test('token holder served through an untrusted tunnel', async (t) => {
+  for (const tunnel of ['tailscale', null]) {
+    await t.test(String(tunnel), async () => {
+      mock.timers.reset();
+      const server = frozen(5, ['Date'], { activeTunnel: () => tunnel });
+      const { v } = open.at(-1);
+      const url = await listening(server);
+      const { token } = v.devices.enroll(v.tokens, { kind: 'cloud-connector', label: 'cloud app' });
+      const flood = await statuses(10, (i) => fetch(`${url}/healthz/x`, { headers: { 'cf-connecting-ip': cf(i), 'x-forwarded-for': xff(i) } }));
+      assert.deepEqual(flood, [401, 401, 401, 401, 401, 429, 429, 429, 429, 429]);
+      const relay = { 'x-forwarded-for': '198.51.100.40', 'x-forwarded-host': 'v.example', 'x-forwarded-proto': 'https' };
+      for (let i = 0; i < 2; i++) assert.equal((await fetch(`${url}/c/${token}/mcp`, { method: 'POST', headers: { ...JSON_HEADERS, ...relay }, body: LIST })).status, 200);
+    });
+  }
+});
+
+test('token holder behind a flooded address', async () => {
+  const server = frozen(5, ['Date'], { activeTunnel: () => 'cloudflare' });
+  const { v } = open.at(-1);
+  const url = await listening(server);
+  const { token } = v.devices.enroll(v.tokens, { kind: 'cloud-connector', label: 'cloud app' });
+  for (const [flooded, holder] of [['198.51.100.60', '198.51.100.60'], ['2001:db8:7:7::1', '2001:db8:7:7::2']]) {
+    const flood = await statuses(10, () => fetch(`${url}/healthz/x`, { headers: { 'cf-connecting-ip': flooded } }));
+    assert.deepEqual(flood.slice(5), [429, 429, 429, 429, 429]);
+    assert.equal((await fetch(`${url}/c/${token}/mcp`, { method: 'POST', headers: { ...JSON_HEADERS, 'cf-connecting-ip': holder }, body: LIST })).status, 200);
+  }
+});
+
+test('a bearer does not skip the pre-auth bucket', async () => {
+  const server = frozen(5, ['Date'], { activeTunnel: () => 'tailscale' });
+  const { v } = open.at(-1);
+  const url = await listening(server);
+  assert.equal((await statuses(6, (i) => fetch(`${url}/healthz/x`, { headers: { 'cf-connecting-ip': cf(i) } }))).at(-1), 429);
+  const log = path.join(v.state, 'access.jsonl');
+  const lines = () => { try { return fs.readFileSync(log, 'utf8').split('\n').length; } catch { return 0; } };
+  const settle = () => new Promise((r) => { setTimeout(r, 200); }); // the log is appended to behind the response
+  await settle(); const before = lines();
+  const bearer = () => ({ authorization: `Bearer ${randomToken()}`, 'cf-connecting-ip': '203.0.113.200' });
+  const calls = [
+    () => fetch(`${url}/healthz/x`, { headers: bearer() }),
+    () => fetch(`${url}/oauth/register`, { method: 'POST', headers: { ...JSON_HEADERS, ...bearer() }, body: JSON.stringify({ client_name: 'x', redirect_uris: ['http://127.0.0.1/cb'] }) }),
+    () => fetch(`${url}/oauth/authorize`, { headers: bearer() }),
+    () => fetch(`${url}/c/${randomToken()}/v1/invite-redeem`, { method: 'POST', headers: { ...JSON_HEADERS, 'cf-connecting-ip': '203.0.113.200' }, body: '{}' }),
+  ];
+  for (const call of calls) assert.equal((await call()).status, 429);
+  await settle();
+  assert.equal(lines(), before, 'a refused request is not logged');
 });
