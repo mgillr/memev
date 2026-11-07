@@ -1,0 +1,232 @@
+{
+  "title": "SR-5.02.1 The Business trial guards, re-specifying MEM-134: a trial is the signed field, a business identity is a resolved organisation actor, every guard is reached through the command (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Contract SR-5.02.1 in memev: the Business trial guards. Unsigned: a spec for red-team review. It supersedes the unsigned SR-5.02 (three criteria, no red-team record and no signed body, so nothing signed is edited) and it re-specifies MEM-134 (pull request #177), which stays open and is not modified. The id has its own record path: specIdOf of this file is SR-5.02.1, and SR-5.02 stays SR-5.02. Why: pull request #177 detects a trial by shape (a business tier, 10 seats and a 14 day term), takes the business identity from .memev/config.json (profile org), adds a second src/engine/identity.mjs although SO-F-01 built one, wires the install guard and an exported memberInvite that no command calls, and leaves its separation and offboard guards as functions only its own test calls (offboard returns a constant). SR-5.02 also leaves invite.trialAvailable() a stub that returns false. What this requires. (1) A trial is a licence whose signed trial field is true and that verifyLicense accepted (SR-1.06 returns it); seats, tier and term never make one. (2) A business identity is a vault token, from the file named by --token-file or from MEMEV_TOKEN (the flag wins), verified by the vault's TokenStore and resolved by resolveActor of SO-F-01 against vaultScope(config); the actor must be of an organisation scope whose id equals the licence's org, and the vault must name that same scope. A config that says profile org, or a bare identity field, proves nothing. No second identity module: the one of SO-F-01 is reused and unchanged. (3) TRIAL_LIMITS (src/engine/trial.mjs, frozen): members 5, computers 10, days 14, one extension of 14 days. A trial term is at most 14 days, at most 28 with trial_ext; seats at most 10; an extension needs a first trial of that organisation on record and is refused a second time; one trial per organisation. (4) Wiring. memev license install and activate refuse a trial that fails the guard, with a fixed reason that echoes no organisation, token or licence id, and write nothing; the guard runs when the caller passes an actor (null for none), the command always does, and a caller that passes none (the MEM-133 tests) is unchanged: no production code but the command calls either function. memev invite --teammate, with a trial installed, needs the same organisation actor and refuses the sixth member (distinct teammate names enrolled, plus unused unexpired teammate invites); without a trial nothing changes. trialAvailable is a pure function of the actor, the vault scope, the licence and the trial record. (5) Dropped from the claims: the separation guard (join, mount, release) of #177, because no mount or release exists and SO-F-01's authorizeScope already refuses mixing a personal and an organisational scope; and the wipe, no-export and audit of its offboard, because none is built. The offboarding claim is limited to memev devices remove, which behaves the same with a trial. (6) docs/BUSINESS-TRIAL.md says what is built, the credential channel and the limits. Decisions for the red-team: the command line has no credential today (docs/IDENTITY-AND-SCOPES.md lists it as planned), so --token-file and MEMEV_TOKEN are chosen here; and trial true means the self-serve trial only, so a sales-assisted pilot of another size or term must not carry it. Depends on: SR-1.06 (signed; its build is not on main: LICENSE_FIELDS lacks trial, org and trial_ext) and SO-F-01 (built). Base revision: TBD, a main commit that holds the SR-1.06 build; criterion 12 checks it and the signer records it here and in the manifest row. Tests reach modules by import() with typeof asserts, so red is an assertion. Owner decisions of 31 Oct 2026 apply: tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Personal trial.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "The Business trial guards: a trial is the signed field, a business identity is a resolved organisation actor, and every guard is reached through the command",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a trial is detected only by the signed trial field being true on a licence verifyLicense accepted; seats, tier and term of the trial shape never make one, trial false is not a trial, and a licence whose trial field was flipped after signing does not verify",
+        "the business identity is a vault token from --token-file or MEMEV_TOKEN, verified by the vault's TokenStore and resolved by resolveActor (src/engine/identity.mjs, SO-F-01) against vaultScope(config); an actor of an organisation scope whose id equals the licence org, in a vault that names that scope, is the only one a trial installs for; nothing in .memev/config.json other than the vault's own scope is read, and an object of the shape of an actor is not one",
+        "TRIAL_LIMITS is exported frozen from src/engine/trial.mjs: members 5, computers 10, days 14, extension_days 14, extensions 1; a trial term is at most 14 days (28 with trial_ext), its seats at most 10, an extension needs a first trial of the organisation on record and is refused a second time, and a second trial for the organisation is refused",
+        "memev license install and memev license activate refuse a failing trial with a fixed reason that echoes no organisation, token or licence id and write no file; installLicense and activateLicense guard when given an actor (null for none) and are unchanged when given none; no code outside the command calls them",
+        "memev invite --teammate, with a trial licence installed, needs the organisation actor of the vault's scope and refuses a sixth member (distinct teammate names of enrolled devices plus unused unexpired teammate invites; a second computer of a member is not a new member); without a trial installed it is unchanged",
+        "trialAvailable is a pure function of the actor, the vault scope, the licence and the trial record, true only for an organisation actor of the vault's scope while the organisation has no trial on record and no live paid licence",
+        "the separation guard (join, mount, release) and the wipe, no-export and audit of #177's offboard are not built and not claimed; memev devices remove has the same effect with and without a trial installed; docs/BUSINESS-TRIAL.md says so, states the credential channel and the limits, and the new module is on docs/MODULES.md",
+        "no second identity module is created, src/engine/identity.mjs and src/engine/license.mjs are not changed (license.mjs is SR-1.06's), and each red-green criterion runs only its own subtest whose name starts with T1-cNN: (the convention of SR-0.03.3 T1 requirement 8)"
+      ],
+      "description": "Repo: memev. Depends on the build of SR-1.06 (the base is TBD until it is on main). The tests make signed licences on a throwaway vendor key, issue vault tokens with identityScope and a subject through the vault's TokenStore, and call the command functions main.mjs dispatches to: licensing.command('license', ['install', file]) with the keys of the test vendor in its context, licensing.command('devices', ['remove', id]) and invite.command. A read-only run of the nine subtests with a draft change, on main with only the verified licence fields of SR-1.06 stood in, was green, and without the draft all nine failed on an assertion; the existing licence, invite, trial conversion and identity tests (57 with the new file) stayed green with it.",
+      "scope": [
+        "src/cli/invite.mjs",
+        "src/cli/licensing.mjs",
+        "src/engine/trial.mjs",
+        "src/engine/devices.mjs",
+        "test/trial-guards.test.mjs",
+        "docs/BUSINESS-TRIAL.md",
+        "docs/README.md",
+        "docs/MODULES.md",
+        "changelog.d/SR-5.02.1.md"
+      ],
+      "criteria": [
+        {
+          "statement": "memev license install refuses a trial licence with no credential, with a personal credential, and on a vault whose config only says profile org even with an organisation credential; the command takes the keys of the test vendor so the refusal is the guard's and not a signature failure; nothing is written. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trial-guards.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/trial-guards.test.mjs"
+          }
+        },
+        {
+          "statement": "A trial licence installs through the command for an organisation member of the scope the vault names (token from --token-file, and from MEMEV_TOKEN when there is no flag) and is recorded; it is refused for a member of another organisation, for an object that only has the shape of an actor, and in a vault that names another organisation. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trial-guards.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/trial-guards.test.mjs"
+          }
+        },
+        {
+          "statement": "A trial is the signed trial field only: a signed licence of the trial's shape with no trial field, and one with trial false, install on a vault with no credential; trial true with other seats and term is guarded; isTrialLicense is false for the string 'true'; a flipped trial field does not verify. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trial-guards.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/trial-guards.test.mjs"
+          }
+        },
+        {
+          "statement": "The limits through the command: TRIAL_LIMITS is the frozen 5, 10, 14, 14, 1; 14 days installs; 28 days without trial_ext, more than 28 days and 11 seats are refused; one extension installs after a first trial on record and a second extension, an extension with no first trial and a second trial are refused. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trial-guards.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/trial-guards.test.mjs"
+          }
+        },
+        {
+          "statement": "The refusal of memev license install holds none of the organisation id, the token, the licence id or the subject id. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trial-guards.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/trial-guards.test.mjs"
+          }
+        },
+        {
+          "statement": "memev invite --teammate with a trial licence installed prints no code, returns 1 and writes no invite for no credential, a personal credential and a vault that names no organisation, and prints a code for an organisation member. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trial-guards.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/trial-guards.test.mjs"
+          }
+        },
+        {
+          "statement": "With a trial installed the fifth member is admitted and the sixth is refused, counting enrolled teammates and an unused unexpired invite; a second computer of a member is admitted; without a trial installed there is no member limit. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trial-guards.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/trial-guards.test.mjs"
+          }
+        },
+        {
+          "statement": "trialAvailable is true only for an organisation actor of the vault's scope with no trial on record and no live paid licence, and false for a trial on record, no actor, a personal vault, a live paid licence and no argument. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trial-guards.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/trial-guards.test.mjs"
+          }
+        },
+        {
+          "statement": "memev devices remove has the same code, the same device status and the same registry result with a trial installed as without one. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trial-guards.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c09:' test/trial-guards.test.mjs"
+          }
+        },
+        {
+          "statement": "The existing tests of the licence, the trial conversion (MEM-133), the invite, the teammate invite and the identity model stay green, with their text unchanged",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/trial-convert.test.mjs test/invite.test.mjs test/invite-teammate.test.mjs test/invite-plan.test.mjs test/licensing.test.mjs test/licensing-activate.test.mjs test/identity.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "One full run of test/trial-guards.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09) with nothing skipped and nothing todo, and prints its whole output.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/trial-guards.test.mjs > \"$f\" 2>&1; rc=$?; cat \"$f\"; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c01:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c02:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c03:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c04:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c05:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c06:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c07:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c08:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c09:' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "This contract is drafted with the memev checkout as its workdir and a base that holds the SR-1.06 build. The workdir is the checkout top level (git rev-parse --show-toplevel equals the working directory) and license.mjs at the base lists the field trial_ext. The base is TBD in the request until SR-1.06 is built and merged",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$(git rev-parse --show-toplevel)\" = \"$(pwd -P)\" ] && git show \"$MEMEV_CONTRACT_BASE:src/engine/license.mjs\" | grep -Eq \"trial_ext\"",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Both guards are reached by the command: licensing.mjs passes an actor from cliActor to installLicense and to activateLicense, no other file of src or bin names either function, and main.mjs dispatches license and invite",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$(grep -c 'actor: cliActor' src/cli/licensing.mjs)\" = 2 ] && test -z \"$(grep -rlE 'installLicense|activateLicense' src bin --include=*.mjs | grep -vx src/cli/licensing.mjs)\" && grep -Eq 'licensing' src/cli/main.mjs && grep -Eq 'invite' src/cli/main.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The change touches only invite.mjs, licensing.mjs, trial.mjs and devices.mjs of src, and creates no second identity module: src holds one file whose name is identity.mjs",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git diff --name-only \"$MEMEV_CONTRACT_BASE\" HEAD -- src bin scripts vendor | grep -Evx 'src/cli/invite.mjs|src/cli/licensing.mjs|src/engine/trial.mjs|src/engine/devices.mjs')\" && test \"$(git ls-files src | grep -cE '(^|/)identity[^/]*[.]mjs$')\" = 1",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "docs/BUSINESS-TRIAL.md states the limits, the signed trial field and the credential channel (--token-file and MEMEV_TOKEN), and claims no wipe, no-export, separation guard or mount guard",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -Eq '5 members' docs/BUSINESS-TRIAL.md && grep -Eq '10 computers' docs/BUSINESS-TRIAL.md && grep -Eq '14 days' docs/BUSINESS-TRIAL.md && grep -Eq 'MEMEV_TOKEN' docs/BUSINESS-TRIAL.md && grep -Eq -- '--token-file' docs/BUSINESS-TRIAL.md && grep -Eq 'signed `trial` field' docs/BUSINESS-TRIAL.md && ! grep -Eiq 'wipe|no-export|separation guard|mount guard' docs/BUSINESS-TRIAL.md",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "docs/MODULES.md matches the imports and the doc links resolve",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-module-map.test.mjs test/docs-links.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The gate's report is byte-identical for the base and the head for every existing signed record",
+          "verifier": {
+            "type": "command",
+            "cmd": "h=$(mktemp -d) && b=$(mktemp -d) && git worktree add -q --detach \"$h\" HEAD && git worktree add -q --detach \"$b\" HEAD && git -C \"$b\" checkout -q \"$MEMEV_CONTRACT_BASE\" -- src scripts vendor && (cd \"$h\" && node scripts/gate/redteam-gate.mjs --report > \"$h.out\" 2>&1); (cd \"$b\" && node scripts/gate/redteam-gate.mjs --report > \"$b.out\" 2>&1); diff \"$h.out\" \"$b.out\"; rc=$?; git worktree remove --force \"$h\"; git worktree remove --force \"$b\"; exit $rc",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "Anything outside the requirements of this task is not built, not stubbed and not defaulted in code; if the work seems to need it, stop and report what it needs.",
+        "A test_red_green command of this contract prints its whole output: it is never piped through tail or head, and never captures its output without printing it."
+      ]
+    }
+  ]
+}

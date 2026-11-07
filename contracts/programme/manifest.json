@@ -1302,6 +1302,46 @@
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
+      "id": "PG-W-21E",
+      "type": "programme work package",
+      "area": "PG-W",
+      "title": "Entitlement gate for trust governance: local trust is free, multi-site and cross-organisation trust need a licence services entry, and a lapsed licence never invalidates existing trust (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP21-E1 (a gap named by the owner's answers on ADR 8 of 1 Nov 2026; proposed 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SR-1.06",
+          "boundary": "owns the licence schema; PG-W-21E reads only the state and the services of what verifyLicense returns and ignores trial, org and trial_ext; the SR-1.06 build must be in the tree first"
+        },
+        {
+          "contract": "SR-5.02.1",
+          "boundary": "the Business trial guards (pull request #384) change src/cli/invite.mjs, src/cli/licensing.mjs and src/engine/devices.mjs; PG-W-21E adds nothing there and reads no trial semantics"
+        },
+        {
+          "contract": "PG-W-21A.2",
+          "boundary": "owns the trust record and the roots; their evaluation takes no licence"
+        },
+        {
+          "contract": "PG-W-21B",
+          "boundary": "owns the trust book and the eligibility reader; they take no licence"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "src/engine/entitlements.mjs (limitsFor and the live test of seatPolicy) is the build layer; this spec adds one pure function there, one new module and their test, and changes no licence field, tier, price or term",
+      "depends_on": [
+        "SR-1.06",
+        "PG-W-21A.2",
+        "PG-W-21B"
+      ],
+      "tasks": 1,
+      "criteria": 23,
+      "spec": "specs/PG-W-21E.json",
+      "base": "4db303071c67c32e2e5b3ecd508a10748b5b5a34 (the memev main commit this spec was written against)",
+      "status": "proposed, unsigned; no red-team record; the base is recorded; depends on the build of SR-1.06; the topology of work breakdown row 1.3.6, ADR 3, ADR 5, ADR 7 and SO-A-05 stay open",
+      "kind": "feature"
+    },
+    {
       "id": "PG-16.1",
       "type": "programme work package",
       "area": "PG-16",
@@ -1336,6 +1376,46 @@
       "criteria": 11,
       "spec": "specs/PG-16.1-positioning-tiers-public-claims-blueprint.json",
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+    },
+    {
+      "id": "PG-W-21D",
+      "type": "programme work package",
+      "area": "PG-W",
+      "title": "Device pairing and recovery: a one-tap signed act pairs a new device at low trust, and a lost device is recovered through the owner's recovery key or an operator re-grant (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP21-D1 (a gap named by the owner's answers on ADR 8 of 1 Nov 2026; proposed 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "PG-W-21A.2",
+          "boundary": "owns the trust record, its signature block, the required verification level, reserved delegation, root records with succession and the personal-scope rule; PG-W-21D hands the trust book a grant proposal and writes no record"
+        },
+        {
+          "contract": "PG-W-21B",
+          "boundary": "owns the trust book, GRANT_AUTHORITY (provisional under ADR 5) and the marking overlay; PG-W-21D calls its grant and revoke with a resolved actor"
+        },
+        {
+          "contract": "SO-F-01",
+          "boundary": "owns the subject, scope, membership and resolveActor model of src/engine/identity.mjs, reused unchanged"
+        },
+        {
+          "contract": "PG-W-21E",
+          "boundary": "gates multi-site and cross-organisation trust; pairing one's own devices is local trust and is not gated"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SO-F-01 (identity) and src/engine/devices.mjs (the registry, the invite and the device key) are the build layer, reused unchanged; this spec adds only src/engine/federation/pairing.mjs, its test and the documentation",
+      "depends_on": [
+        "PG-W-21A.2",
+        "SO-F-01",
+        "PG-W-21B"
+      ],
+      "tasks": 2,
+      "criteria": 32,
+      "spec": "specs/PG-W-21D.json",
+      "base": "4db303071c67c32e2e5b3ecd508a10748b5b5a34 (the memev main commit this spec was written against)",
+      "status": "proposed, unsigned; no red-team record; the base is recorded; depends on PG-W-21A.2 (proposed in parallel) and the amended PG-W-21B for the book; the topology of work breakdown row 1.3.6, ADR 3, ADR 5, ADR 7 and SO-A-05 stay open",
+      "kind": "feature"
     },
     {
       "id": "PG-19.1",
@@ -1519,6 +1599,46 @@
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
+      "id": "PG-W-21F",
+      "type": "programme work package",
+      "area": "PG-W",
+      "title": "Trust proposal step: agents propose a grant or revocation as a decision, the person or operator answers, and the signed answer is the only way a trust record is written (memev, provisional under ADR 5)",
+      "repo": "memev",
+      "programme_tasks": "WP21-F1 (a gap named by the owner's answers on ADR 8 of 1 Nov 2026; proposed 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SO-A-05",
+          "boundary": "owns the decision workflow and its seven states; PG-W-21F uses raised, approved, rejected and deferred by name and defines none; the SO-A-05 build must be in the tree first"
+        },
+        {
+          "contract": "PG-W-21A.2",
+          "boundary": "owns the trust record and its validator, used here without writing"
+        },
+        {
+          "contract": "PG-W-21B",
+          "boundary": "owns the trust book and GRANT_AUTHORITY, which is provisional under ADR 5 and reused here and not repeated; the proposal step is its only caller on the answer of a person or operator"
+        },
+        {
+          "contract": "PG-W-21D",
+          "boundary": "device pairing is a person's signed act on its own path and does not use this step"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SO-A-05 (the decision entity and queue), PG-W-21B (the book) and src/engine/identity.mjs (resolveActor, isResolvedActor) are the build layer, cited by id; this spec adds only the proposal module, two decision kinds and their test",
+      "depends_on": [
+        "SO-A-05",
+        "PG-W-21A.2",
+        "PG-W-21B"
+      ],
+      "tasks": 1,
+      "criteria": 22,
+      "spec": "specs/PG-W-21F.json",
+      "base": "4db303071c67c32e2e5b3ecd508a10748b5b5a34 (the memev main commit this spec was written against)",
+      "status": "proposed, unsigned; no red-team record; the base is recorded; provisional under ADR 5; depends on the build of SO-A-05 and the amended PG-W-21B; the topology of work breakdown row 1.3.6, ADR 3, ADR 5, ADR 7 and SO-A-05 stay open",
+      "kind": "feature"
+    },
+    {
       "id": "SR-0.03.3",
       "type": "superseding spec (version 3 of SR-0.03)",
       "area": "SR-0",
@@ -1560,6 +1680,37 @@
       "spec": "specs/SR-W-03A.json",
       "base": "ba24c82e16c91f5962f20d49b396d46054a505da (the memev main commit that merged pull request #358, SO-F-03)",
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); additive to the signed SR-0.03.3, which it does not supersede"
+    },
+    {
+      "id": "QL-W-01B",
+      "kind": "feature",
+      "type": "programme work package",
+      "area": "QL-W",
+      "title": "QL-W-01B A signed contract with no base revision gets one from a signed base attestation that Vault.contractVerify reads, without editing a signed byte (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP23-02 (the back-fill that QL-W-01A leaves open; proposed 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SR-0.03.3",
+          "boundary": "T1 of the signed contract records a base at signing and verify is BLOCKED without one; QL-W-01B adds only a second source for the base, a signed attestation, read by contractVerify for a signed body that has none, and changes no signed body"
+        },
+        {
+          "contract": "QL-W-01A",
+          "boundary": "QL-W-01A (signed; merged in pull request #380) refuses new signings that have no base and leaves contractVerify unchanged; QL-W-01B changes contractVerify, adds contractAttestBase and one export, and touches no function that QL-W-01A touches; a verify of a contract with no attestation behaves as QL-W-01A requirement 4 says"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SR-0.03.3 (base recording, the approval record and the base check) is the build layer, cited by id; this spec changes contractVerify and adds contractAttestBase and checkBaseAttestation in src/engine/contracts.mjs, the protected path in src/engine/vault.mjs, one MCP tool and one CLI command",
+      "depends_on": [
+        "SR-0.03.3",
+        "QL-W-01A"
+      ],
+      "tasks": 1,
+      "criteria": 28,
+      "spec": "specs/QL-W-01B.json",
+      "base": "2686be2edeba642a0c1d2d3f3b0b58d0c255ee3c (the memev main commit that merged pull request #380, QL-W-01A)",
+      "status": "proposed, unsigned; adds no attestation record and changes no signed body"
     },
     {
       "id": "PG-03.6",
@@ -1715,6 +1866,30 @@
       "criteria": 34,
       "spec": "../seed-readiness/specs/SR-1.34-a-daemon-start-waits-long-enough-for-a-slow-machine.json",
       "status": "proposed 1 Nov 2026; unsigned; red-team review and signing by the signer, after SR-1.01 T1, T3 and SR-1.24 have merged; builder Claim F; no code until signed",
+      "kind": "feature"
+    },
+    {
+      "id": "SR-5.02.1",
+      "type": "superseding spec (supersedes the unsigned SR-5.02)",
+      "area": "SR-5",
+      "title": "The Business trial guards, re-specifying MEM-134: a trial is the signed trial field, a business identity is a resolved organisation actor of SO-F-01, every guard is reached through the command (memev)",
+      "repo": "memev",
+      "supersedes": "SR-5.02",
+      "supersedes_reason": "SR-5.02 is unsigned (three criteria, no red-team record, no signed body), so nothing signed is edited: it names MEM-129, MEM-130 and MEM-134 and leaves trialAvailable a stub; SR-5.02.1 re-specifies the guards of MEM-134 (pull request #177, which stays open and unmodified) with the trial detected by the signed trial field and the business identity resolved by SO-F-01, and drops the guards that no production path reaches",
+      "related_pull_request": "#177",
+      "programme_tasks": "WP24-01 (a gap found at the review of pull request #177; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "vault_contracts": [],
+      "build_layer": "SR-1.06 (signed) makes trial, org and trial_ext licence fields; SO-F-01 (built) resolves an actor; this spec adds only the trial guards, the credential channel of the command line and the tests",
+      "depends_on": [
+        "SR-1.06",
+        "SO-F-01"
+      ],
+      "tasks": 1,
+      "criteria": 23,
+      "spec": "specs/SR-5.02.1-business-trial-guards.json",
+      "base": "TBD: a main commit that holds the SR-1.06 build (license.mjs lists trial, org and trial_ext); recorded here and in the request before signing",
+      "status": "proposed and unsigned; no red-team record; not to be signed until the SR-1.06 build is on main and the base is recorded",
       "kind": "feature"
     }
   ],
@@ -2216,6 +2391,12 @@
       "note": "specified in this set"
     },
     {
+      "task": "WP24-01",
+      "title": "The Business trial guards: the trial is the signed field, the business identity is a resolved organisation actor, and install, member invite, trial availability and device removal are reached through the command",
+      "contract": "SR-5.02.1",
+      "note": "specified in this set"
+    },
+    {
       "task": "WP19-01",
       "title": "memev work dispatches to runWork from main.mjs, with a production openStore port that reaches project state only through a read-only vault method",
       "contract": "PG-19.2",
@@ -2279,6 +2460,12 @@
       "task": "WP22-01",
       "title": "A red run whose TAP header was cut off is red only when an assertion is visible, and every other kind of output is judged as before",
       "contract": "SR-W-03A",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP23-02",
+      "title": "A signed base attestation gives a locally signed contract with no base a verifiable base: contractAttestBase writes it once, contractVerify reads it when the body has no base, and it never overrides a recorded base",
+      "contract": "QL-W-01B",
       "note": "specified in this set"
     }
   ]

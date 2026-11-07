@@ -1,0 +1,236 @@
+{
+  "title": "PG-W-21E Entitlement gate for trust governance: local trust is free, multi-site and cross-organisation trust need a licence services entry, and a lapsed licence never invalidates existing trust (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Contract PG-W-21E in memev: the entitlement gate for trust governance under ADR 8, work package WP21-E1. Unsigned: a spec proposed for red-team review. ORIGIN. The owner answered ADR 8 on 1 Nov 2026. Question 5: local trust is free; multi-site and cross-organisation features are the contact-us tiers. Clarification 11: Question 5 is enforced through the licence's services list, and a lapsed licence never invalidates existing trust. The tiers are those of the owner decision of 31 Oct 2026 and are not changed: Free (this computer, with everything local), Personal at $12/month or $120/year for up to 3 computers, and Business and Corporate by contacting us; there is no Federated tier. WHAT IT BUILDS. (1) In src/engine/entitlements.mjs, beside seatPolicy and limitsFor, one pure function trustEntitlement({ license, feature, at }) and the frozen lists TRUST_FEATURES (local, multi_site, cross_org) and TRUST_SERVICES (the two strings multi_site and cross_org, which a licence names in its services list). Local trust (trust records, grants, the checks of one site, device pairing of PG-W-21D) is always allowed, with no licence, an invalid, expired or not yet valid one, on the Free and the Personal tier. Multi-site and cross-organisation use are allowed only when the licence the caller gives is valid or in its grace period and its services list, as limitsFor already returns it, holds the string of that feature; the tier id alone never decides; neither feature implies the other. A refusal carries one fixed rule and one fixed reason that says to contact us and echoes no licence id, tier, organisation or seat count. (2) In src/engine/federation/trust-entitlement.mjs, guardEstablish({ action, reach, license, at }, fn): an action that establishes or extends trust across sites (propose, accept, renew, add_root) runs fn only when trustEntitlement allows the feature its reach names (same_site is local; multi_site and cross_org need their service; a missing or unknown reach counts as cross_org, the strictest) and otherwise returns the refusal with fn never called; an action that ends, reads or judges trust (revoke, verify, evaluate, admit) is never gated, with any licence or none. A LAPSED LICENCE NEVER INVALIDATES EXISTING TRUST. The evaluation of a relationship, the relationship gate, the Admission, the trust book and the eligibility reader take no licence and import neither src/engine/license.mjs nor src/engine/entitlements.mjs; the gate sits only where trust is established or extended. A relationship, a grant or a root record that exists keeps deciding exactly as before when the licence expires, is removed or becomes invalid, and revoking is always possible. What a lapse stops is establishing or extending multi-site and cross-organisation trust. OVERLAP CHECKED. SR-1.06 (signed, build in progress): LICENSE_FIELDS already lists services, and SR-1.06 adds trial, org and trial_ext and the one schema check in verifyLicense; this gate reads the object verifyLicense and loadLicense return, uses only its state and its services, ignores trial, org and trial_ext, and changes no licence field, so the two do not touch the same lines of src/engine/license.mjs, which this contract does not change. The SR-1.06 build must be in the tree first (a criterion checks that LICENSE_FIELDS lists trial, org and trial_ext). SR-5.02.1 (pull request #384, unsigned): its Business trial guards change src/cli/invite.mjs, src/cli/licensing.mjs and src/engine/devices.mjs and add src/engine/trial.mjs; this gate adds nothing there and reads no trial semantics: a trial licence unlocks multi-site or cross-organisation use only if its services list names it, the same as any licence. DECISIONS FOR THE RED-TEAM. (a) The reach of a relationship is stated by the caller (same_site, multi_site, cross_org) and defaults to cross_org, because the relationship record carries no organisation field and this contract does not change it; a caller that understates the reach is a bug of the caller, not of the gate, and the node composition root will derive it from the roots (PG-W-21A.2). (b) Grace counts as live, as in seatPolicy. (c) The two service strings are new names in an existing free-form list: older licences simply do not carry them, so their holders must ask for a re-issued licence, which is the contact-us path anyway. (d) docs/PRICING.md and the pricing tests are not touched: no price, tier or licence term changes, and the statement of what the services entries unlock goes in docs/FEDERATION.md, section Relationship to the tiers. BOUNDARIES. PG-W-21A.2 and PG-W-21B (trust records, the book, the reader) are cited by id and not repeated; SO-F-04C and the relationship records are not touched; the transport and notices of another author are not touched; the licence terms and the crdt-merge terms are not touched. The topology of work breakdown row 1.3.6 stays OPEN; ADR 3, ADR 5, ADR 7 and SO-A-05 stay open. Depends on the build of SR-1.06. Base revision: 4db303071c67c32e2e5b3ecd508a10748b5b5a34, the memev main commit this spec was written against and the commit the red runs are judged at; the SR-1.06 build is applied on it before the build starts. The tests reach the modules by namespace import() inside each test with typeof asserts, so a missing export fails on an assertion and not at load. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "T1",
+      "phase": "implement",
+      "depends_on": [],
+      "title": "Local trust is free; multi-site and cross-organisation trust need a licence services entry; a lapsed licence never invalidates existing trust",
+      "requirements": [
+        "src/engine/entitlements.mjs exports TRUST_FEATURES (frozen: local, multi_site, cross_org), TRUST_SERVICES (frozen: multi_site, cross_org, the strings a licence names in its services list) and trustEntitlement({ license, feature, at }), which returns { allowed, rule, reason } and never throws; the file gains no import and changes no existing export (TIERS, PLANS, CORE_FEATURES, PAID_FEATURES, seatPolicy, limitsFor and report keep their values)",
+        "feature local is always allowed with rule entitlement.local, whatever the licence is: none, invalid, expired, not yet valid, a Free or Personal tier; feature multi_site or cross_org is allowed with rule entitlement.licensed only when the licence state is valid or grace (the same live test as seatPolicy) and limitsFor(license).services holds the string of that feature; the tier id and the seat count never decide; multi_site does not imply cross_org nor the reverse; an unknown feature is refused with rule entitlement.unknown_feature",
+        "a refusal has rule entitlement.not_licensed (no licence, an invalid or not yet valid one, or a licence without the entry) or entitlement.lapsed (state expired, past its grace), one fixed reason that says that multi-site and cross-organisation trust is part of the contact-us tiers (Business and Corporate) and to contact us, and echoes no licence id, tier, organisation, seat count or date",
+        "src/engine/federation/trust-entitlement.mjs (new) exports GATED_ACTIONS (frozen: propose, accept, renew, add_root), UNGATED_ACTIONS (frozen: revoke, verify, evaluate, admit) and guardEstablish({ action, reach, license, at }, fn): for a gated action it runs fn once and returns { ok: true, result } when the feature of the reach is allowed (same_site maps to local, multi_site and cross_org to their feature, a missing or unknown reach to cross_org), and otherwise returns { ok: false, code: 'not_entitled', rule, reason } with fn never called and nothing written; an ungated action runs fn with any licence or none; an action in neither list is refused; an exception of fn is not caught",
+        "a lapsed licence never invalidates existing trust: evaluate, relationshipGate, Admission, membership, trust-record and trust-book modules take no licence and import neither src/engine/license.mjs nor src/engine/entitlements.mjs nor trust-entitlement.mjs; with a licence that has expired, been removed or become invalid, an existing live relationship, grant or root record decides exactly as with a live licence, and revoking is allowed; only guardEstablish of a gated action refuses",
+        "the gate reads only the state and services of the licence object: a licence object with trial, org and trial_ext fields (SR-1.06) or a trial licence is judged by its services alone; src/engine/license.mjs, scripts/license, docs/PRICING.md, LICENSE, NOTICE and docs/LICENSING-NOTICE.md are not changed, no licence field and no tier, price or term changes, and nothing calls out to the network or a licence server",
+        "docs/FEDERATION.md, in the section on the tiers, says that local trust is free, that multi-site and cross-organisation trust need a services entry in a licence of the contact-us tiers (Business and Corporate), that Free and Personal carry neither, that a lapsed licence never invalidates existing trust and only stops new multi-site and cross-organisation trust being established or extended, and that revoking is never gated; no file of src, scripts or vendor changes but entitlements.mjs and the new module; each red-green criterion runs only its own subtest whose name starts with T1-cNN: (source: the convention of SR-0.03.3 T1 requirement 8)"
+      ],
+      "description": "Repo: memev. The fixtures are licence objects as verifyLicense returns them (state valid, grace, expired, not_yet_valid, invalid or none; tier; services; seats), and signed fixtures from test/helpers/tier-fixtures.mjs for one real verifyLicense round trip. The evaluation of a relationship is the real evaluate of src/engine/federation/policy.mjs with a plain relationship record; trust records and the book are not built yet (PG-W-21A.2 and PG-W-21B), so their no-licence rule is checked by a scan of imports of the files that exist and a rule that the build adds the same scan for them. A stand-in of every subtest was run read-only at the base: each fails on ERR_ASSERTION.",
+      "scope": [
+        "src/engine/entitlements.mjs",
+        "src/engine/federation/trust-entitlement.mjs",
+        "test/trust-entitlement.test.mjs",
+        "docs/FEDERATION.md",
+        "docs/MODULES.md",
+        "changelog.d/PG-W-21E.md",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "entitlements.mjs exports TRUST_FEATURES (frozen, local, multi_site, cross_org), TRUST_SERVICES (frozen, the strings multi_site and cross_org) and trustEntitlement; TIERS, PLANS, CORE_FEATURES, PAID_FEATURES and the results of seatPolicy and limitsFor for the fixtures of every tier are what they are at the base; trustEntitlement never throws on a missing, null, non-object or malformed licence, a missing feature or a non-number time. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-entitlement.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/trust-entitlement.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Local trust is free: trustEntitlement for feature local is allowed with rule entitlement.local for no licence, an invalid, an expired, a not yet valid, a Free, a Personal and a Business or Corporate licence alike. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-entitlement.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/trust-entitlement.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Multi-site is enforced through the services list: a valid licence or one in grace whose services hold multi_site is allowed with rule entitlement.licensed; a valid licence without the entry, whatever its tier (Personal, Business, Corporate, an older team, office or enterprise id) and its seat count, is refused with entitlement.not_licensed; a licence in grace is allowed; an expired one past grace is refused with entitlement.lapsed; none, invalid and not yet valid are refused with entitlement.not_licensed. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-entitlement.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/trust-entitlement.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Cross-organisation is enforced the same way and independently: a licence holding only multi_site is refused cross_org, a licence holding only cross_org is refused multi_site, a licence holding both is allowed both; an unknown feature is refused with entitlement.unknown_feature. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-entitlement.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/trust-entitlement.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A refusal has one fixed reason per rule, it says that multi-site and cross-organisation trust is part of the contact-us tiers (Business and Corporate) and to contact us, it is the same text for every licence, and it contains none of the licence id, tier, organisation, seat count or date of the licence given. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-entitlement.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/trust-entitlement.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "guardEstablish: GATED_ACTIONS (propose, accept, renew, add_root) and UNGATED_ACTIONS (revoke, verify, evaluate, admit) are frozen; for a gated action with an allowed feature fn runs once and its result is returned, with a refused feature fn is never called, nothing is written and the answer is ok false, code not_entitled and the rule and reason of the refusal; reach same_site is local and always allowed, a missing or unknown reach counts as cross_org; an ungated action runs with no licence, an expired one and an invalid one; an action in neither list is refused; an exception thrown by fn propagates. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-entitlement.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/trust-entitlement.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A lapsed licence never invalidates existing trust: with a live relationship record and a policy, evaluate of src/engine/federation/policy.mjs gives the same decision, rule and relationship id whatever licence exists or not, and a revoke through guardEstablish succeeds with an expired licence; no module of src/engine/federation other than trust-entitlement.mjs imports entitlements.mjs, license.mjs or trust-entitlement.mjs, and no module of src/engine/federation or src/engine/identity.mjs reads a licence. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-entitlement.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/trust-entitlement.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The gate reads only state and services: a valid licence object that carries trial, org and trial_ext and no multi_site entry is refused, one that carries the entry is allowed whatever its trial field is; the result for the same state and services is the same for every tier id. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-entitlement.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/trust-entitlement.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "docs/FEDERATION.md says that local trust is free, that multi-site and cross-organisation trust need a services entry in a licence of the contact-us tiers (Business and Corporate), and that a lapsed licence never invalidates existing trust",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/FEDERATION.md",
+            "pattern": "local trust is free.*(multi-site|multi_site).*(cross-organisation|cross_org).*services.*(Business and Corporate).*(lapsed|expired) licence never invalidates",
+            "flags": "is"
+          }
+        },
+        {
+          "statement": "docs/FEDERATION.md says that revoking is never gated and that Free and Personal carry neither entry",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -Eiq 'revok.*never gated|never gate.*revok' docs/FEDERATION.md && grep -Eiq 'Free and Personal' docs/FEDERATION.md",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The SR-1.06 build is in the tree: LICENSE_FIELDS lists trial, org and trial_ext",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -E 'LICENSE_FIELDS' src/engine/license.mjs | grep -q trial_ext",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "No licence, tier, price or term changes, and only entitlements.mjs and the new module change under src",
+          "verifier": {
+            "type": "command",
+            "cmd": "git diff --quiet \"$MEMEV_CONTRACT_BASE\" HEAD -- src/engine/license.mjs scripts/license docs/PRICING.md docs/tiers LICENSE NOTICE docs/LICENSING-NOTICE.md && test -z \"$(git diff --name-only \"$MEMEV_CONTRACT_BASE\" HEAD -- src scripts vendor | grep -vE '^src/engine/(entitlements\\.mjs|federation/trust-entitlement\\.mjs)$')\" && ! grep -Eq \"^import .*src/engine\" test/trust-entitlement.test.mjs && ! grep -Eq '^import' src/engine/entitlements.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The pricing tests stay green",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/pricing-docs.test.mjs test/pricing-figures.test.mjs test/pricing-honesty.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "One full run of test/trust-entitlement.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08) with nothing skipped and nothing todo, and prints its whole output.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/trust-entitlement.test.mjs > \"$f\" 2>&1; rc=$?; cat \"$f\"; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c01:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c02:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c03:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c04:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c05:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c06:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c07:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c08:' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "docs/MODULES.md lists the new module",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/MODULES.md",
+            "pattern": "src/engine/federation/trust-entitlement\\.mjs",
+            "flags": ""
+          }
+        },
+        {
+          "statement": "The module map is current",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/docs/module-graph.mjs --check",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "This contract is drafted with the memev checkout as its workdir and a pinned base. The workdir is the checkout top level (git rev-parse --show-toplevel equals the working directory). The base is 4db303071c67c32e2e5b3ecd508a10748b5b5a34, the memev main commit this spec was written against and the commit the red runs are judged at; src/engine/entitlements.mjs exists at it",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$MEMEV_CONTRACT_BASE\" = 4db303071c67c32e2e5b3ecd508a10748b5b5a34 ] && [ \"$(git rev-parse --show-toplevel)\" = \"$(pwd -P)\" ] && git cat-file -e \"$MEMEV_CONTRACT_BASE:src/engine/entitlements.mjs\"",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "Anything outside the requirements of this task is not built, not stubbed and not defaulted in code; if the work seems to need it, stop and report what it needs.",
+        "A test_red_green command of this contract prints its whole output: it is never piped through tail or head, and never captures its output without printing it.",
+        "Stop and ask when the work would decide ADR 3, ADR 5, ADR 7 or SO-A-05, add a role-by-action matrix, pick the topology of work breakdown row 1.3.6, or touch the licence terms, the tier prices or the crdt-merge terms.",
+        "Stop and ask when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would edit a signed spec or a signed contract: a signed id is superseded by a new id, never edited.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently.",
+        "Stop and ask when the work would change src/engine/license.mjs, a licence field, a tier, a price, or any licence or crdt-merge term, or would make an evaluation, a gate, the Admission or a trust reader read a licence.",
+        "Stop and ask when the work would gate revocation, reading or evaluation, or invalidate or hide any trust that exists, because a licence lapsed."
+      ]
+    }
+  ]
+}
