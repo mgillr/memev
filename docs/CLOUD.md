@@ -96,7 +96,10 @@ Apps set up before per-device credentials still send `X-Memev-Key`; it keeps wor
 longer needed.
 
 Remote requests always need a token issued for remote use, are rate limited (120 a minute by
-default) and are logged to `.memev/access.jsonl`. Admin routes are local only. Contract signing is
+default, per caller, and at most 10,000 callers are held) and are logged to `.memev/access.jsonl`.
+A caller is its socket address, whatever headers it sends. The exception is a running Cloudflare tunnel,
+which overwrites `cf-connecting-ip`, so there that header is the caller. Everyone through a relay or
+Tailscale, or a reverse proxy of your own, arrives from one address and shares one limit. Admin routes are local only. Contract signing is
 available remotely; a contract signed from a remote origin records that origin, and its command
 criteria do not run on this machine until a local operator approves it with
 `memev contract approve <id>`. `memev cloud rotate-key` changes the legacy shared key, for apps

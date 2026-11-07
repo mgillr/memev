@@ -10,7 +10,7 @@ import { newVault, cleanup } from './helpers/tmp.mjs';
 let v, server, base;
 before(async () => {
   ({ v } = newVault());
-  server = createServer(v);
+  server = createServer(v, { activeTunnel: () => 'cloudflare' });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}`;
 });

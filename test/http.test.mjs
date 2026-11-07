@@ -9,7 +9,7 @@ let v, server, base, local, remoteTok, readTok, key;
 before(async () => {
   ({ v } = newVault());
   key = 'k'.repeat(32);
-  server = createServer(v, { tunnelKey: () => key });
+  server = createServer(v, { tunnelKey: () => key, activeTunnel: () => 'cloudflare' });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}`;
   local = v.tokens.issue({ agent: 'local' }).token;

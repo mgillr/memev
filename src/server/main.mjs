@@ -42,8 +42,9 @@ try { vault = new Vault(root, { onProgress: moved }).open(); } catch (e) {
 }
 const port = Number(flags.port || process.env.MEMEV_PORT || vault.config.port || 7787);
 const bind = process.env.MEMEV_BIND || '127.0.0.1';
-const server = createServer(vault, { tunnelKey: () => tunnelKey(root) });
 const extras = [];
+// the provider the tunnel supervisor actually started, which decides what the rate limiter counts as a caller
+const server = createServer(vault, { tunnelKey: () => tunnelKey(root), activeTunnel: () => extras.find((x) => x.activeTunnel)?.activeTunnel() ?? null });
 // the device registry records requests in memory; write it out every few seconds (report only)
 const flush = setInterval(() => { try { vault.devices.saveSoon(); } catch {} }, 5000); flush.unref();
 const stop = (code = 0) => {

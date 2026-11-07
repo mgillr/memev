@@ -154,7 +154,16 @@ export function renderBus(u, { lead = false } = {}) {
   return L.join('\n');
 }
 
-export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICENSE_KEYS, env = process.env } = {}) {
+// Which address the limiter counts. Only the socket's, because a caller sets its own headers, with one exception: Cloudflare
+// overwrites cf-connecting-ip, so through a running Cloudflare tunnel, whose connector reaches this server on loopback, that
+// header is the caller. Every caller through a relay or Tailscale arrives from the one loopback address and shares a bucket.
+export function callerAddress(req, tunnel) {
+  const peer = String(req.socket.remoteAddress);
+  const cf = req.headers['cf-connecting-ip'];
+  return cf && ['cloudflare', 'quick'].includes(tunnel) && LOOPBACK.has(peer) ? String(cf) : peer;
+}
+
+export function createServer(vault, { tunnelKey = () => null, activeTunnel = () => null, licenseKeys = LICENSE_KEYS, env = process.env } = {}) {
   const limiter = new Buckets(vault.config.remote?.rate_per_min || 120);
   const nonces = new NonceCache(path.join(vault.state, 'nonces.json'));
   // a grant whose device was removed stops working at once: the device's token_id is the grant's id
@@ -177,7 +186,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       else { const a = String(req.headers.authorization || ''); if (a.startsWith('Bearer ')) token = a.slice(7).trim(); }
       if (!local) {
         if (!vault.config.remote?.enabled) return send(403, { error: 'remote_off', error_description: 'remote access is switched off on this vault (memev cloud on)' });
-        const ipKey = sha256(String(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress)).slice(0, 16);
+        const ipKey = sha256(callerAddress(req, activeTunnel())).slice(0, 16);
         if (!limiter.take(`ip:${ipKey}`) || (token && !limiter.take(`t:${token.slice(3, 11)}`))) return send(429, { error: 'rate_limited' }, { 'retry-after': '30' });
         fs.appendFile(audit, `${JSON.stringify({ ts: now(), ip: ipKey, route: route.slice(0, 64), method: req.method, token: token ? token.slice(3, 11) : null })}\n`, () => {});
       }

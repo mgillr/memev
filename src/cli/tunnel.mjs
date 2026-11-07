@@ -99,7 +99,7 @@ const ownConfig = (t, prev) => t.toUs && (prev?.mode === 'serve' || prev?.mode =
 
 /** The daemon side: keep the tunnel up while remote access is on. */
 export function supervise(vault, { root, port, run = runCmd, whichFn = which }) {
-  let child = null, stopped = false, backoff = 1000, timer = null;
+  let child = null, stopped = false, backoff = 1000, timer = null, running = null;
   const env = process.env;
   const write = (s) => writeJson(stateFile(root), { ...s, updated: now() }, 0o600);
   const log = (m) => console.error(`[memev tunnel] ${m}`);
@@ -109,6 +109,7 @@ export function supervise(vault, { root, port, run = runCmd, whichFn = which }) 
     ensureTunnelKey(root);
     const provider = pickProvider(vault.config, env, { run, whichFn });
     if (!provider) { write({ enabled: true, provider: null, url: null, state: 'no provider available' }); return; }
+    running = provider;
     try {
       if (provider === 'tailscale') {
         const ts = whichFn('tailscale');
@@ -150,10 +151,10 @@ export function supervise(vault, { root, port, run = runCmd, whichFn = which }) 
       };
       child.stdout.on('data', onData); child.stderr.on('data', onData);
       child.on('exit', (code) => { child = null; if (stopped) return; write({ enabled: true, provider, url: tunnelState(root)?.url || null, state: `restarting (exit ${code})` }); timer = setTimeout(start, backoff); backoff = Math.min(backoff * 2, 5 * 60000); });
-    } catch (e) { log(e.message); write({ enabled: true, provider, url: null, state: `error: ${e.message}` }); timer = setTimeout(start, backoff); backoff = Math.min(backoff * 2, 5 * 60000); }
+    } catch (e) { running = null; log(e.message); write({ enabled: true, provider, url: null, state: `error: ${e.message}` }); timer = setTimeout(start, backoff); backoff = Math.min(backoff * 2, 5 * 60000); }
   }
   function halt() {
-    clearTimeout(timer);
+    clearTimeout(timer); running = null;
     if (child) { child.removeAllListeners('exit'); child.kill(); child = null; }
     // Only what Memev started is turned off: the state records it as mode serve or funnel. A config Memev
     // left as is has no mode. Turning off the https 443 handler also clears its funnel (Tailscale drops
@@ -167,7 +168,7 @@ export function supervise(vault, { root, port, run = runCmd, whichFn = which }) 
   start();
   // the relay (off unless the setting is on) is kept up beside the tunnel; see relay.mjs and docs/RELAY.md
   const relay = import('./relay.mjs').then((m) => m.superviseRelay(vault, { root, port, env })).catch((e) => { log(`relay: ${e.message}`); return null; });
-  return { stop() { stopped = true; halt(); relay.then((r) => r?.stop()); }, reload() { halt(); start(); relay.then((r) => r?.reload()); } };
+  return { activeTunnel: () => running, stop() { stopped = true; halt(); relay.then((r) => r?.stop()); }, reload() { halt(); start(); relay.then((r) => r?.reload()); } };
 }
 
 /** Connector URLs a cloud app can use: the URL form carries the token, so treat it like a password. */
