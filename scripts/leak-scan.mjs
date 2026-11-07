@@ -32,8 +32,21 @@ const OK_HOME = new Set(['you', 'me', 'user', 'username', 'name', 'runner', 'exa
 // URL inside another URL (after = or ?) is not it either.
 const REPO_URL = /(?<=^|[\s"'`(<\[])https:\/\/github\.com\/([a-z0-9-]+)\/memev(?=\.git(?![a-z0-9])|[/\s"'`)>]|$)/g;
 const ROOT_HOME = new RegExp(`(^|[\\s"'(])/${'root'}/`);
+// The account that owns this repository, read at run time from the origin remote's GitHub URL and never written here. It is null
+// when there is no origin or the origin is not on GitHub; then nothing is blanked and the scan fails closed.
+function repoOwner() {
+  let url = '';
+  try { url = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return null; }
+  const m = /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@(?:ssh\.)?github\.com(?::443)?\/)([A-Za-z0-9-]+)\/[A-Za-z0-9._-]+\/?$/.exec(url);
+  return m ? m[1].toLowerCase() : null;
+}
+const OWNER = repoOwner();
+// GitHub writes a merge commit's first line as "Merge pull request #N from <owner>/<branch>". When <owner> is this repository's
+// owner, that one segment of that one line is blanked, so a merge made in the web UI with GitHub's default subject passes. Any other
+// login in that slot, the branch segment, the same word anywhere else in the message, and a line of any other form are still found.
+const MERGE_SUBJECT = /^(Merge pull request #\d+ from )([A-Za-z0-9-]+)(\/\S+)$/;
 const findings = [];
-function scanText(where, text, file = '') {
+function scanText(where, text, file = '', isCommit = false) {
   if (EXEMPT.some((re) => re.test(file)) || SELF.has(file)) return;
   const lines = text.split('\n');
   lines.forEach((line, i) => {
@@ -44,7 +57,9 @@ function scanText(where, text, file = '') {
     // character before it is not a letter, a digit, a dot or a hyphen, so gist.github.com and a look-alike host do not count. The
     // same word anywhere else on the line, in another repository's URL, on another host, in a file path or in a commit message is
     // still found.
-    const lower = file ? line.toLowerCase().replace(REPO_URL, (m, owner) => (deny.has(h(owner)) ? m.replace(`/${owner}/`, '//') : m)) : line.toLowerCase();
+    const merge = isCommit && i === 0 && OWNER ? MERGE_SUBJECT.exec(line) : null;
+    const lower = file ? line.toLowerCase().replace(REPO_URL, (m, owner) => (deny.has(h(owner)) ? m.replace(`/${owner}/`, '//') : m))
+      : merge && merge[2].toLowerCase() === OWNER ? `${merge[1]}${merge[3]}`.toLowerCase() : line.toLowerCase();
     const words = new Set();
     for (const w of lower.split(/[^a-z0-9@._+-]+/)) { if (!w) continue; words.add(w); words.add(w.replace(/^[._-]+|[._-]+$/g, '')); for (const p of w.split(/[._@+-]+/)) if (p) words.add(p); }
     for (const w of lower.split(/[^a-z0-9]+/)) if (w) words.add(w);
@@ -69,7 +84,7 @@ if (process.argv.includes('--history')) {
   for (let i = 0; i + 1 < log.length; i += 2) {
     const sha = log[i].trim(); const lines = log[i + 1].split('\n'); const skip = ALLOW_COMMIT_LINE.get(sha);
     if (skip) lines[skip - 1] = '';
-    scanText(`commit ${sha.slice(0, 10)}`, lines.join('\n'));
+    scanText(`commit ${sha.slice(0, 10)}`, lines.join('\n'), '', true);
   }
 }
 if (findings.length) { console.error(`leak scan: ${findings.length} finding(s)`); for (const f of findings) console.error(`  ${f}`); process.exit(1); }
