@@ -44,7 +44,7 @@ regulated differently by jurisdiction, or led by multiple competing providers.
 These stages describe how customers may adopt AI and how the market may evolve. They are not
 predictions, fixed dates, or a claim that every organisation follows the same sequence.
 
-### Stage 1 — Organisations adopt and automate with AI
+### Stage 1: Organisations adopt and automate with AI
 
 AI applications and agents are introduced into existing work: software development, research,
 engineering, finance, procurement, customer operations, administration and other functions.
@@ -64,7 +64,7 @@ Memev's role is to provide a common operational environment around those tools:
 The value proposition is not simply automating a task. It is helping an organisation coordinate
 the work that automation creates and understand its effects across functions.
 
-### Stage 2 — Frontier AI capability advances
+### Stage 2: Frontier AI capability advances
 
 External laboratories and providers develop more capable models, agents, tools and applications.
 These systems may become able to perform longer, more complex and more autonomous work.
@@ -90,7 +90,7 @@ organisational authority, federation and verifiable exchange.
 Stage 2 is an ecosystem condition that Memev must accommodate. It is not a dependency on a
 particular laboratory, model, API or timetable.
 
-### Stage 3 — AI participates in and operates economic functions
+### Stage 3: AI participates in and operates economic functions
 
 As AI systems become more capable, organisations may delegate a growing proportion of operational
 and professional functions to agents and automated services. Economic activity will increasingly
@@ -123,7 +123,7 @@ remain provider-neutral.
 
 | Tier | Customer scope | Stage 1 value | Stage 3 role | Status boundary |
 |---|---|---|---|---|
-| **Personal — Free Core** | One person, one computer at a time | Connect the person's AI tools around local context, projects, communications and evidence | A personal control and continuity point for the person's AI-assisted or delegated work | Core is built; see [Personal](docs/tiers/free.md) and [CHARTER](CHARTER.md) |
+| **Personal: Free Core** | One person, one computer at a time | Connect the person's AI tools around local context, projects, communications and evidence | A personal control and continuity point for the person's AI-assisted or delegated work | Core is built; see [Personal](docs/tiers/free.md) and [CHARTER](CHARTER.md) |
 | **Personal with more computers** | One person, up to three computers | Keep the person's tools and work coordinated across devices | Portable personal operating context across devices and providers | Current tier capabilities and price are documented; automatic concurrent merge and hosted services remain planned |
 | **Business** | One organisation, initially one company node | Coordinate members, approved AI tools and business work in a company-controlled environment | Govern AI-operated functions within one organisation, with organisational identity, policy and evidence | Coming; company vault, administration and associated services remain planned |
 | **Corporate** | One organisation across sites, departments and jurisdictions | Apply organisational controls, deployment policy, audit and resilience across larger operations | Coordinate autonomous operations across independently operated sites while retaining corporate authority and jurisdiction controls | Coming/planned; multi-site federation is not shipped end to end |
@@ -161,7 +161,7 @@ This is the tier most directly aligned with the possibility of AI-operated suppl
 
 The economic-transition stages above explain the market. The following capability phases describe how Memev should establish the product and earn the right to address that market. They are capability gates, not calendar promises.
 
-### Phase 0 — Establish the personal operating core
+### Phase 0: Establish the personal operating core
 
 **Primary tier:** Personal.
 
@@ -174,7 +174,7 @@ Gate evidence:
 - useful work coordination beyond simple recall;
 - clear product status, security documentation and reproducible tests.
 
-### Phase 1 — Extend personal continuity across devices
+### Phase 1: Extend personal continuity across devices
 
 **Primary tier:** Personal with more computers.
 
@@ -187,7 +187,7 @@ Gate evidence:
 - clear separation between free single-computer behaviour and paid multi-computer entitlements;
 - deployment and support processes that do not require bespoke engineering for every user.
 
-### Phase 2 — Make one organisation operational
+### Phase 2: Make one organisation operational
 
 **Primary tier:** Business.
 
@@ -200,7 +200,7 @@ Gate evidence:
 - cross-functional work and dependency scenarios with source-linked evidence;
 - independent security review, recovery tests and paid customer deployments.
 
-### Phase 3 — Operate across sites and jurisdictions
+### Phase 3: Operate across sites and jurisdictions
 
 **Primary tier:** Corporate.
 
@@ -214,7 +214,7 @@ Gate evidence:
 - enterprise observability, audit export and operational support;
 - successful multi-site customer deployments.
 
-### Phase 4 — Federate independent organisations
+### Phase 4: Federate independent organisations
 
 **Primary tier:** Federated.
 
@@ -305,6 +305,6 @@ The following principles should remain true regardless of which AI capabilities 
 
 ## Positioning statement
 
-**Memev is the provider-neutral operating infrastructure that helps people and organisations adopt AI today and coordinate increasingly autonomous systems tomorrow — across applications, functions, sites and independent organisations, without surrendering control of their data, authority or operational state.**
+**Memev is the provider-neutral operating infrastructure that helps people and organisations adopt AI today and coordinate increasingly autonomous systems tomorrow, across applications, functions, sites and independent organisations, without surrendering control of their data, authority or operational state.**
 
 The strategic destination is operating infrastructure for an AI-enabled economy. The route is to prove useful personal workflows, one organisation, multiple sites and finally independent organisations working together under verifiable agreements.

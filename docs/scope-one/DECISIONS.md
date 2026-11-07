@@ -169,7 +169,7 @@ current code already uses, so no contract is blocked on a guess.
 - Safe default: deny by default and local records only, as before. Nothing in the code changes by this record, so until a
   contract lands a behaviour, that behaviour is not available.
 
-### Tiers (historical decision, owner decision 31 Oct 2026 — superseded)
+### Tiers (historical decision, owner decision 31 Oct 2026, superseded)
 
 The owner decision on 31 October was the free core, Personal at $12/month or $120/year for up to 3 computers, and contact us for anything above, with no Federated tier. This was the decision in force on that date. It is explicitly superseded by the owner decision of 2 November 2026 below. The names the app and licence tooling use today remain Personal for the free core and Personal with more computers for the paid tier; the higher tiers still require code and contract work.
 
@@ -232,11 +232,11 @@ This decision explicitly reverses and supersedes the 31 October 2026 decision th
 
 **Decision:** Memev has five named tiers:
 
-1. **Personal** — one person, one computer; the free core.
-2. **Personal with more computers** — one person, up to three computers; the current paid Personal offer.
-3. **Business** — one organisation, initially a single company node.
-4. **Corporate** — one organisation across multiple sites, departments, programmes, portfolios and jurisdictions.
-5. **Federated** — multiple independent organisations coordinating shared projects, programmes, portfolios, supply chains, research or industry work while retaining separate ownership, operators, trust roots, policies and legal responsibilities.
+1. **Personal**: one person, one computer; the free core.
+2. **Personal with more computers**: one person, up to three computers; the current paid Personal offer.
+3. **Business**: one organisation, initially a single company node.
+4. **Corporate**: one organisation across multiple sites, departments, programmes, portfolios and jurisdictions.
+5. **Federated**: multiple independent organisations coordinating shared projects, programmes, portfolios, supply chains, research or industry work while retaining separate ownership, operators, trust roots, policies and legal responsibilities.
 
 Business and Corporate concern coordination within one organisation. Federated is the distinct cross-organisation tier. It is not a shared global vault, a central authority over participants, or an assumption that one organisation can see another's internal records.
 
