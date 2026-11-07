@@ -109,6 +109,8 @@ const main = async () => {
     seedVault(root, 'small', JSON.parse(fs.readFileSync(path.join(REPO, 'bench', 'queries.json'), 'utf8')));
     genNotes(root, NOTES, 'memory', 7 + NOTES);
     const git = (...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t.invalid', ...a], { cwd: root, env, encoding: 'utf8' });
+    // the benches run with an empty HOME, so the vault holds its own identity: initVault writes one only when the person running this has none
+    git('config', 'user.name', 't'); git('config', 'user.email', 't@t.invalid');
     git('add', '-A'); git('commit', '-qm', 'notes');
 
     const start = runBench('start.mjs', '--root', root, '--port', await freePort(), '--runs', '4', '--tree', REPO).filter((x) => x.run !== undefined && x.ok);
