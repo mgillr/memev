@@ -48,14 +48,689 @@
             "sig": "BZ9ixBzrVpOZs1arthGNu1BDhbTyfMArZ+IF0VICYTmGoQkRCP893KllVgaHcoiUIuTIIt2JWhrw+ui4ht2tAQ=="
           }
         ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "be4c0aec225745865d9de9bb0f18e22b91d43ba42beb91a85d03ecd1b6c31296",
+      "base_commit": "280ed16ecf8ed8bed216582790580955b7503335",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "21d5aa97719a86699221e79b64f679cc45e12a1d23ec1cd6f662f12102dc5fdc"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "28ec9c1f6ddb69a3d4c87dfb65f19712be1094f7394ae8d60dfba53ceea10759"
+          },
+          {
+            "path": "scripts/bench/speed/targets.mjs",
+            "sha256": "04c728bdc81206d92671dba2b29a066fbd81e4dd424849cfd740650bd35014d4"
+          },
+          {
+            "path": "docs/testing/SPEED-RESULTS.md",
+            "sha256": "2ee7a27a16ebc844a38cf416c61467b54541af23f101d8b666ffd14a44f02313"
+          },
+          {
+            "path": "docs/BUS.md",
+            "sha256": "7c14e4d7e31520d6e2715eb916534d713ec0659563e813fa1d79d15dc02af232"
+          },
+          {
+            "path": "package.json",
+            "sha256": "df0a33344e4d35bdb39ce4d9d2fbecc02f1d44b6037fd181a27740fe80195606"
+          }
+        ]
       },
-      "closing": {
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "second seat on the same machine; the criteria were run, as stated here, and this is not an independent review: both seats are AI on one machine. Version 2 exists because version 1 could not pass: T1-c00 sets MEMEV_NO_SERVICE, which three Windows service tests inherited, and its body lost the end of its request to a cut at 4,000 characters. A rehearsal of version 2 through the real contractVerify, with a throwaway key on a clone that was its own vault, as a non-root user on a Linux server, then found four more faults, all now fixed or in this spec's scope: paths that only intermediate commits touched, a dated licence test that had begun to fail on every run, a commit bench that got no commit when its runner had a git identity, and a seeded bus folder that reads as uncommitted.  Read against version 1: no criterion statement or verifier changed; T6's one requirement now names first import as a guard, with the measured reason, 60.6 s against 200 s on that server, which narrows what T6-c03 shows and is stated in the results page; fourteen paths are added to the scope, under reviewer note 1. A limit that PR 451 adds, raised by the lead: where the vault is the workdir, a commit that adds code under a top-level bus/ escapes the scope check, as contracts/ already does; the memev repository tracks no bus/ folder. Timing tests can trip on a loaded machine: test/hooks-startup.test.mjs failed once under load, and T2-c03w failed once in 9 runs on a test not captured; a run that trips is rerun while nothing has landed on top, and the receipt names it. The second seat wrote PRs 446, 447, 449, 450 and 451, which this contract's range now holds, and the lead read them, so neither seat is independent of the other's work. Not done: power loss, a real vault at this size, Windows, or two computers through git.",
+      "amendments": [
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "README.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "changelog.d/444-request-whole.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "changelog.d/scope-vault-bus.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "scripts/sign/owner-key-preload.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "scripts/sign/owner-sign.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "src/engine/contracts.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "src/engine/seg2.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "src/engine/segindex.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "test/contract-request-whole.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "test/contracts-scope-vault.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "test/licence-merge-default.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "test/owner-sign.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "test/segindex.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "test/service-windows.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "README.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "changelog.d/444-request-whole.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "changelog.d/scope-vault-bus.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "scripts/sign/owner-key-preload.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "scripts/sign/owner-sign.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "src/engine/contracts.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "src/engine/seg2.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "src/engine/segindex.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "test/contract-request-whole.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "test/contracts-scope-vault.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "test/licence-merge-default.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "test/owner-sign.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "test/segindex.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "test/service-windows.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "README.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "changelog.d/444-request-whole.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "changelog.d/scope-vault-bus.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "scripts/sign/owner-key-preload.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "scripts/sign/owner-sign.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "src/engine/contracts.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "src/engine/seg2.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "src/engine/segindex.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/contract-request-whole.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/contracts-scope-vault.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/licence-merge-default.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/owner-sign.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/segindex.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/service-windows.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "README.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "changelog.d/444-request-whole.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "changelog.d/scope-vault-bus.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "scripts/sign/owner-key-preload.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "scripts/sign/owner-sign.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "src/engine/contracts.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "src/engine/seg2.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "src/engine/segindex.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "test/contract-request-whole.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "test/contracts-scope-vault.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "test/licence-merge-default.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "test/owner-sign.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "test/segindex.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "test/service-windows.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "README.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "changelog.d/444-request-whole.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "changelog.d/scope-vault-bus.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "scripts/sign/owner-key-preload.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "scripts/sign/owner-sign.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "src/engine/contracts.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "src/engine/seg2.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "src/engine/segindex.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "test/contract-request-whole.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "test/contracts-scope-vault.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "test/licence-merge-default.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "test/owner-sign.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "test/segindex.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "test/service-windows.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "README.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "changelog.d/444-request-whole.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "changelog.d/scope-vault-bus.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "scripts/sign/owner-key-preload.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "scripts/sign/owner-sign.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "src/engine/contracts.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "src/engine/seg2.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "src/engine/segindex.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "test/contract-request-whole.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "test/contracts-scope-vault.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "test/licence-merge-default.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "test/owner-sign.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "test/segindex.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "test/service-windows.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "README.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "changelog.d/444-request-whole.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "changelog.d/scope-vault-bus.md",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "scripts/sign/owner-key-preload.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "scripts/sign/owner-sign.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "src/engine/contracts.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "src/engine/seg2.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "src/engine/segindex.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "test/contract-request-whole.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "test/contracts-scope-vault.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "test/licence-merge-default.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "test/owner-sign.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "test/segindex.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "test/service-windows.test.mjs",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T6",
+          "field": "requirement",
+          "from": "The ceilings sit well above what the iMac measured, so a slower computer passes. Those in CAUGHT sit under the old cost. a4_new_note_p50_ms and a8_stop_ms are guards the old code also passes, and claim no gain. a3_recall_p95_ms and a6_send_ms are guards as well: the old code measured under twice their ceilings here, so a faster computer could pass it, and they are not counted as catching it.",
+          "to": "The ceilings sit well above what the iMac measured, so a slower computer passes. Those in CAUGHT sit under the old cost. a4_new_note_p50_ms and a8_stop_ms are guards the old code also passes, and claim no gain. a3_recall_p95_ms, a6_send_ms and a7_first_import_ms are guards as well: the old code measured under twice their ceilings on the fastest machine this runs on, so they are not counted as catching it. Seven ceilings catch the old code.",
+          "reviewer_note": 2
+        }
+      ],
+      "sig": {
         "payloadType": "application/vnd.memev.contract-sha256",
-        "payload": "ODA0ZjUwZGYyMTQ2ODdiYjZjZWQ5YmE4YjQ3MGQ4OWI5OTY2MjY2OTEzZGYwM2U0MzdhMTM4ODk0YmVkNjM1MQ==",
+        "payload": "NDNlNzA1OWU4YjRiOWQxNGQyOWU0YWUzMzZhMjQ0NmVlZmE4ZTQ5ZGJhN2U3MjQ5NGZmYTQ4ZjlkNWFmOWVjNg==",
         "signatures": [
           {
             "keyid": "1f6b4e7c00729bc7",
-            "sig": "TMB97nlKMTpeBwIH3KJ5b8yPtQfn5UAsnSZDIG879E4fZFBH0b9/rizhpCjC0fVSMFwcHNBGomnD/VjC+38oAw=="
+            "sig": "CEiuup2yp9mLtG5aZ0/MK43s3mf/8qFXCco2wGLteaL9nRPoO9fgFNDJJjTxppWKPoeC2p4pzSJtrWl2W464Cw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MTg5ZDgwY2M5YTQ5NTY5MDNiMGQyYjhmMzU2NDUyYTNmYmVmN2Q1Y2E5ZWIyYjRjODIyZWU0MTM5YzBjOGYzMA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "4J5KbreSau6Ga4/VULfhj1/prT4YqtBXf/E/e7lvmps/xVZLuZ7cfPiqxkYfcIHrmwC8MBrv08IchDlZ8i+EBg=="
+          }
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": [
+    {
+      "n": 1,
+      "text": "second seat on the same machine; run through the real verifier's scope criterion. Version 2 of SR-1.35 adds fourteen paths to every task's scope, since the verifier walks every commit since the base and each path below was touched by a commit in that range. Fix PRs since version 1: changelog.d/444-request-whole.md, scripts/sign/owner-key-preload.mjs, scripts/sign/owner-sign.mjs, src/engine/contracts.mjs, test/contract-request-whole.test.mjs, test/owner-sign.test.mjs, test/service-windows.test.mjs, test/licence-merge-default.test.mjs, test/contracts-scope-vault.test.mjs, changelog.d/scope-vault-bus.md. Touched while the speed work was built: README.md, src/engine/seg2.mjs, src/engine/segindex.mjs, test/segindex.test.mjs; the last three no longer exist at head. No criterion changes, and none of these widens what a criterion allows.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YTEzY2I3ODllMzEyNzVjNjcxMzM4OTRlYzkwNWQzNWQzYjE5NWJiNDczMjIwNDgzYWRiMzQ4Yzg4Y2MwZDBkNw==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "ViSt4Q0Xk8zZRVpmm/2R49LoiguVo8mZfm5DuyK9HFsYD2QyCkpM8Qcjgvgj6FuAX/sJLiQlPQXjrBpAVT0qBw=="
+          }
+        ]
+      }
+    },
+    {
+      "n": 2,
+      "text": "second seat on the same machine; measured by the lead with the fixed benches, and read by the second seat. T6's requirement is reworded, which narrows what T6-c03 shows: first import is no longer a ceiling the old code must fail. On a 16-core Linux server the old code took 60.6 s against a ceiling of 200 s, so that ceiling cannot catch it there, and the contract's own rule is that a ceiling the old code stands under twice of on the fastest machine is a guard. The gain measured on the iMac, 405 s to 90 s, stays in docs/testing/SPEED-RESULTS.md, and the ceiling stays as a guard. The seven other ceilings stay in CAUGHT, each at 3.1 times or more on that server. The new text: The ceilings sit well above what the iMac measured, so a slower computer passes. Those in CAUGHT sit under the old cost. a4_new_note_p50_ms and a8_stop_ms are guards the old code also passes, and claim no gain. a3_recall_p95_ms, a6_send_ms and a7_first_import_ms are guards as well: the old code measured under twice their ceilings on the fastest machine this runs on, so they are not counted as catching it. Seven ceilings catch the old code.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZjgyNGY3MmE4MjBkODFhMzkwM2Y4ZmNjZWYyMGYzNDVmZDI2MTdkNDIwYzUxY2JiOTI2Mzg0ZTUwMDNiYTgwNw==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "uMyPV2SEBbLJo/TSC39Qb70yBbMmwZBbZaGofq7tOtw+UBHTuyP82XDLzvFi6FEgPsRvIN3MMKlXQr6Xv/sPAA=="
           }
         ]
       }
