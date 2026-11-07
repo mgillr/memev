@@ -10,7 +10,7 @@ import { detect, connectAll } from '../src/cli/clients.mjs';
 
 after(() => cleanup());
 
-const NAMES = { cline: 'Cline', roo: 'Roo', continue: 'Continue', kiro: 'Kiro', 'jetbrains-ai': 'JetBrains AI', amp: 'Amp', goose: 'Goose' };
+const NAMES = { roo: 'Roo', continue: 'Continue', 'jetbrains-ai': 'JetBrains AI', goose: 'Goose', jan: 'Jan', 'cherry-studio': 'Cherry Studio', lingma: 'Lingma', rovodev: 'Rovo Dev CLI', crush: 'Crush' };
 
 // The directory each app's docs name, on the platform this run is on. The tests plant exactly these,
 // so a lookup that points anywhere else fails the run.
@@ -22,30 +22,33 @@ function appDirs(sb) {
     : win ? (sb.env.APPDATA || path.join(home, 'AppData', 'Roaming'))
     : xdg;
   return {
-    cline: path.join(home, '.cline'),
     roo: path.join(home, '.roo'),
     continue: path.join(home, '.continue'),
-    kiro: path.join(home, '.kiro'),
     'jetbrains-ai': path.join(appData, 'JetBrains'),
-    amp: win ? path.join(home, '.config', 'amp') : path.join(xdg, 'amp'),
     goose: win ? path.join(sb.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(xdg, 'goose'),
+    jan: path.join(win || process.platform === 'darwin' ? appData : path.join(home, '.local', 'share'), 'Jan', 'data'),
+    'cherry-studio': path.join(appData, 'CherryStudio'),
+    lingma: path.join(home, '.lingma'),
+    rovodev: path.join(home, '.rovodev'),
+    crush: path.join(home, '.config', 'crush'),
+    ...(process.platform === 'darwin' ? { boltai: path.join(home, '.boltai') } : {}),
   };
 }
 
-test('MEM-046 AC01: with fake config dirs for Cline, Continue and Goose, the checklist lists each as found but not supported yet', () => {
+test('MEM-046 AC01: with fake config dirs for Roo, Continue and Goose, the checklist lists each as found but not supported yet', () => {
   const sb = sandbox();
   try {
     const dirs = appDirs(sb);
-    for (const id of ['cline', 'continue', 'goose']) fs.mkdirSync(dirs[id], { recursive: true });
+    for (const id of ['roo', 'continue', 'goose']) fs.mkdirSync(dirs[id], { recursive: true });
     const r = sb.run(['init', '--port', String(sb.port), '--local-only']);
     assert.equal(r.code, 0, r.out + r.err);
-    for (const id of ['cline', 'continue', 'goose']) {
+    for (const id of ['roo', 'continue', 'goose']) {
       assert.match(r.out, new RegExp(`${NAMES[id]}: found, not supported yet`), `${NAMES[id]} is listed as found, not supported yet\n${r.out}`);
     }
     assert.match(r.out, /docs\/CLIENTS\.md/, 'the line points to docs/CLIENTS.md');
     // the found-but-unsupported apps are not treated as connected or as steps that need the user
-    assert.equal(r.out.includes('Cline: MCP'), false, r.out);
-    assert.equal(r.out.includes('memev connect cline'), false, r.out);
+    assert.equal(r.out.includes('Roo: MCP'), false, r.out);
+    assert.equal(r.out.includes('memev connect roo'), false, r.out);
   } finally { sb.stop(); }
 });
 
@@ -109,12 +112,13 @@ test('detect marks a found unsupported app with supported false, and connectAll 
   const sb = sandbox();
   try {
     const dirs = appDirs(sb);
-    fs.mkdirSync(dirs.cline, { recursive: true });
+    fs.mkdirSync(dirs.roo, { recursive: true });
     fs.mkdirSync(path.join(sb.home, '.codex'), { recursive: true });
     const d = detect(sb.env, '/x/memev');
-    const cline = d.find((c) => c.id === 'cline');
-    assert.equal(cline.found, true);
-    assert.equal(cline.supported, false);
+    const roo = d.find((c) => c.id === 'roo');
+    assert.equal(roo.found, true);
+    assert.equal(roo.supported, false);
+    assert.ok(roo.manual, 'the way to add it by hand comes with it');
     const codex = d.find((c) => c.id === 'codex');
     assert.equal(codex.found, true);
     assert.equal(codex.supported, true);
@@ -140,15 +144,15 @@ test('memev connect for a found unsupported app says found, not supported yet an
   const sb = sandbox();
   try {
     const dirs = appDirs(sb);
-    const f = path.join(dirs.amp, 'config.json');
+    const f = path.join(dirs.goose, 'config.yaml');
     fs.mkdirSync(path.dirname(f), { recursive: true });
-    fs.writeFileSync(f, '{"theme":"dark"}');
+    fs.writeFileSync(f, 'extensions: {}\n');
     const before = fs.readFileSync(f);
     const i = sb.run(['init', '--port', String(sb.port), '--local-only']);
     assert.equal(i.code, 0, i.out + i.err);
-    const c = sb.run(['connect', 'amp']);
+    const c = sb.run(['connect', 'goose']);
     assert.equal(c.code, 0, c.out + c.err);
-    assert.match(c.out, /Amp: found, not supported yet/, c.out);
-    assert.ok(fs.readFileSync(f).equals(before), 'the amp config is unchanged');
+    assert.match(c.out, /Goose: found, not supported yet/, c.out);
+    assert.ok(fs.readFileSync(f).equals(before), 'the goose config is unchanged');
   } finally { sb.stop(); }
 });
