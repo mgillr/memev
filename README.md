@@ -260,6 +260,15 @@ Memev requires **Node.js 22 or newer** and **Git**. The supported, immediately u
 
 ### 1. Install from the repository
 
+**On Windows without Node or Git:** install both first. In PowerShell or Windows Terminal:
+
+```powershell
+winget install --id OpenJS.NodeJS.LTS -e
+winget install --id Git.Git -e
+```
+
+Then close the terminal and open a new one, so `node` and `git` are on your PATH. Check with `node --version` (22 or newer) and `git --version`. Without winget, use the installers from nodejs.org and git-scm.com. A Windows installer that needs neither is being built.
+
 macOS, Linux, or Windows PowerShell with Node 22+ and Git:
 
 ```sh
