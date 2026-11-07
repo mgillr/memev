@@ -304,10 +304,12 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
         return [json(path.join(copilotHome, 'mcp-config.json'), setServer('mcpServers', entry), delServer('mcpServers')), mdBlock(path.join(copilotHome, 'copilot-instructions.md'))];
       } },
     // Grok Build (xAI's terminal agent, command grok) reads stdio MCP servers from [mcp_servers.<name>] tables
-    // (command, args) in the global ~/.grok/config.toml (docs.x.ai/build/features/mcp-servers). No hooks are documented.
+    // (command, args) in the global ~/.grok/config.toml (docs.x.ai/build/features/mcp-servers). It has hooks, but for every
+    // event but PreToolUse its docs say stdout is ignored (docs.x.ai/build/features/hooks), so a hook cannot carry the protocol
+    // or the card: the app stays in instructions mode and gets them from the MCP instructions.
     { id: 'grok-build', name: 'Grok Build', mode: 'instructions', detect: () => exists(path.join(home, '.grok')),
       edits: () => [text(path.join(home, '.grok', 'config.toml'), (t) => upsertMcpToml(t, mcpTomlBlock(win, bin, 'grok-build')), (t) => removeBlock(t, [TOML_START, TOML_END]), tomlSkipNote('Grok Build'))],
-      note: 'Grok Build also reads ~/.claude.json, so when Claude Code is connected too it may list memev twice; grok mcp list shows which one it uses.' },
+      note: 'Grok Build also reads ~/.claude.json, so when Claude Code is connected too it may list memev twice; grok mcp list shows the servers it loaded.' },
   ];
   return defs;
 }
