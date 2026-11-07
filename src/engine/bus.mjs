@@ -172,7 +172,8 @@ export class Bus {
   _runnerSeats() { const r = readJson(path.join(this.root, '.memev', 'runner.json'), {}) || {}; return new Set(Object.entries(r).filter(([, e]) => e?.enabled).map(([n]) => n)); }
   /**
    * The seat of one session of an app on a computer. Each live session of the app has its own seat:
-   *   1. the seat this session already holds (its pulse names the session), so a resume or compaction keeps it;
+   *   1. the seat this session already holds (its pulse names the session), so a resume or compaction keeps it, or
+   *      the seat of the session it replaced in the same app process (prev, from the session link);
    *   2. else the plain seat (my-app@my-laptop), when it is not live, or live with no session holding it (a vault
    *      from before session seats, or an app that names no session);
    *   3. else the first sub-seat my-app@my-laptop/2, /3 ... that is not live and no runner holds.
@@ -180,7 +181,7 @@ export class Bus {
    * seat:<name> (a runner's headless turn, MEMEV_SEAT) is pinned to that seat, when it is this app's on this computer.
    * The heartbeat that follows records the session on the seat; nothing here writes.
    */
-  sessionSeat(client, device, session, { hint = null, at = Date.now() } = {}) {
+  sessionSeat(client, device, session, { hint = null, prev = null, at = Date.now() } = {}) {
     const base = this.ownSeatName(client, device);
     const app = label(client);
     const ours = (r) => r && !r.removed && r.device === device.id && r.client === app;
@@ -194,6 +195,8 @@ export class Bus {
     const held = (n) => { const r = this.seat(n); return r && ours(r) && this._pulse(r.seat).session === session ? r.seat : null; };
     if (hint) { const h = held(hint); if (h) return h; }
     for (const r of this.seats()) if (ours(r) && this._pulse(r.seat).session === session) return r.seat;
+    // the same app process started a new session (a /clear can do that): the seat of the one it replaced passes to it
+    if (prev && prev !== session) for (const r of this.seats()) if (ours(r) && this._pulse(r.seat).session === prev) return r.seat;
     const reserved = this._runnerSeats();
     for (const n of names) {
       if (n !== base && reserved.has(n)) continue;
@@ -372,7 +375,7 @@ export class Bus {
     const base = this.ownSeatName(ctx.client, computer);
     // a session the app named (the hooks, and the MCP server linked to them) has a seat of its own: see sessionSeat
     const sess = !ctx.cli && computer.kind !== 'cloud-connector' && ctx.busSession ? String(ctx.busSession) : null;
-    const own = sess ? this.sessionSeat(ctx.client, computer, sess, { hint: ctx.seatHint || null }) : base;
+    const own = sess ? this.sessionSeat(ctx.client, computer, sess, { hint: ctx.seatHint || null, prev: ctx.prevSession || null }) : base;
     let name = seat || own;
     if (seat && sess) {
       // a session posts only as its own seat: not as the plain seat when it holds a sub-seat, nor as another session's

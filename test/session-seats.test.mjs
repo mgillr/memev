@@ -167,6 +167,10 @@ test('the hook route keys the seat on the session, and an MCP call with the link
     assert.equal((await s.post('/v1/bus-pulse', { session: 'two', seat: 'claude-code@host/2' })).seat, 'claude-code@host/2');
     const call = (headers) => s.post('/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'bus_send', arguments: { to: 'all', type: 'status', body: 'hello' } } }, headers);
     assert.equal((await call({ 'x-memev-bus-session': 'two' })).result.structuredContent.from, 'claude-code@host/2');
+    // a new session in the same app process (a /clear) names the one it replaced and takes its seat; without that it is a new session
+    assert.equal((await s.post('/v1/bus-pulse', { session: 'two-cleared', prev_session: 'two' })).seat, 'claude-code@host/2');
+    assert.equal((await s.post('/v1/bus-pulse', { session: 'three' })).seat, 'claude-code@host/3');
+    assert.equal((await call({ 'x-memev-bus-session': 'two-cleared' })).result.structuredContent.from, 'claude-code@host/2');
     // without the link the MCP server posts as the app's plain seat, as before
     assert.equal((await call({})).result.structuredContent.from, 'claude-code@host');
   } finally { s.close(); }
@@ -237,6 +241,10 @@ test('the session-start hook keeps the seat, passes it on each bus call, and lin
     assert.match(r.out, /This session's bus seat is claude-code@host\/2/);
     assert.equal(JSON.parse(fs.readFileSync(path.join(root, '.memev', 'hooks', 'sess-2.json'), 'utf8')).seat, 'claude-code@host/2');
     await memev(['hook', 'prompt', '--client', 'claude-code'], root, JSON.stringify({ session_id: 'sess-2', prompt: 'ok' }));
+    // a second session started by the same app process (here: this test process) names the first
+    await memev(['hook', 'session-start', '--client', 'claude-code'], root, JSON.stringify({ session_id: 'sess-3', source: 'clear' }));
+    assert.equal(st.calls.filter((c) => c.route === '/v1/bus-pulse').at(-1).body.prev_session, 'sess-2');
+    await memev(['hook', 'session-start', '--client', 'claude-code'], root, JSON.stringify({ session_id: 'sess-2', source: 'resume' }));
     const again = st.calls.filter((c) => c.route === '/v1/bus-pulse').at(-1);
     assert.equal(again.body.seat, 'claude-code@host/2');
     assert.equal(again.body.bus_session, 'sess-2');

@@ -112,12 +112,16 @@ export async function runHook(event, flags, env = process.env) {
       const isSetup = fresh && !asked;
       const lead = await import('../engine/bus.mjs');
       if (isSetup && opFile) lead.markLeadAsked(root);
-      const bus = await call('bus-pulse', busBody({ lead: isSetup })).catch(() => null);
+      // the MCP server this app started for the session finds the session through the processes they share; a session
+      // this app process ran before (a /clear can start a new one) is named, so its seat passes to this one
+      const link = await import('./session-link.mjs');
+      const chain = link.ancestors(process.pid, link.procTable());
+      const before = link.readLink(path.dirname(stateFile), chain, client);
+      const prev = before && before.session !== busSession && !busSession.startsWith('seat:') ? { prev_session: before.session } : {};
+      const bus = await call('bus-pulse', busBody({ lead: isSetup, ...prev })).catch(() => null);
       if (bus?.seat) {
         st.seat = bus.seat;
-        // the MCP server this app started for the session finds the session through the processes they share
-        const link = await import('./session-link.mjs');
-        link.writeLink(path.dirname(stateFile), link.ancestors(process.pid, link.procTable()), { session: busSession, seat: bus.seat, client });
+        link.writeLink(path.dirname(stateFile), chain, { session: busSession, seat: bus.seat, client });
       }
       // while no lead is set: the setup session gets the question with its own seat suggested; once it has
       // asked, the others get one quiet line telling them not to ask again

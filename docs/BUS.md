@@ -25,7 +25,8 @@ with nothing to set up. The first live session keeps the plain seat, `claude-cod
 one session at a time, and the lead seat, do not change. Each further live session takes the first free
 sub-seat: `claude-code@my-laptop/2`, then `/3` and so on. A sub-seat comes free when its session has been
 gone longer than the roster's live window (15 minutes, `bus.live_min`); until then the roster shows it
-**stale**, and the next new session takes it. A session that is resumed or compacted keeps its seat. A
+**stale**, and the next new session takes it. A session that is resumed or compacted keeps its seat, and
+a new session the same app process starts (after a clear, say) takes over the seat of the one it replaced. A
 session that sat idle past the window and lost its seat to a new one takes the next free seat when it
 comes back.
 
