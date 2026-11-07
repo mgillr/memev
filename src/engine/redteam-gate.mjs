@@ -129,7 +129,7 @@ function readStrict(file) {
 function git(cwd, args, { buffer = false } = {}) {
   const env = { ...process.env };
   for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_NAMESPACE']) delete env[k];
-  const r = spawnSync('git', args, { cwd, env, encoding: buffer ? 'buffer' : 'utf8', maxBuffer: 256 << 20 });
+  const r = spawnSync('git', args, { windowsHide: true, cwd, env, encoding: buffer ? 'buffer' : 'utf8', maxBuffer: 256 << 20 });
   return { ok: r.status === 0, out: buffer ? r.stdout : String(r.stdout || '').trim() };
 }
 const isRepo = (root) => git(root, ['rev-parse', '--is-inside-work-tree']).out === 'true';

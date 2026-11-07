@@ -27,7 +27,7 @@ export const pidAlive = (pid) => { if (!pid) return false; try { process.kill(pi
  * image is Alpine, whose ps knows no -p and exits 1. Anything but a successful answer with output is no answer: a process cannot be told
  * apart by a tool that failed.
  */
-export function commandOf(pid, { platform = process.platform, readProc = (f) => fs.readFileSync(f, 'utf8'), ps = () => spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', timeout: 2000 }) } = {}) {
+export function commandOf(pid, { platform = process.platform, readProc = (f) => fs.readFileSync(f, 'utf8'), ps = () => spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { windowsHide: true, encoding: 'utf8', timeout: 2000 }) } = {}) {
   if (platform === 'win32') return null;
   if (platform === 'linux') { try { const args = readProc(`/proc/${pid}/cmdline`).split('\0').filter(Boolean); if (args.length) return args; } catch { /* hidden, or no /proc: ps may still know */ } }
   const r = ps(); if (r.error || r.status !== 0 || !String(r.stdout || '').trim()) return null;
@@ -70,7 +70,7 @@ export const exists = (p) => { try { fs.accessSync(p); return true; } catch { re
  * so a caller can say what is wrong instead of crashing on a null stdout.
  */
 export function run(cmd, args = [], opts = {}) {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', ...opts });
+  const r = spawnSync(cmd, args, { windowsHide: true, encoding: 'utf8', ...opts });
   if (r.error) return { ok: false, status: null, stdout: '', stderr: '', error: r.error.message };
   return { ok: r.status === 0, status: r.status, stdout: r.stdout || '', stderr: r.stderr || '', error: null };
 }

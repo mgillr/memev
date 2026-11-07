@@ -10,7 +10,7 @@ import { homeDir, configDir, exists, writeAtomic, run as spawn } from '../engine
 import { resolveRoot, out } from './common.mjs';
 import { launcherPath } from './clients.mjs';
 
-const run = (cmd, args) => { const r = spawn(cmd, args, { timeout: 15000 }); return { ok: r.ok, out: `${r.stdout}${r.stderr}`.trim() }; };
+const run = (cmd, args) => { const r = spawn(cmd, args, { windowsHide: true, timeout: 15000 }); return { ok: r.ok, out: `${r.stdout}${r.stderr}`.trim() }; };
 const LABEL = 'dev.memev.daemon';
 // launchctl, systemctl and schtasks act on the whole user account, not on the HOME in use, so with MEMEV_NO_SERVICE set
 // (tests and sandboxes set it) Memev never calls them: a sandbox must not replace the person's own login service

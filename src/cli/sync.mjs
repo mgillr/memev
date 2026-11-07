@@ -113,7 +113,7 @@ function mergeJsonl(ours, theirs) {
 
 /** The exact content of one side of a conflicted file, from the merge index (stage 2 is ours, 3 theirs). */
 function stageContent(root, stage, p) {
-  const r = spawnSync('git', ['show', `:${stage}:${p}`], { cwd: root, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, maxBuffer: ENGINE_MAX_BUFFER });
+  const r = spawnSync('git', ['show', `:${stage}:${p}`], { windowsHide: true, cwd: root, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, maxBuffer: ENGINE_MAX_BUFFER });
   // null means "this side has no such file" below; a read that failed (a note over the buffer) must not look like that
   if (r.error) throw new Error(`could not read ${p} from the merge: ${r.error.code || r.error.message}`);
   return r.status === 0 ? r.stdout : null;
@@ -335,7 +335,7 @@ function gitWithin(root, { args, remote, url }, deadline) {
   const run = (dest) => {
     const ms = deadline - Date.now();
     if (ms <= 0) return { ok: false, err: 'no time left', timedOut: true };
-    const r = spawnSync('git', args.map((a) => (a === remote ? dest : a)), { cwd: root, encoding: 'utf8', timeout: ms, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+    const r = spawnSync('git', args.map((a) => (a === remote ? dest : a)), { windowsHide: true, cwd: root, encoding: 'utf8', timeout: ms, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
     const timedOut = r.error?.code === 'ETIMEDOUT';
     return { ok: r.status === 0 && !timedOut, err: timedOut ? 'timed out' : String(r.stderr || r.error?.message || '').trim(), timedOut };
   };
@@ -361,7 +361,7 @@ export function syncOnceWithin(vault, { ms = STOP_SYNC_MS, ...opts } = {}) {
 function gitAsync(root, args, { timeoutMs = NET_TIMEOUT_MS, live = null } = {}) {
   return new Promise((resolve) => {
     const group = process.platform !== 'win32';
-    const child = spawn('git', args, { cwd: root, detached: group, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+    const child = spawn('git', args, { windowsHide: true, cwd: root, detached: group, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
     if (live) live.child = child;
     let out = '', err = '', timedOut = false;
     child.stdout.on('data', (d) => { out += d; });

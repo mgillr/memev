@@ -131,7 +131,7 @@ export function supervise(vault, { root, port, run = runCmd, whichFn = which }) 
       const args = provider === 'cloudflare'
         ? ['tunnel', '--no-autoupdate', 'run', '--url', `http://127.0.0.1:${port}`, vault.config.remote.cloudflare.name]
         : ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${port}`];
-      child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      child = spawn(bin, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
       const fixed = provider === 'cloudflare' ? `https://${vault.config.remote.cloudflare.hostname}` : null;
       if (fixed) write({ enabled: true, provider, url: fixed, stable: true, state: 'starting' });
       const onData = (d) => {

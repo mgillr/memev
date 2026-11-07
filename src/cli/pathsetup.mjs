@@ -64,7 +64,7 @@ export function rcTarget(dir, env = process.env, platform = process.platform) {
 }
 
 /** Read and write the signed-in user's PATH on Windows through reg.exe. `run` is where the commands go (stubbed in tests). */
-export function userPath(run = (args) => { const r = spawnSync('reg', args, { encoding: 'utf8', timeout: 15000 }); return r.error ? { ok: false, out: '' } : { ok: r.status === 0, out: `${r.stdout || ''}` }; }) {
+export function userPath(run = (args) => { const r = spawnSync('reg', args, { windowsHide: true, encoding: 'utf8', timeout: 15000 }); return r.error ? { ok: false, out: '' } : { ok: r.status === 0, out: `${r.stdout || ''}` }; }) {
   return {
     get() { const r = run(['query', USER_ENV, '/v', 'Path']); const m = /\bPath\s+REG_(?:EXPAND_)?SZ\s+(.*?)\s*$/im.exec(r.out || ''); return r.ok && m ? m[1] : ''; },
     set(value) { const r = run(['add', USER_ENV, '/v', 'Path', '/t', 'REG_EXPAND_SZ', '/d', value, '/f']); if (!r.ok) throw new Error('could not update your user PATH'); },

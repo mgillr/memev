@@ -53,7 +53,7 @@ port.on('message', ({ id, root, paths, clients }) => {
   try {
     const g = (args) => {
       // no preload: its threads spend every core on lstat for about 75 ms less git time, and that starves the daemon's own thread
-      const r = spawnSync('git', ['-c', 'core.preloadIndex=false', ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+      const r = spawnSync('git', ['-c', 'core.preloadIndex=false', ...args], { windowsHide: true, cwd: root, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
       if (r.error) return { ok: false, status: null, out: '', err: r.error.message };
       return { ok: r.status === 0, status: r.status, out: (r.stdout || '').trim(), err: (r.stderr || '').trim() };
     };

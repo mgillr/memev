@@ -8,7 +8,7 @@ import path from 'node:path';
 import { configDir, exists, run as spawn } from '../engine/util.mjs';
 import { config, out } from './common.mjs';
 
-const probe = (cmd, args) => { const r = spawn(cmd, args, { timeout: 15000 }); return { ok: r.ok, out: `${r.stdout}${r.stderr}`.trim() }; };
+const probe = (cmd, args) => { const r = spawn(cmd, args, { windowsHide: true, timeout: 15000 }); return { ok: r.ok, out: `${r.stdout}${r.stderr}`.trim() }; };
 
 /** Whether a folder, or the nearest folder above it that exists, can be written to. Writes nothing. */
 export function canWrite(p) {
