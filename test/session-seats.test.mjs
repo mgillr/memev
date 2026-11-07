@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { newVault, cleanup, tmpdir } from './helpers/tmp.mjs';
 import { fileOf } from '../src/engine/bus.mjs';
 import { createServer } from '../src/server/http.mjs';
-import { ancestors, procTable, readLink, writeLink } from '../src/cli/session-link.mjs';
+import { ancestors, readProcs, readLink, writeLink } from '../src/cli/session-link.mjs';
 import { pidFile, runTurn, agentSeats, saveRunner, command as runnerCommand } from '../src/cli/runner.mjs';
 after(cleanup);
 
@@ -194,7 +194,7 @@ test('the session link: nearest recorded process first, start time checked, app 
   const reused = new Map([...table, [9, { ppid: 8, started: 'LATER' }]]);
   assert.notEqual(readLink(dir, ancestors(10, reused), 'claude-code')?.session, 'S1');
   // the real process table reads, where there is one
-  const real = procTable();
+  const real = readProcs();
   if (real) assert.ok(ancestors(process.pid, real).length >= 1);
 });
 
@@ -229,7 +229,7 @@ const memev = (args, root, input, extraEnv = {}) => new Promise((resolve) => {
   p.stdin.end(input);
 });
 
-test('the session-start hook keeps the seat, passes it on each bus call, and links the MCP server of the same app process', { skip: process.platform === 'win32' ? 'no process table on Windows' : false }, async () => {
+test('the session-start hook keeps the seat, passes it on each bus call, and links the MCP server of the same app process', { skip: process.platform === 'win32' ? 'not yet run on a real Windows machine; the Windows process table is tested with a fake runner in session-link-windows.test.mjs' : false }, async () => {
   const st = await stub('claude-code@host/2');
   const root = fakeVault(st.port);
   try {

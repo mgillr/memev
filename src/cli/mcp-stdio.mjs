@@ -6,7 +6,7 @@ import { clientToken, daemonInfo, config, effectiveClient } from './common.mjs';
 import { ensureDaemon } from './daemon.mjs';
 import { fetchOut } from '../engine/net.mjs';
 import path from 'node:path';
-import { ancestors, procTable, readLink } from './session-link.mjs';
+import { ancestors, readProcs, readLink } from './session-link.mjs';
 
 /** The headers that tell the vault which app session this MCP server serves, read again on each call (a /clear moves it). */
 export function busSessionHeaders(dir, client, chain) {
@@ -14,7 +14,7 @@ export function busSessionHeaders(dir, client, chain) {
   return r ? { 'x-memev-bus-session': String(r.session).slice(0, 96) } : {};
 }
 /** This process's parents, read once: they do not change while it runs. */
-export function chainOnce(pid = process.pid) { let c = null; return () => (c ??= ancestors(pid, procTable())); }
+export function chainOnce(pid = process.pid) { let c = null; return () => (c ??= ancestors(pid, readProcs())); }
 
 export async function runStdio(root, client) {
   const who = effectiveClient(client);

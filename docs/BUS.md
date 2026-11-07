@@ -43,8 +43,12 @@ comes back.
   the vault for the session's seat and keeps it in the session's hook state. The MCP server the app
   starts for the session is told no session id, so the hook also records, for the processes above it,
   which session they run; the MCP server looks up the nearest of its own parent processes and sends
-  that session with each tool call. Where the process table cannot be read (Windows), the session's
-  start-up context tells the AI its seat, and the AI passes it as `seat` on bus calls.
+  that session with each tool call. The process table comes from `ps` on macOS and Linux. On Windows it
+  comes from one PowerShell query (`Get-CimInstance Win32_Process`, which Windows PowerShell 5.1 in
+  Windows 10 and 11 has built in), read for each process's id, parent id and creation time; the creation
+  time keeps a reused process id, or a parent id that now names a newer process, from being taken for the
+  old one. Where the table cannot be read (no PowerShell, or the query takes longer than 3 seconds), the
+  session's start-up context tells the AI its seat, and the AI passes it as `seat` on bus calls.
 - This applies to the apps Memev connects with hooks: Claude Code, Codex CLI, Gemini CLI and Cursor.
   Apps connected with MCP and instructions only (Claude Desktop, VS Code, GitHub Copilot CLI and the
   rest) keep one seat per app per computer, because nothing tells Memev which of their sessions is

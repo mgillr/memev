@@ -115,7 +115,7 @@ export async function runHook(event, flags, env = process.env) {
       // the MCP server this app started for the session finds the session through the processes they share; a session
       // this app process ran before (a /clear can start a new one) is named, so its seat passes to this one
       const link = await import('./session-link.mjs');
-      const chain = link.ancestors(process.pid, link.procTable());
+      const chain = link.ancestors(process.pid, link.readProcs());
       const before = link.readLink(path.dirname(stateFile), chain, client);
       const prev = before && before.session !== busSession && !busSession.startsWith('seat:') ? { prev_session: before.session } : {};
       const bus = await call('bus-pulse', busBody({ lead: isSetup, ...prev })).catch(() => null);
