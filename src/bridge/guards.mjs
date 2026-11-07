@@ -157,6 +157,31 @@ export function acceptLarkEvent(event, paired, sentIds) {
   return { id: msg.message_id, text, by };
 }
 
+// ---- Discord
+/** Guard: send only to the one paired channel. */
+export function checkDiscordDestination(channelId, paired) {
+  if (!paired?.channel_id) throw new ChatGuardError('not_paired', 'refused: Discord is not paired with a channel');
+  if (channelId !== paired.channel_id) throw new ChatGuardError('refused_other_chat', 'refused: not the paired Discord channel');
+  return channelId;
+}
+/**
+ * A MESSAGE_CREATE when it is in the paired channel of the paired server, from the z.ai bot or the
+ * paired person, and not this bot's own: { id, text, by }, else null. A direct message has no
+ * guild_id and is dropped, as is a webhook post or a message from anyone else.
+ */
+export function acceptDiscordMessage(msg, paired, selfId, sentIds) {
+  if (!msg || !paired?.channel_id || !paired.guild_id) return null;
+  if (msg.channel_id !== paired.channel_id || msg.guild_id !== paired.guild_id) return null;
+  if (msg.webhook_id) return null;
+  if (sentIds?.has(msg.id)) return null;
+  const author = msg.author?.id;
+  if (!author || (selfId && author === selfId)) return null; // this bot's own post
+  const by = paired.zai_user_id && author === paired.zai_user_id ? 'zai' : paired.person_user_id && author === paired.person_user_id ? 'person' : null;
+  if (!by) return null;
+  if (typeof msg.content !== 'string' || !msg.content.trim()) return null;
+  return { id: msg.id, text: msg.content, by };
+}
+
 // ---- rate limit
 /** Guard e: at most `max` messages in any rolling hour (default 30). take() throws when the next would pass it. */
 export class RateLimiter {

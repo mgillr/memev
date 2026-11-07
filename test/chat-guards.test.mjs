@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   classifyJid, whatsappSelf, isSelfChat, checkWhatsAppDestination, acceptWhatsAppInbound, narrowSocket, WHATSAPP_EVENTS,
-  checkTelegramDestination, acceptTelegramUpdate, telegramStartCode, checkLarkDestination, acceptLarkEvent,
+  checkTelegramDestination, acceptTelegramUpdate, telegramStartCode, checkLarkDestination, acceptLarkEvent, checkDiscordDestination, acceptDiscordMessage,
   RateLimiter, guardedSender, newPairingCode, pairingMatches, ChatGuardError,
 } from '../src/bridge/guards.mjs';
 
@@ -125,6 +125,26 @@ test('inbound Lark: the z.ai bot and the person in the paired chat; any other ch
   assert.equal(acceptLarkEvent(lark({ sender: { sender_id: { open_id: 'ou_self' }, sender_type: 'app' } }), LP, new Set()), null, 'own bot');
   assert.equal(acceptLarkEvent(lark({ sender: { sender_id: { open_id: 'ou_self' }, sender_type: 'app' } }), { ...LP, zai_open_id: 'ou_self' }, new Set()), null, 'own bot, even when set as the z.ai bot by mistake');
   assert.equal(acceptLarkEvent(lark(), LP, new Set(['om_1'])), null, 'own message id');
+});
+
+const DP = { guild_id: '111111111111111111', channel_id: '222222222222222222', zai_user_id: '333333333333333333', person_user_id: '444444444444444444' };
+const SELF_BOT = '555555555555555555';
+const dm = (over = {}) => ({ id: '900000000000000001', guild_id: DP.guild_id, channel_id: DP.channel_id, author: { id: DP.zai_user_id, bot: true }, content: 'answer', ...over });
+test('outbound Discord: only the paired channel', () => {
+  assert.equal(checkDiscordDestination(DP.channel_id, DP), DP.channel_id);
+  refused(() => checkDiscordDestination('999999999999999999', DP), 'refused_other_chat');
+  refused(() => checkDiscordDestination(DP.channel_id, null), 'not_paired');
+});
+test('inbound Discord: the z.ai bot and the person in the paired channel; other channels, other servers, direct messages, webhooks, strangers and its own posts are ignored', () => {
+  assert.deepEqual(acceptDiscordMessage(dm(), DP, SELF_BOT, new Set()), { id: '900000000000000001', text: 'answer', by: 'zai' });
+  assert.equal(acceptDiscordMessage(dm({ author: { id: DP.person_user_id } }), DP, SELF_BOT, new Set()).by, 'person');
+  assert.equal(acceptDiscordMessage(dm({ channel_id: '999999999999999999' }), DP, SELF_BOT, new Set()), null, 'other channel');
+  assert.equal(acceptDiscordMessage(dm({ guild_id: '999999999999999999' }), DP, SELF_BOT, new Set()), null, 'other server');
+  assert.equal(acceptDiscordMessage(dm({ guild_id: undefined }), DP, SELF_BOT, new Set()), null, 'a direct message has no server');
+  assert.equal(acceptDiscordMessage(dm({ webhook_id: '1' }), DP, SELF_BOT, new Set()), null, 'webhook');
+  assert.equal(acceptDiscordMessage(dm({ author: { id: '666666666666666666' } }), DP, SELF_BOT, new Set()), null, 'stranger');
+  assert.equal(acceptDiscordMessage(dm({ author: { id: SELF_BOT } }), { ...DP, zai_user_id: SELF_BOT }, SELF_BOT, new Set()), null, 'its own post, even if set as the z.ai bot by mistake');
+  assert.equal(acceptDiscordMessage(dm(), DP, SELF_BOT, new Set(['900000000000000001'])), null, 'its own message id');
 });
 
 test('rate limit: at most N an hour, then refused, and free again after the hour', () => {
