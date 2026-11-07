@@ -2,7 +2,7 @@
   "title": "SR-0.04 Receipts match signatures, and what is claimed is in the tree",
   "project": "memev",
   "workdir": null,
-  "request": "Asked for by the owner on 6 Nov 2026, on the outside seed analysis of that date, in his words: 'make a contract to solve all of this, you sign, its gets done'. The analysis found 146 signed bodies and 1 receipt, signed contracts whose named tests are not in the tree, builds parked after signing, pages that disagree with each other, and review by seats on one machine that the records call independent. This contract makes receipts match signatures and makes what is claimed be in the tree. Repository: memev. Depends on contracts: SR-1.35 (T3 is built after it lands, since both change the vault and log paths; SR-1.35 lands first, and this contract's base at signing is that commit or a later one, so that it is not inside this contract's range). It was reviewed against memev main d597366052ac48d890fea92ce41f0f1e98f6a328, where SR-0.04 is a free id. Review: review of this contract is by the second seat on the same machine and is not independent. Both seats are AI on one machine. T7 makes the records honest about that; only a human second reviewer (O2) changes it. Decisions carried, stated as decisions. (1) The owner holds signing authority, in his words of 6 Nov 2026: 'I should hold authority over signing and I can sign everything that needs to be signed'. (2) The freeze's review date is 13 Nov 2026; that date is the lead's proposal and the owner may change it. (3) T2e runs on GitHub-hosted runners, split into jobs under the 6-hour limit (the owner, by dialog with the lead, 6 Nov 2026, once the count was known: 1,381 commands, 814 of them red-green, 93 full-suite runs across 73 contracts). It never runs on the owner's Mac, where full suites have wedged the machine, and a throwaway runner cannot reach his files. (4) The owner approves T2d's command file by signing its hash. (5) He makes his own signing key under a passphrase only he knows (same dialog; T9). Rule 0, the freeze. From signing, no contract is drafted, signed or superseded in memev, memev-ops or memev-app, and no design record, tier or repository is added. After the freeze too, a stale index row or an unlisted scope path never causes a new signed version. Allowed: this contract; security fixes, through T4; SR-1.35, which is signed after the second seat's round and gets a receipt like any other; SR-3.02 (the merge conformance corpus) if the owner says so under O5. Fix pull requests in memev wait until T2 is closed, because each would land inside this contract's base..HEAD and fail its scope criteria; other repositories are unaffected. Exit: the freeze lifts when T2 is closed. If T2 is not closed by 13 Nov 2026, the owner decides whether it continues. The freeze holds the first trial's contracts (installers, PL-1, MU-1, BO-1) until then. What was checked of the analysis on 6 Nov, by running it. By the lead, true: 146 signed bodies and 1 receipt; 8 of 146 record a base commit; test/oplog-lock.test.mjs, test/oplog-lock-cli.test.mjs and test/nonce-persist.test.mjs do not exist; VaultLocked and MAX_BUCKETS are nowhere in src; the OAuth issuer is built from the Host header (src/server/http.mjs:141); the builds of SR-1.01, SR-1.06 and the trial stack sit in memev-ops under refs/parked/2026-11-05/; the live site says 'merged automatically' 3 times, 'free Business trial' 2 times and 'Coming Soon' 4 times; no release, no npm package, 0 stars; docs/tiers/free.md:74 headlines 'Edit on two machines at once, nothing to resolve'. By the second seat: 114 live bodies (SO 74, PG 35, SR 26, QL 10, other 1 before supersedes), 107 with no base, 145 of 146 with a null workdir, 143 with command criteria, 110 of 110 records holding the word 'independent'. Not checked by either seat: line counts and ratios, the analysis's own test run, the tagline count, the zip finding. Tasks: T1 numbers and a ratchet; T2 receipts for every live contract, in five parts that carry their own task ids so that other tasks can depend on one part (T2a a derived base, T2b the base is never chosen by hand, T2c where it runs, T2d the commands, T2e the runs and the receipts); T3 unpark and land; T4 security, nine items; T5 one truth; T6 the suite runs anywhere; T7 review says what it is, from now on; T8 the weekly file; T9 the owner's own signing key. Deliberately out, so silence is not read as missed: SR-1.09 (line lengths, cross-layer imports, duplicated helpers), SR-2.01 (embedding recall; first after the freeze, since memory recall ranks high in demand), and memev-cloud's placeholder licence. The owner's alone, with his answers of 6 Nov 2026 where he has given one. O1 Deploy the site: his go given; the honest labels are being deployed. O2 A human second reviewer: not now, his decision. O3 Legal: no lawyer, his decision kept; the seller is the licensor ('its me'). O4 Legal entity (SR-9.01): open. O5 Engine: on record, no merge engine is built in Memev, and the analysis's small Node merge is declined; the conformance corpus, SR-3.02, is built now if he says so. O6 One release: a tag, an npm package and an install address conflict with decisions on record, which are SR-1.20, D-01, the private trial and the hold on new releases; his choice. O7 Where T2 runs: answered, GitHub-hosted runners; review on 13 Nov 2026; he approves the command file. O8 Users: nothing here creates demand. O9 The TypeScript and Rust editions PG-03.4 and PG-03.5: stopped, his decision; their receipts say so. O10 Business trial: none for now, his decision. O11 memev-ops stays private, his decision: T2c's table says which contracts cannot be checked from outside. O12 The 28 signed preambles that the 5 Nov decision reads differently and does not re-sign: is a note in T7's register enough? Open. The analysis's own small errors, for the record: PGP-1.06.2 was never signed as a contract, only its round; its 145 is our 146; it asks to verify 12 SR and 4 QL contracts, and this contract verifies all live ones on purpose. What this contract cannot fix, said plainly: both seats are AI on one machine. T7 makes the records honest about that; only O2 changes it.",
+  "request": "Asked for by the owner on 6 Nov 2026, on the outside seed analysis of that date, in his words: 'make a contract to solve all of this, you sign, its gets done'. The analysis found 146 signed bodies and 1 receipt, signed contracts whose named tests are not in the tree, builds parked after signing, pages that disagree with each other, and review by seats on one machine that the records call independent. This contract makes receipts match signatures and makes what is claimed be in the tree. Repository: memev. Depends on contracts: SR-1.35 (T3 is built after it lands, since both change the vault and log paths; SR-1.35 lands first, and this contract's base at signing is that commit or a later one, so that it is not inside this contract's range). It was reviewed against memev main d597366052ac48d890fea92ce41f0f1e98f6a328, where SR-0.04 is a free id. Review: review of this contract is by the second seat on the same machine and is not independent. Both seats are AI on one machine. T7 makes the records honest about that; only a human second reviewer (O2) changes it. Decisions carried, stated as decisions. (1) The owner holds signing authority, in his words of 6 Nov 2026: 'I should hold authority over signing and I can sign everything that needs to be signed'. (2) The freeze's review date is 13 Nov 2026; that date is the lead's proposal and the owner may change it. (3) T2e runs on GitHub-hosted runners, split into jobs under the 6-hour limit (the owner, by dialog with the lead, 6 Nov 2026, once the count was known: 1,381 commands, 814 of them red-green, 93 full-suite runs across 73 contracts). It never runs on the owner's Mac, where full suites have wedged the machine, and a throwaway runner cannot reach his files. (4) The owner approves T2d's command file by signing its hash. (5) He makes his own signing key under a passphrase only he knows (same dialog; T9). No freeze. In its place, coordination (the owner, 7 Nov 2026: \"what freeze and why just coordinate the work and sync\"): the register of 7 Nov is the one list of work; each row has one owner seat; no seat starts a row another holds; nothing lands inside a contract's scope while it waits for its verify; every seat syncs on the team bus. Until this contract verifies, other work builds in memev-app or memev-ops, or on a memev branch that does not land, as the scope check would otherwise fail this contract in every task. T2f, with the owner's word that it changes SR-0.03's meaning, judges a commit tagged for another contract by that contract, so later contracts can run side by side. What was checked of the analysis on 6 Nov, by running it. By the lead, true: 146 signed bodies and 1 receipt; 8 of 146 record a base commit; test/oplog-lock.test.mjs, test/oplog-lock-cli.test.mjs and test/nonce-persist.test.mjs do not exist; VaultLocked and MAX_BUCKETS are nowhere in src; the OAuth issuer is built from the Host header (src/server/http.mjs:141); the builds of SR-1.01, SR-1.06 and the trial stack sit in memev-ops under refs/parked/2026-11-05/; the live site says 'merged automatically' 3 times, 'free Business trial' 2 times and 'Coming Soon' 4 times; no release, no npm package, 0 stars; docs/tiers/free.md:74 headlines 'Edit on two machines at once, nothing to resolve'. By the second seat: 114 live bodies (SO 74, PG 35, SR 26, QL 10, other 1 before supersedes), 107 with no base, 145 of 146 with a null workdir, 143 with command criteria, 110 of 110 records holding the word 'independent'. Not checked by either seat: line counts and ratios, the analysis's own test run, the tagline count, the zip finding. Tasks: T1 numbers and a ratchet; T2 receipts for every live contract, in five parts that carry their own task ids so that other tasks can depend on one part (T2a a derived base, T2b the base is never chosen by hand, T2c where it runs, T2d the commands, T2e the runs and the receipts); T3 unpark and land; T4 security, nine items; T5 one truth; T6 the suite runs anywhere; T7 review says what it is, from now on; T8 the weekly file; T9 the owner's own signing key. Deliberately out, so silence is not read as missed: SR-1.09 (line lengths, cross-layer imports, duplicated helpers), SR-2.01 (embedding recall; first after the freeze, since memory recall ranks high in demand), and memev-cloud's placeholder licence. The owner's alone, with his answers of 6 Nov 2026 where he has given one. O1 Deploy the site: his go given; the honest labels are being deployed. O2 A human second reviewer: not now, his decision. O3 Legal: no lawyer, his decision kept; the seller is the licensor ('its me'). O4 Legal entity (SR-9.01): open. O5 Engine: on record, no merge engine is built in Memev, and the analysis's small Node merge is declined; the conformance corpus, SR-3.02, is built now if he says so. O6 One release: a tag, an npm package and an install address conflict with decisions on record, which are SR-1.20, D-01, the private trial and the hold on new releases; his choice. O7 Where T2 runs: answered, GitHub-hosted runners; review on 13 Nov 2026; he approves the command file. O8 Users: nothing here creates demand. O9 The TypeScript and Rust editions PG-03.4 and PG-03.5: stopped, his decision; their receipts say so. O10 Business trial: none for now, his decision. O11 memev-ops stays private, his decision: T2c's table says which contracts cannot be checked from outside. O12 The 28 signed preambles that the 5 Nov decision reads differently and does not re-sign: is a note in T7's register enough? Open. The analysis's own small errors, for the record: PGP-1.06.2 was never signed as a contract, only its round; its 145 is our 146; it asks to verify 12 SR and 4 QL contracts, and this contract verifies all live ones on purpose. What this contract cannot fix, said plainly: both seats are AI on one machine. T7 makes the records honest about that; only O2 changes it.",
   "tasks": [
     {
       "id": "T1",
@@ -10,9 +10,8 @@
       "phase": "implement",
       "depends_on": [],
       "requirements": [
-        "Rule 0, the freeze (the request holds it in full, with why fix pull requests in memev wait): from signing, no contract is drafted, signed or superseded in memev, memev-ops or memev-app, and no design record, tier or repository is added. Allowed: this contract; security fixes, through T4; SR-1.35, signed after the second seat's round, with a receipt like any other; SR-3.02 if the owner says so under O5",
-        "Rule 0, after the freeze too: a stale index row or an unlisted scope path never causes a new signed version",
-        "Rule 0, exit: the freeze lifts when T2 is closed (T2e). If T2 is not closed by 13 Nov 2026 (the lead's proposal; the owner may change the date), the owner decides whether it continues. The freeze holds the first trial's contracts (installers, PL-1, MU-1, BO-1) until then",
+        "Coordination, in place of a freeze (the owner, 7 Nov 2026: 'what freeze and why just coordinate the work and sync'): the register of 7 Nov 2026 is the one list of work, each of its rows has one owner seat, no seat starts a row another seat holds, nothing lands inside a contract's scope while that contract waits for its verify, and every seat syncs on the team bus. Until this contract verifies, work that is not its own builds in memev-app or memev-ops, or on a memev branch that does not land, as the owner decided on 7 Nov 2026; T2f lets later contracts run side by side",
+        "a stale index row or an unlisted scope path never causes a new signed version",
         "scripts/metrics/assurance.mjs prints two gated numbers: receipts over live signed contracts, and PASS receipts over live. With --json it prints one JSON object holding live, with_receipt, pass, live_without_receipt, receipts_not_pass_or_fail and fail_without_decision as whole numbers, and it names the contracts behind each",
         "a PASS with its scope not judged (T2a: a derived base cannot judge scope) is counted apart: --json holds pass and pass_scope_not_judged, the printout names them separately, and nothing adds one to the other. Both are ratcheted and may not fall",
         "a contract recorded NOT RUN (T2c) is counted apart as not_run, with its reason, is never a receipt, and stays in live_without_receipt until the owner has decided it",
@@ -162,7 +161,7 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     },
     {
@@ -332,7 +331,7 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     },
     {
@@ -419,7 +418,7 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     },
     {
@@ -590,7 +589,7 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     },
     {
@@ -655,7 +654,7 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     },
     {
@@ -677,7 +676,6 @@
         "RECONCILIATION's line on back-filling a base through superseding versions (the follow-up 'Base on the signed bodies') is replaced by T2a, so one route stands",
         "a contract whose work is in another repository than the one that holds its body has no derived base there (T2a-c11). DRAFT 3 does not say what its receipt is. By the rule above it is a FAIL with the reason that its work repository holds no base, unless the red-team round or the owner decides otherwise",
         "done when every live contract has a valid receipt (T1's rule) and every FAIL and every NOT RUN has an owner decision recorded: build it, or withdraw it, or for a NOT RUN, run it later. The decisions are committed in contracts/receipts/FAIL-DECISIONS.json, one row per failed contract with the decision and its date, and the owner signs the file's hash with his own key (T9). Withdrawing stopped work such as PG-03.4 and PG-03.5 is such a decision",
-        "the freeze's exit is recorded: when T2 is closed, or when the owner ends the freeze at its review date, contracts/receipts/FREEZE-LIFTED.md is committed and names the last commit the freeze held at. Up to that commit nothing but the allowed work is added in this repository (T2e-c07). memev-ops and memev-app cannot be checked from here",
         "each red-green criterion has its own subtest in test/receipts-verdict.test.mjs whose name starts with the criterion's label (the text before its first colon), and the criterion runs only that subtest. Each subtest's first assertion fails at the base on an assertion and never on a load error: a new module or script is imported inside the subtest or run as a child process, and a new file is checked by an assertion that it exists before it is read. No criterion command pipes through tail or head, and each prints the whole captured output (docs/scope-one/RECONCILIATION.md, 'Commands that cut their output' and 'False reds in signed criteria')"
       ],
       "description": "The verdict mapping and the load-gate rule are code in the runner (scripts/receipts/**), so this task is of phase implement and carries red-green criteria; the runs themselves and the owner's decisions are records. T2e-c04 passes on main d597366 on this machine today, so it cannot go red here; it can still fail, and it guards the runs. T2e-c07 covers this repository only, and only the four folders it names; a new repository, a tier named outside docs/tiers, and anything in memev-ops or memev-app are outside what a criterion here can see.",
@@ -746,14 +744,6 @@
           }
         },
         {
-          "statement": "T2e-c07: Rule 0 in this repository: between the base and HEAD (or the commit contracts/receipts/FREEZE-LIFTED.md names, once the freeze is lifted) no file is added under contracts/signed, contracts/*/specs, docs/scope-one/design or docs/tiers, other than the signed bodies of SR-0.04, SR-1.35 and SR-3.02 and the spec of SR-1.35",
-          "verifier": {
-            "type": "command",
-            "cmd": "[ -n \"$MEMEV_CONTRACT_BASE\" ] || { echo 'no base recorded'; exit 1; }; end=HEAD; if [ -f contracts/receipts/FREEZE-LIFTED.md ]; then end=$(grep -oE '[0-9a-f]{40}' contracts/receipts/FREEZE-LIFTED.md | awk 'NR==1'); git cat-file -e \"$end^{commit}\" || { echo 'FREEZE-LIFTED.md names no commit of this repository'; exit 1; }; fi; added=$(git diff --name-only --diff-filter=A \"$MEMEV_CONTRACT_BASE\" \"$end\" -- contracts/signed 'contracts/*/specs' docs/scope-one/design docs/tiers | grep -Ev '^contracts/signed/k-sr-(0-04|1-35|3-02)-|^contracts/(seed-readiness|programme)/specs/SR-1\\.35'); if [ -n \"$added\" ]; then printf '%s\\n' \"$added\"; exit 1; fi",
-            "timeout_s": 120
-          }
-        },
-        {
           "statement": "T2e-c08: every live contract has a valid receipt, or is NOT RUN with an owner decision",
           "verifier": {
             "type": "metric",
@@ -817,7 +807,89 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+      ]
+    },
+    {
+      "id": "T2f",
+      "title": "A commit tagged for another contract is judged by that contract",
+      "depends_on": [],
+      "requirements": [
+        "the owner's word, 7 Nov 2026, that this changes the meaning SR-0.03 signed for the scope check: a commit whose Contract-Task trailer names a task of another contract is no longer a violation in itself, so contracts can be built side by side in one repository",
+        "such a commit is left out of this contract's scope check only when all three hold: the contract it names is signed in this repository at the commit verified; the task it names is one of that contract's tasks; and every path the commit changes lies inside that task's scope. Otherwise it is a violation, as before, and the detail says which of the three failed",
+        "a commit that names more than one task, or whose trailer is not \"<contract id> <task id>\", stays a violation; an untrailered commit is judged against the union, as before",
+        "docs/CONTRACTS.md states the rule, that it changes SR-0.03's meaning by the owner's word, and why a tag cannot carry a change into a path neither contract allows",
+        "each red-green criterion of this task has its own subtest in test/contracts-scope-other.test.mjs whose name starts with the criterion's label, the criterion runs only that subtest, and its first assertion fails at the base on an assertion, never on a load error"
+      ],
+      "scope": {
+        "allow": [
+          "src/engine/contracts.mjs",
+          "test/contracts-scope-other.test.mjs",
+          "test/helpers/**",
+          "docs/CONTRACTS.md",
+          "docs/MODULES.md",
+          "changelog.d/SR-0.04.md"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T2f-c01: a commit tagged for another signed contract's task, every path inside that task's scope, is left out of this contract's scope check, and the check passes",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-other.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2f-c01:' test/contracts-scope-other.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T2f-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2f-c02: the same commit with one path outside the named task's scope fails this contract's scope check and names that path",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-other.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2f-c02:' test/contracts-scope-other.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T2f-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2f-c03: a commit naming a contract that is not signed here, or a task that contract does not have, fails as before and says which",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-other.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2f-c03:' test/contracts-scope-other.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T2f-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2f-c04: a commit naming two tasks fails, and an untrailered commit is judged against the union, as before",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-other.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2f-c04:' test/contracts-scope-other.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T2f-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2f-c05: docs/CONTRACTS.md states the rule, the owner's word of 7 Nov 2026 and why a tag cannot carry a change outside both contracts",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-other.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2f-c05:' test/contracts-scope-other.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T2f-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2f-c06: the full suite passes (on CI, never on the Mac)",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     },
     {
@@ -831,7 +903,7 @@
         "SR-1.06 lands as the licence schema only (test/license-schema.test.mjs), not the separate Personal trial that docs/scope-one/DECISIONS.md line 183 rules out. This task's scope is the scope of SR-1.01 and SR-1.06 and names no file of the trial stack, so a landed trial fails the scope criterion",
         "SR-1.06 criterion 24 (the field list and the refused keys) and findings H1 and H5 of the paid red-team report are read first, and the change note says what each changed in what lands",
         "the named test files exist, pass, and failed at the base, each on an assertion: where a parked test imports a new module at the top of the file, the import moves inside the test, so the red run is not a load error",
-        "no contract is signed or superseded for this (Rule 0): SR-1.01 and SR-1.06 stay as signed, and their receipts come from T2e"
+        "no contract is signed or superseded for this (this contract adds no signed version): SR-1.01 and SR-1.06 stay as signed, and their receipts come from T2e"
       ],
       "description": "The parked builds are in another repository and were not read for this spec; the test file names are those the signed SR-1.01 and SR-1.06 name. Reading criterion 24, H1 and H5 cannot be checked; T3-c06 checks only that the change note speaks of each. T3-c01 is a precondition and fails until SR-1.35 is landed: it looks for a signed body of SR-1.35 and for the bench scripts its draft names (scripts/bench/speed/).",
       "scope": {
@@ -867,7 +939,13 @@
           "src/cli/relay.mjs",
           "src/engine/merge.mjs",
           "test/helpers/**",
-          "changelog.d/SR-0.04.md"
+          "changelog.d/SR-0.04.md",
+          "test/import.test.mjs",
+          "test/index-damage.test.mjs",
+          "test/notestate.test.mjs",
+          "test/oplog-sliced-snapshot.test.mjs",
+          "test/speed-promises.test.mjs",
+          "test/paid-client.test.mjs"
         ]
       },
       "criteria": [
@@ -936,7 +1014,7 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     },
     {
@@ -950,7 +1028,7 @@
         "local contracts need approval before sh -c runs (SR-1.02): verify runs no command, metric or red-green command of a locally signed contract until it is approved on this machine (test/contract-approval.test.mjs)",
         "the mutation gate's test command needs the same: the --test command that src/engine/mutation-gate.mjs:734 runs through /bin/sh runs only for an approved contract (test/gate-mutate.test.mjs)",
         "nonces survive a restart (SR-1.03; test/nonce-persist.test.mjs)",
-        "no bearer token in a URL (SR-1.04; test/connector-url.test.mjs), or SR-1.04 is amended by the owner with the reason, since the connector address carries one today and docs/DOCKER.md documents it. DRAFT 3 says amended and not how. Under Rule 0 it cannot be a new signed version, so here it is the owner's decision written in docs/scope-one/DECISIONS.md as one line that begins 'SR-1.04 amended by the owner' and holds 'reason:' and the reason; the red-team round settles the form",
+        "no bearer token in a URL (SR-1.04; test/connector-url.test.mjs), or SR-1.04 is amended by the owner with the reason, since the connector address carries one today and docs/DOCKER.md documents it. DRAFT 3 says amended and not how. This contract adds no signed version, so here it is the owner's decision written in docs/scope-one/DECISIONS.md as one line that begins 'SR-1.04 amended by the owner' and holds 'reason:' and the reason; the red-team round settles the form",
         "rate buckets are bounded (SR-1.05; test/rate-limit.test.mjs)",
         "the relay verifies its peer's certificate (SR-1.07; test/relay.test.mjs; src/cli/relay.mjs:190 turns the check off today)",
         "the OAuth issuer comes from configuration, never the Host header (test/oauth.test.mjs; src/server/http.mjs:141 builds it from the header today)",
@@ -958,7 +1036,7 @@
         "import refuses a decompression bomb before inflating (test/zip-bomb.test.mjs, new; src/engine/zip.mjs:43 inflates with no output limit today)",
         "each of the nine has a test that fails first",
         "order: the approval rule lands after T2d, so the two do not collide: with the rule on, the T2 runner still runs a command that is in the approved command file and refuses one that is not",
-        "no contract is signed or superseded for this (Rule 0): the signed SR-1.03 and SR-1.05 stay as they are and get their receipts from T2e; SR-1.02, SR-1.04, SR-1.07 and SR-1.08 stay unsigned specs",
+        "no contract is signed or superseded for this (this contract adds no signed version): the signed SR-1.03 and SR-1.05 stay as they are and get their receipts from T2e; SR-1.02, SR-1.04, SR-1.07 and SR-1.08 stay unsigned specs",
         "each red-green criterion has its own subtest in the test file its requirement names whose name starts with the criterion's label (the text before its first colon), and the criterion runs only that subtest. Each subtest's first assertion fails at the base on an assertion and never on a load error: a new module or script is imported inside the subtest or run as a child process, and a new file is checked by an assertion that it exists before it is read. No criterion command pipes through tail or head, and each prints the whole captured output (docs/scope-one/RECONCILIATION.md, 'Commands that cut their output' and 'False reds in signed criteria')"
       ],
       "description": "DRAFT 3 says nine items; they are the nine requirements above, the two approval items counted apart. The scope is the scope of the first task of SR-1.02, SR-1.03, SR-1.04, SR-1.05 and SR-1.08 and both tasks of SR-1.07, plus the files of the two new items. T4-c04 is a command and not a red-green criterion because it has two ways to pass, and the owner's way builds nothing. No mutation criterion: the gate counts every changed line since the base, and T3 and SR-1.35 change the same files.",
@@ -1002,7 +1080,8 @@
           "docs/DOCKER.md",
           "docs/scope-one/DECISIONS.md",
           "test/helpers/**",
-          "changelog.d/SR-0.04.md"
+          "changelog.d/SR-0.04.md",
+          "test/setup-session.test.mjs"
         ]
       },
       "criteria": [
@@ -1103,7 +1182,7 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     },
     {
@@ -1240,7 +1319,7 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     },
     {
@@ -1413,7 +1492,7 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     },
     {
@@ -1567,7 +1646,7 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     },
     {
@@ -1636,7 +1715,7 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     },
     {
@@ -1731,7 +1810,8 @@
           "statement": "T9-c08: the full suite passes (on CI, never on the Mac)",
           "verifier": {
             "type": "command",
-            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test"
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {
@@ -1743,7 +1823,7 @@
       ],
       "stop_rules": [
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. An unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say."
       ]
     }
   ]
