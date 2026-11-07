@@ -222,6 +222,39 @@ test('the mark a damaged store leaves is gone once no request from before it cou
   assert.equal(JSON.parse(fs.readFileSync(r.store, 'utf8')).not_before, null, 'and then gone');
 });
 
+test('a not_before past the clock by more than the skew is damage, so it cannot refuse for good', async (t) => {
+  const said = []; t.mock.method(console, 'error', (...a) => said.push(a.join(' ')));
+  mock.timers.enable({ apis: ['Date'], now: T0 });
+  const r = await rig();
+  assert.equal((await post(r.url, sign(r))).status, 200);
+  const write = (notBefore) => fs.writeFileSync(r.store, JSON.stringify({ v: 1, not_before: notBefore, nonces: {} }));
+  await r.close();
+  write(1e300);
+  await r.open();
+  mock.timers.setTime(T0 + 301e3);
+  const after = await post(r.url, sign(r));
+  assert.equal(after.status, 200, `a mark far in the future must not refuse for good: ${after.text}`);
+  assert.match(said.join('\n'), /damaged/);
+  assert.equal(fs.readdirSync(path.dirname(r.store)).filter((f) => f.startsWith('nonces.json.damaged-')).length, 1);
+
+  // inside the skew it is a clock that differs a little, and no damage
+  await r.close();
+  said.length = 0;
+  const at = Date.now();
+  write(at + 300e3);
+  await r.open();
+  assert.equal(said.length, 0, said.join('\n'));
+  assert.equal(JSON.parse(fs.readFileSync(r.store, 'utf8')).not_before, at + 300e3);
+
+  // a good mark, and then the clock steps back a long way: found once, and served again after the skew from there
+  mock.timers.setTime(at - 3600e3);
+  refusedAsUsed(await post(r.url, sign(r)), 'just after the step back');
+  const count = fs.readdirSync(path.dirname(r.store)).filter((f) => f.startsWith('nonces.json.damaged-')).length;
+  mock.timers.setTime(at - 3600e3 + 301e3);
+  assert.equal((await post(r.url, sign(r))).status, 200, 'the mark is the time of the step back, and not the one in the future');
+  assert.equal(fs.readdirSync(path.dirname(r.store)).filter((f) => f.startsWith('nonces.json.damaged-')).length, count, 'and it was found once');
+});
+
 test('a write fault is a 5xx that names no path, and what it was refused for stays used', { skip: process.platform === 'win32' }, async (t) => {
   t.mock.method(console, 'error', () => {});
   const r = await rig();

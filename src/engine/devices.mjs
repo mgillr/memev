@@ -270,6 +270,8 @@ export class NonceCache {
     }
     let o = null; let why = 'wrong shape';
     try { o = NonceCache._parse(text); } catch (e) { why = e.message; }
+    // a mark further ahead than any clock may be would refuse every request until the clock got there, so it is not believed
+    if (o && o.not_before > at + this.skew) { o = null; why = 'its not_before is in the future'; }
     if (!o) { this._damaged(at, why); return; }
     for (const [k, ts] of Object.entries(o.nonces)) if (!this.m.has(k)) this.m.set(k, ts);
     if (o.not_before !== null) this.notBefore = Math.max(this.notBefore ?? 0, o.not_before);
@@ -279,7 +281,7 @@ export class NonceCache {
     let moved = true;
     try { fs.renameSync(this.file, aside); } catch { moved = false; }
     console.error(`[memev] the store of used signed requests ${this.file} is damaged (${why})${moved ? `; kept as ${aside}` : ''}. Signed requests may be refused for up to ${Math.ceil(this.skew / 60e3)} minutes, because a request already used could not be told from a new one.`);
-    this.notBefore = Math.max(this.notBefore ?? 0, at);
+    this.notBefore = this.notBefore !== null && this.notBefore <= at + this.skew ? Math.max(this.notBefore, at) : at;
     // said at once so a kill before the next signed request forgets nothing; if this fails too, the next write reports it
     try { this._write(at); } catch (e) { console.error(`[memev] ${e.message}`); }
   }
