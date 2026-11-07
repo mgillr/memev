@@ -158,6 +158,7 @@ for (const [label, damage] of [
 ]) {
   test(`a store that is ${label} neither stops the server nor reopens an old request`, { skip: label === 'unreadable' && (process.platform === 'win32' || process.getuid?.() === 0) }, async (t) => {
     const said = []; t.mock.method(console, 'error', (...a) => said.push(a.join(' ')));
+    mock.timers.enable({ apis: ['Date'], now: T0 });
     const r = await rig();
     const old = sign(r);
     assert.equal((await post(r.url, old)).status, 200);
@@ -167,14 +168,38 @@ for (const [label, damage] of [
     assert.match(said.join('\n'), new RegExp(r.store.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'the damage is said, naming the file');
     assert.equal(fs.readdirSync(path.dirname(r.store)).filter((f) => f.startsWith('nonces.json.damaged-')).length, 1, 'the damaged file is kept aside');
     refusedAsUsed(await post(r.url, old), 'signed before the damage was found');
-    assert.equal((await post(r.url, sign(r))).status, 200, 'a fresh request is served');
+    // fail closed: a time inside the skew cannot be told from a clock running ahead, so a fresh request waits too
+    refusedAsUsed(await post(r.url, sign(r)), 'signed now, right after the damage');
     // and the damage is not forgotten at the next start: the old request is still inside its window
     await r.restart();
     refusedAsUsed(await post(r.url, old), 'after one more restart');
+    mock.timers.setTime(T0 + 300001);
+    assert.equal((await post(r.url, sign(r))).status, 200, 'served once the skew has passed');
   });
 }
 
-test('after the window has passed, a damaged store leaves nothing behind that refuses', async (t) => {
+test('signed ahead of the clock, used, store torn, restart: the replay is refused for as long as it could be accepted', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  mock.timers.enable({ apis: ['Date'], now: T0 });
+  const r = await rig();
+  mock.timers.setTime(T0 + 240e3);
+  const ahead = sign(r);
+  mock.timers.setTime(T0);
+  const first = await post(r.url, ahead);
+  mock.timers.setTime(T0 + 10e3);
+  await r.close();
+  fs.writeFileSync(r.store, fs.readFileSync(r.store).subarray(0, 15));
+  await r.open();
+  const replay = await post(r.url, ahead);
+  assert.equal(replay.status, 401, `replayed after the store was torn: ${replay.text}`);
+  assert.equal(first.status, 200);
+  refusedAsUsed(replay, 'replayed after the store was torn');
+  // its own signature lasts until 240 s + the skew: the last moment it could be accepted
+  mock.timers.setTime(T0 + 539e3);
+  refusedAsUsed(await post(r.url, ahead), 'at the far end of its signature');
+});
+
+test('the mark a damaged store leaves is gone once no request from before it could be accepted', async (t) => {
   t.mock.method(console, 'error', () => {});
   mock.timers.enable({ apis: ['Date'], now: T0 });
   const r = await rig();
@@ -182,14 +207,19 @@ test('after the window has passed, a damaged store leaves nothing behind that re
   await r.close();
   fs.writeFileSync(r.store, 'not json');
   await r.open();
-  // signed before the damage was found, and sent while the window holds: refused
-  mock.timers.setTime(T0 - 1000);
-  const before = sign(r);
-  mock.timers.setTime(T0 + 1000);
-  refusedAsUsed(await post(r.url, before), 'older than the damage');
+  // signed inside the skew of the damage: refused, whichever side of it the time falls
+  for (const stamp of [T0 - 1000, T0 + 299e3]) {
+    mock.timers.setTime(stamp);
+    const h = sign(r);
+    mock.timers.setTime(T0 + 200e3);
+    refusedAsUsed(await post(r.url, h), `signed at ${stamp - T0} ms from the damage`);
+  }
   mock.timers.setTime(T0 + 301e3);
   assert.equal((await post(r.url, sign(r))).status, 200);
-  assert.equal(JSON.parse(fs.readFileSync(r.store, 'utf8')).not_before, null, 'the mark is gone once no request that old could be accepted');
+  assert.equal(JSON.parse(fs.readFileSync(r.store, 'utf8')).not_before, T0, 'kept until no request from before it can be accepted');
+  mock.timers.setTime(T0 + 601e3);
+  assert.equal((await post(r.url, sign(r))).status, 200);
+  assert.equal(JSON.parse(fs.readFileSync(r.store, 'utf8')).not_before, null, 'and then gone');
 });
 
 test('a write fault is a 5xx that names no path, and what it was refused for stays used', { skip: process.platform === 'win32' }, async (t) => {

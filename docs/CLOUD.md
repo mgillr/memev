@@ -99,7 +99,11 @@ Remote requests always need a token issued for remote use, are rate limited (120
 default, per caller, and at most 10,000 callers are held) and are logged to `.memev/access.jsonl`.
 A caller is its socket address, whatever headers it sends. The exception is a running Cloudflare tunnel,
 which overwrites `cf-connecting-ip`, so there that header is the caller. Everyone through a relay or
-Tailscale, or a reverse proxy of your own, arrives from one address and shares one limit. Admin routes are local only. Contract signing is
+Tailscale, or a reverse proxy of your own, arrives from one address and shares one limit.
+A computer's signed request can be used once, also across a restart: what was used is kept in
+`.memev/nonces.json`. If that file is found damaged it is set aside as `nonces.json.damaged-<time>`, the
+vault keeps running, and signed requests may be refused as already used for up to 5 minutes, because one
+already used could not be told from a new one. Admin routes are local only. Contract signing is
 available remotely; a contract signed from a remote origin records that origin, and its command
 criteria do not run on this machine until a local operator approves it with
 `memev contract approve <id>`. `memev cloud rotate-key` changes the legacy shared key, for apps
