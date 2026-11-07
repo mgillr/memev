@@ -255,6 +255,21 @@ test('a not_before past the clock by more than the skew is damage, so it cannot 
   assert.equal(fs.readdirSync(path.dirname(r.store)).filter((f) => f.startsWith('nonces.json.damaged-')).length, count, 'and it was found once');
 });
 
+test('a nonce outside its form is refused before it can reach the store, whatever its signature', async () => {
+  const r = await rig();
+  assert.equal((await post(r.url, sign(r))).status, 200);
+  const size = fs.statSync(r.store).size;
+  const bodyHash = crypto.createHash('sha256').update(BODY).digest('hex');
+  for (const nonce of ['a'.repeat(65), 'a'.repeat(4096), 'A'.repeat(32), 'not hex at all, and long enough']) {
+    const ts = String(Date.now());
+    const sig = crypto.sign(null, proofPayload({ method: 'POST', path: '/mcp', ts, nonce, bodyHash }), crypto.createPrivateKey(r.key.privateKeyPem)).toString('base64');
+    const res = await post(r.url, { authorization: `Bearer ${r.dev.token}`, 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.7', 'x-memev-ts': ts, 'x-memev-nonce': nonce, 'x-memev-sig': sig });
+    assert.equal(res.status, 401, `a nonce of ${nonce.length} characters`);
+    assert.match(res.json.error_description, /bad nonce/);
+  }
+  assert.equal(fs.statSync(r.store).size, size, 'nothing was written for any of them');
+});
+
 test('a write fault is a 5xx that names no path, and what it was refused for stays used', { skip: process.platform === 'win32' }, async (t) => {
   t.mock.method(console, 'error', () => {});
   const r = await rig();
