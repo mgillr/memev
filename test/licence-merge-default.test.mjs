@@ -33,6 +33,8 @@ test('every paid tier in the tier table carries merge; free and federated do not
 });
 
 test('a development licence signed without --services passes the engine gate; one signed with the old default does not', () => {
+  // license-dev signs with today's date, so this judges at today, and a fixed date here would fail once today had passed it
+  const EXP = new Date(Date.now() + 365 * 86400e3).toISOString().slice(0, 10);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-licdev-'));
   try {
     const dev = (...a) => spawnSync(process.execPath, [path.join(here, '..', 'scripts', 'license-dev.mjs'), ...a], { encoding: 'utf8' });
@@ -40,13 +42,13 @@ test('a development licence signed without --services passes the engine gate; on
     assert.equal(kg.status, 0, kg.stderr);
     const { kid, public_key: pub, private_key_file: keyFile } = JSON.parse(kg.stdout);
     const keys = { [kid]: pub };
-    const signed = dev('sign', '--key', keyFile, '--tier', 'personal_more', '--seats', '3', '--exp', '2027-11-01');
+    const signed = dev('sign', '--key', keyFile, '--tier', 'personal_more', '--seats', '3', '--exp', EXP);
     assert.equal(signed.status, 0, signed.stderr);
     const lic = JSON.parse(signed.stdout);
     assert.deepEqual(lic.services, ['sync', 'backup', 'relay', 'merge']);
-    assert.equal(engineAllowed(lic, { now: NOW, keys }), true);
-    const old = JSON.parse(dev('sign', '--key', keyFile, '--tier', 'personal_more', '--seats', '3', '--exp', '2027-11-01', '--services', 'sync,backup,relay').stdout);
-    assert.equal(engineAllowed(old, { now: NOW, keys }), false);
+    assert.equal(engineAllowed(lic, { now: Date.now(), keys }), true);
+    const old = JSON.parse(dev('sign', '--key', keyFile, '--tier', 'personal_more', '--seats', '3', '--exp', EXP, '--services', 'sync,backup,relay').stdout);
+    assert.equal(engineAllowed(old, { now: Date.now(), keys }), false);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
