@@ -397,6 +397,41 @@ function moreApps(env, platform, stdio) {
     // https://docs.qoder.com/cli/mcp-reference : user level "~/.qoder/settings.json", key mcpServers
     { id: 'qoder', name: 'Qoder CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.qoder')),
       edits: () => [mcpJson(path.join(home, '.qoder', 'settings.json'), 'qoder')] },
+    // https://docs.cline.bot/mcp/configuring-mcp-servers : "CLI: ~/.cline/data/settings/cline_mcp_settings.json (override with the
+    // CLINE_MCP_SETTINGS_PATH env var)"; https://docs.cline.bot/getting-started/config : ~/.cline/ is shared by the IDE, CLI and SDK
+    { id: 'cline', name: 'Cline', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.cline')),
+      edits: () => [mcpJson(env.CLINE_MCP_SETTINGS_PATH || path.join(home, '.cline', 'data', 'settings', 'cline_mcp_settings.json'), 'cline', 'mcpServers', { disabled: false })],
+      manual: 'In the Cline extension for VS Code, check MCP Servers, Configure: the extension keeps its own MCP settings file, which its docs do not name.' },
+    // https://kiro.dev/docs/mcp/configuration/ : "User Level: ~/.kiro/settings/mcp.json", for the IDE, the CLI and the web
+    { id: 'kiro', name: 'Kiro', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.kiro')),
+      edits: () => [mcpJson(path.join(home, '.kiro', 'settings', 'mcp.json'), 'kiro')],
+      manual: 'In the Kiro IDE, turn on the MCP support setting if it is off.' },
+    // https://junie.jetbrains.com/docs/junie-cli-mcp-configuration.html : "User scope: ~/.junie/mcp/mcp.json", the IDE plugin and CLI share it
+    { id: 'junie', name: 'Junie', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.junie')),
+      edits: () => [mcpJson(path.join(home, '.junie', 'mcp', 'mcp.json'), 'junie')] },
+    // https://ampcode.com/docs/cli/settings : ~/.config/amp/settings.json or settings.jsonc, on Windows %USERPROFILE%\.config\amp\...;
+    // https://ampcode.com/docs/customize/mcp : the "amp.mcpServers" key with command and args
+    { id: 'amp', name: 'Amp', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'amp')),
+      edits: () => {
+        const dir = path.join(home, '.config', 'amp');
+        const f = exists(path.join(dir, 'settings.json')) || !exists(path.join(dir, 'settings.jsonc')) ? path.join(dir, 'settings.json') : path.join(dir, 'settings.jsonc');
+        return [mcpJson(f, 'amp', 'amp.mcpServers')];
+      } },
+    // https://kilo.ai/docs/automate/mcp/using-in-kilo-code : "Global Configuration: ~/.config/kilo/kilo.jsonc" (or kilo.json),
+    // on Windows C:\Users\<username>\.config\kilo\kilo.jsonc; key mcp, type local, the command as one array
+    { id: 'kilo-code', name: 'Kilo Code', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'kilo')),
+      edits: () => {
+        const dir = path.join(home, '.config', 'kilo');
+        const f = !exists(path.join(dir, 'kilo.jsonc')) && exists(path.join(dir, 'kilo.json')) ? path.join(dir, 'kilo.json') : path.join(dir, 'kilo.jsonc');
+        const e = stdio('kilo-code');
+        return [json(f, setServer('mcp', { type: 'local', command: [e.command, ...e.args], enabled: true }), delServer('mcp'))];
+      },
+      manual: 'Kilo asks before each Memev tool call; to allow them, add "permission": { "memev_*": "allow" } to kilo.jsonc.' },
+    // https://github.com/aws/amazon-q-developer-cli/blob/main/docs/agent-file-locations.md : "~/.aws/amazonq/mcp.json for global",
+    // read by the built-in default agent ("useLegacyMcpJson": true). The CLI is now Kiro CLI; this is for installs that remain.
+    { id: 'amazon-q-cli', name: 'Amazon Q Developer CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.aws', 'amazonq')),
+      edits: () => [mcpJson(path.join(home, '.aws', 'amazonq', 'mcp.json'), 'amazon-q-cli')],
+      note: 'Custom agents read their own mcpServers; the default agent reads this file.' },
     // https://docs.openhands.dev/openhands/usage/cli/mcp-servers : "~/.openhands/mcp.json", key mcpServers
     { id: 'openhands', name: 'OpenHands CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.openhands')),
       edits: () => [mcpJson(path.join(home, '.openhands', 'mcp.json'), 'openhands')] },
@@ -417,13 +452,27 @@ export function unsupportedDefs(env, platform = process.platform) {
   const xdg = env.XDG_CONFIG_HOME || path.join(home, '.config');
   const win = platform === 'win32';
   return [
-    { id: 'cline', name: 'Cline', detect: () => exists(path.join(home, '.cline')) },
-    { id: 'roo', name: 'Roo', detect: () => exists(path.join(home, '.roo')) },
-    { id: 'continue', name: 'Continue', detect: () => exists(path.join(home, '.continue')) },
-    { id: 'kiro', name: 'Kiro', detect: () => exists(path.join(home, '.kiro')) },
-    { id: 'jetbrains-ai', name: 'JetBrains AI', detect: () => exists(path.join(appData, 'JetBrains')) },
-    { id: 'amp', name: 'Amp', detect: () => exists(win ? path.join(home, '.config', 'amp') : path.join(xdg, 'amp')) },
-    { id: 'goose', name: 'Goose', detect: () => exists(win ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(xdg, 'goose')) },
+    { id: 'roo', name: 'Roo', detect: () => exists(path.join(home, '.roo')),
+      manual: 'Roo keeps its global MCP servers in mcp_settings.json inside VS Code, at a place its docs do not name: add memev from Roo\'s MCP settings (Edit Global MCP).' },
+    { id: 'continue', name: 'Continue', detect: () => exists(path.join(home, '.continue')),
+      manual: 'Continue lists MCP servers in ~/.continue/config.yaml, a YAML list Memev does not edit yet: add a stdio entry named memev under mcpServers.' },
+    { id: 'jetbrains-ai', name: 'JetBrains AI', detect: () => exists(path.join(appData, 'JetBrains')),
+      manual: 'JetBrains AI Assistant keeps MCP servers in its settings only: Settings | Tools | AI Assistant | Model Context Protocol (MCP), Add.' },
+    { id: 'goose', name: 'Goose', detect: () => exists(win ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(xdg, 'goose')),
+      manual: 'Goose keeps extensions in config.yaml, a YAML map Memev does not edit yet: add memev under extensions with type: stdio, cmd and args.' },
+    // MCP servers kept in the app's own settings screen or a file whose format the docs do not give: found, never changed
+    { id: 'jan', name: 'Jan', detect: () => exists(path.join(platform === 'win32' || platform === 'darwin' ? osDirs(env, platform).appData : path.join(home, '.local', 'share'), 'Jan', 'data')),
+      manual: 'Jan adds MCP servers in its settings only: Settings, MCP Servers, + Add MCP Server, transport STDIO, then toggle the server on.' },
+    { id: 'cherry-studio', name: 'Cherry Studio', detect: () => exists(path.join(osDirs(env, platform).appData, 'CherryStudio')),
+      manual: 'Cherry Studio adds MCP servers in its settings only: Settings, MCP, MCP Servers, Add.' },
+    { id: 'boltai', name: 'BoltAI', detect: () => platform === 'darwin' && exists(path.join(home, '.boltai')),
+      manual: 'BoltAI\'s docs name ~/.boltai/mcp.json but not its format: add memev in Settings, Plugins, then Reload Config.' },
+    { id: 'lingma', name: 'Lingma', detect: () => exists(path.join(home, '.lingma')),
+      manual: 'Lingma adds MCP servers through a JSON form in the IDE, then asks you to restart the IDE.' },
+    { id: 'rovodev', name: 'Rovo Dev CLI', detect: () => exists(path.join(home, '.rovodev')),
+      manual: 'Rovo Dev\'s docs name two different MCP files (mcp.json and mcp_config.json): run acli rovodev mcp to add memev in the file your version opens.' },
+    { id: 'crush', name: 'Crush', detect: () => exists(path.join(home, '.config', 'crush')),
+      manual: 'Crush now reads a crushrc file of mcp add lines (its JSON config is deprecated): add memev with an mcp add line in ~/.config/crush/crushrc.' },
     // apps connected on macOS and Linux whose docs name no Windows location: found on Windows, never changed there
     ...(win ? clientDefs(env, 'memev', platform, { allPlatforms: true }).filter((d) => d.windows === false).map((d) => ({ id: d.id, name: d.name, detect: d.detect, manual: `${d.name}'s docs give no Windows location for its MCP config, so Memev does not change it on Windows yet.` })) : []),
   ];
@@ -601,6 +650,9 @@ export const RESTART = {
   oterm: 'Restart oterm', 'muse-code': 'Start a new Muse Code session', zcode: 'Open ZCode settings, MCP Servers, and check memev is enabled',
   'mcphub-nvim': 'Nothing to do: MCPHub picks up servers.json changes in every Neovim', codebuddy: 'Restart CodeBuddy Code',
   qoder: 'Run /mcp reload in Qoder CLI', openhands: 'Start a new OpenHands conversation',
+  cline: 'Restart Cline', kiro: 'Nothing to do: Kiro applies a saved mcp.json between turns', junie: 'Start a new Junie session',
+  amp: 'Run the Reload MCP command in Amp', 'kilo-code': 'Restart Kilo Code',
+  'amazon-q-cli': 'Start a new q chat session',
 };
 // Apps whose session-start hook brings the protocol, so their MCP instructions need not repeat it.
 export const HOOK_CLIENTS = new Set(clientDefs({}, 'memev').filter((d) => d.mode === 'hooks').map((d) => d.id));
@@ -673,7 +725,7 @@ export async function command(cmd, pos, flags, { env, root }) {
       const unsup = detect(env, launcher).filter((c) => c.found && !c.supported);
       if (unsup.length) { console.log(`Found ${unsup.map((c) => c.name).join(', ')} but Memev does not support ${unsup.length > 1 ? 'them' : 'it'} yet (see docs/CLIENTS.md to ask for it).`); return 0; }
     }
-    if (!res.length) console.log('No AI apps found. Install one (Codex, Cursor, Gemini CLI, Windsurf, VS Code, Zed, OpenCode, GitHub Copilot CLI, or a Claude product) and run memev connect again.');
+    if (!res.length) console.log('No AI apps found. Install one (Codex, Cursor, Gemini CLI, Windsurf, VS Code, Zed, OpenCode, GitHub Copilot CLI, a Claude product, or another app in docs/CLIENTS.md) and run memev connect again.');
     for (const r of res) {
       if (r.status === 'added') out.ok(`${r.name}: connected (${r.mode === 'hooks' ? 'hooks + MCP + instructions' : 'MCP + instructions'})`);
       else if (r.status === 'already') out.ok(`${r.name}: already connected`);

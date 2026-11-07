@@ -55,6 +55,18 @@ const JSON_APPS = [
     entry: { type: 'stdio', command: BIN, args: linuxArgs('codebuddy') }, win: false },
   { id: 'qoder', dir: (h) => path.join(h, '.qoder'), file: (h) => path.join(h, '.qoder', 'settings.json'), key: ['mcpServers'],
     entry: { command: BIN, args: linuxArgs('qoder') }, win: false },
+  { id: 'cline', dir: (h) => path.join(h, '.cline'), file: (h) => path.join(h, '.cline', 'data', 'settings', 'cline_mcp_settings.json'), key: ['mcpServers'],
+    entry: { disabled: false, command: BIN, args: linuxArgs('cline') }, win: false },
+  { id: 'kiro', dir: (h) => path.join(h, '.kiro'), file: (h) => path.join(h, '.kiro', 'settings', 'mcp.json'), key: ['mcpServers'],
+    entry: { command: BIN, args: linuxArgs('kiro') }, win: false },
+  { id: 'junie', dir: (h) => path.join(h, '.junie'), file: (h) => path.join(h, '.junie', 'mcp', 'mcp.json'), key: ['mcpServers'],
+    entry: { command: BIN, args: linuxArgs('junie') }, win: false },
+  { id: 'amp', dir: (h) => path.join(h, '.config', 'amp'), file: (h) => path.join(h, '.config', 'amp', 'settings.json'), key: ['amp.mcpServers'],
+    entry: { command: BIN, args: linuxArgs('amp') }, win: (h) => path.join(h, '.config', 'amp', 'settings.json') },
+  { id: 'kilo-code', dir: (h) => path.join(h, '.config', 'kilo'), file: (h) => path.join(h, '.config', 'kilo', 'kilo.jsonc'), key: ['mcp'],
+    entry: { type: 'local', command: [BIN, ...linuxArgs('kilo-code')], enabled: true }, win: (h) => path.join(h, '.config', 'kilo', 'kilo.jsonc') },
+  { id: 'amazon-q-cli', dir: (h) => path.join(h, '.aws', 'amazonq'), file: (h) => path.join(h, '.aws', 'amazonq', 'mcp.json'), key: ['mcpServers'],
+    entry: { command: BIN, args: linuxArgs('amazon-q-cli') }, win: false },
   { id: 'openhands', dir: (h) => path.join(h, '.openhands'), file: (h) => path.join(h, '.openhands', 'mcp.json'), key: ['mcpServers'],
     entry: { command: BIN, args: linuxArgs('openhands') }, win: false },
 ];
@@ -120,8 +132,9 @@ for (const app of JSON_APPS) {
     const [e] = def.edits();
     assert.equal(e.file, app.win(home));
     const m = dig(e.apply({}), [...app.key, 'memev']);
-    assert.ok(m.command.endsWith('node.exe'), m.command);
-    assert.deepEqual(m.args, [path.join(env.MEMEV_CONFIG_DIR, 'runtime', VERSION, 'bin', 'memev.mjs'), 'mcp', '--client', app.id]);
+    const argv = [].concat(m.command, m.args || []); // Kilo takes the command and its arguments as one array
+    assert.ok(argv[0].endsWith('node.exe'), argv[0]);
+    assert.deepEqual(argv.slice(1), [path.join(env.MEMEV_CONFIG_DIR, 'runtime', VERSION, 'bin', 'memev.mjs'), 'mcp', '--client', app.id]);
   });
 }
 
@@ -219,4 +232,41 @@ test('codebuddy: a JSONC file with comments keeps its comments', () => {
   const t = fs.readFileSync(f, 'utf8');
   assert.match(t, /\/\/ my servers/);
   assert.match(t, /"memev"/);
+});
+
+test('cline: CLINE_MCP_SETTINGS_PATH moves the file', () => {
+  const { home, env } = sandboxEnv();
+  const f = path.join(home, 'elsewhere', 'mcp.json');
+  assert.equal(clientDefs({ ...env, CLINE_MCP_SETTINGS_PATH: f }, BIN, 'linux').find((d) => d.id === 'cline').edits()[0].file, f);
+});
+
+test('amp and kilo-code: the file the person already has is the one edited (settings.jsonc, kilo.json)', () => {
+  const { home, env } = sandboxEnv();
+  plant(path.join(home, '.config', 'amp', 'settings.jsonc'), { 'amp.notifications.enabled': false });
+  plant(path.join(home, '.config', 'kilo', 'kilo.json'), { mcp: {} });
+  const defs = clientDefs(env, BIN, 'linux');
+  assert.equal(defs.find((d) => d.id === 'amp').edits()[0].file, path.join(home, '.config', 'amp', 'settings.jsonc'));
+  assert.equal(defs.find((d) => d.id === 'kilo-code').edits()[0].file, path.join(home, '.config', 'kilo', 'kilo.json'));
+  connect('amp', { env, launcher: BIN, platform: 'linux' });
+  const j = JSON.parse(fs.readFileSync(path.join(home, '.config', 'amp', 'settings.jsonc'), 'utf8'));
+  assert.equal(j['amp.notifications.enabled'], false);
+  assert.deepEqual(j['amp.mcpServers'].memev, { command: BIN, args: linuxArgs('amp') });
+  assert.equal(fs.existsSync(path.join(home, '.config', 'amp', 'settings.json')), false, 'no second settings file');
+});
+
+test('apps kept in a settings screen are found, never changed, and come with the way to add Memev by hand', () => {
+  const { home, env } = sandboxEnv();
+  const dirs = { jan: path.join(home, '.local', 'share', 'Jan', 'data'), 'cherry-studio': path.join(home, '.config', 'CherryStudio'), lingma: path.join(home, '.lingma'), rovodev: path.join(home, '.rovodev'), crush: path.join(home, '.config', 'crush') };
+  for (const d of Object.values(dirs)) fs.mkdirSync(d, { recursive: true });
+  const found = detect(env, BIN, 'linux');
+  for (const id of Object.keys(dirs)) {
+    const c = found.find((x) => x.id === id);
+    assert.equal(c.found, true, id);
+    assert.equal(c.supported, false, id);
+    assert.ok(c.manual, `${id} has a manual step`);
+  }
+  const winJan = path.join(home, 'AppData', 'Roaming', 'Jan', 'data');
+  fs.mkdirSync(winJan, { recursive: true });
+  assert.equal(unsupportedDefs(env, 'win32').find((d) => d.id === 'jan').detect(), true, 'Jan on Windows is looked for under %APPDATA%');
+  assert.equal(unsupportedDefs(env, 'linux').find((d) => d.id === 'boltai').detect(), false, 'BoltAI is a Mac app');
 });
