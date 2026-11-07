@@ -2,7 +2,7 @@
 
 Part of the [Memev documentation](README.md). Written by `node scripts/docs/module-graph.mjs` from the real imports in `bin/` and `src/`; do not edit it by hand. `node scripts/docs/module-graph.mjs --check` (and `test/docs-module-map.test.mjs`) fail when it is out of date. How the parts fit at a higher level: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-102 modules and 369 import edges (89 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
+103 modules and 373 import edges (91 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
 
 ## Layers
 
@@ -21,7 +21,7 @@ flowchart LR
   bridge -->|"1"| cli
   bridge -->|"10"| engine
   cli -->|"5"| bridge
-  cli -->|"93"| engine
+  cli -->|"94"| engine
   cli -->|"1"| server
   cli -->|"1"| services
   cli -->|"3"| vendor
@@ -82,6 +82,7 @@ flowchart LR
     src_cli_remote["remote.mjs"]
     src_cli_runner["runner.mjs"]
     src_cli_service["service.mjs"]
+    src_cli_session_link["session-link.mjs"]
     src_cli_setup_remote["setup-remote.mjs"]
     src_cli_sync["sync.mjs"]
     src_cli_transcript["transcript.mjs"]
@@ -258,6 +259,7 @@ flowchart LR
   src_cli_hooks --> src_cli_common
   src_cli_hooks --> src_cli_daemon
   src_cli_hooks -.-> src_cli_remote
+  src_cli_hooks -.-> src_cli_session_link
   src_cli_hooks -.-> src_cli_transcript
   src_cli_hooks -.-> src_engine_bus
   src_cli_hooks --> src_engine_card
@@ -324,6 +326,7 @@ flowchart LR
   src_cli_main -.-> src_server_main
   src_cli_mcp_stdio --> src_cli_common
   src_cli_mcp_stdio --> src_cli_daemon
+  src_cli_mcp_stdio --> src_cli_session_link
   src_cli_mcp_stdio --> src_engine_net
   src_cli_memory_cli --> src_cli_common
   src_cli_memory_cli --> src_cli_daemon
@@ -357,6 +360,7 @@ flowchart LR
   src_cli_remote -.-> src_cli_clients
   src_cli_remote --> src_cli_common
   src_cli_remote -.-> src_cli_main
+  src_cli_remote -.-> src_cli_mcp_stdio
   src_cli_remote --> src_engine_devices
   src_cli_remote --> src_engine_net
   src_cli_remote --> src_engine_util
@@ -366,6 +370,7 @@ flowchart LR
   src_cli_service --> src_cli_clients
   src_cli_service --> src_cli_common
   src_cli_service --> src_engine_util
+  src_cli_session_link --> src_engine_util
   src_cli_setup_remote --> src_cli_clients
   src_cli_setup_remote --> src_cli_common
   src_cli_setup_remote --> src_engine_setup_channel
@@ -558,21 +563,22 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/cli/deployment.mjs` | `memev deployment`: where this vault runs (local, on-prem or cloud-hosted), what kind of AI provider it uses (hosted-api, internal-llm or mixed), and... | `engine/util.mjs` | `cli/main.mjs` |
 | `src/cli/doctor.mjs` | `memev doctor`: checks everything Memev depends on and says what to do | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/common.mjs`, `cli/daemon.mjs`, `cli/github.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/preflight.mjs`, `cli/relay.mjs`, `cli/service.mjs`, `cli/update.mjs`, `engine/bus.mjs`, `engine/license.mjs`, `engine/net.mjs`, `engine/secrets.mjs`, `engine/tokens.mjs`, `engine/util.mjs`, `engine/vault.mjs` | `cli/main.mjs`, `cli/onboarding.mjs`, `server/mcp.mjs` |
 | `src/cli/github.mjs` | `memev github setup`: back the vault up to your own private GitHub repository | `cli/common.mjs`, `engine/git.mjs`, `engine/util.mjs` | `cli/doctor.mjs`, `cli/main.mjs`, `cli/sync.mjs` |
-| `src/cli/hooks.mjs` | Session hooks | `cli/common.mjs`, `cli/daemon.mjs`, `cli/remote.mjs`, `cli/transcript.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/util.mjs`, `engine/vault-marker.mjs` | `memev.mjs`, `cli/main.mjs` |
+| `src/cli/hooks.mjs` | Session hooks | `cli/common.mjs`, `cli/daemon.mjs`, `cli/remote.mjs`, `cli/session-link.mjs`, `cli/transcript.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/util.mjs`, `engine/vault-marker.mjs` | `memev.mjs`, `cli/main.mjs` |
 | `src/cli/import.mjs` | memev import: preview and import history from project folders, AI history files, and chat export zips | `cli/common.mjs`, `cli/daemon.mjs`, `engine/importers/core.mjs`, `engine/vault.mjs` | `cli/main.mjs`, `cli/onboarding.mjs` |
 | `src/cli/invite.mjs` | `memev invite` mints a one-time enrolment secret and prints a code, a link and a QR code | `cli/licensing.mjs`, `engine/devices.mjs`, `engine/entitlements.mjs`, `engine/license.mjs`, `engine/util.mjs`, `engine/vault.mjs`, `vendor/qr.mjs` | `cli/main.mjs` |
 | `src/cli/licensing.mjs` | `memev license …` and `memev devices …` | `cli/common.mjs`, `cli/relay.mjs`, `engine/bus.mjs`, `engine/devices.mjs`, `engine/entitlements.mjs`, `engine/git.mjs`, `engine/license.mjs`, `engine/net.mjs`, `engine/tokens.mjs`, `engine/util.mjs`, `engine/vault.mjs` | `cli/doctor.mjs`, `cli/invite.mjs`, `cli/main.mjs`, `cli/upgrade.mjs` |
 | `src/cli/main.mjs` | The memev command | `cli/agentid.mjs`, `cli/bus-cli.mjs`, `cli/chat-cli.mjs`, `cli/clients.mjs`, `cli/common.mjs`, `cli/compact.mjs`, `cli/contracts-cli.mjs`, `cli/daemon.mjs`, `cli/deployment.mjs`, `cli/doctor.mjs`, `cli/github.mjs`, `cli/hooks.mjs`, `cli/import.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/mcp-stdio.mjs`, `cli/memory-cli.mjs`, `cli/onboarding.mjs`, `cli/pathsetup.mjs`, `cli/preflight.mjs`, `cli/ready.mjs`, `cli/remote.mjs`, `cli/runner.mjs`, `cli/service.mjs`, `cli/setup-remote.mjs`, `cli/tunnel.mjs`, `cli/update.mjs`, `cli/upgrade.mjs`, `cli/work-store.mjs`, `cli/work.mjs`, `engine/card.mjs`, `engine/git.mjs`, `engine/net.mjs`, `engine/tokens.mjs`, `engine/util.mjs`, `engine/vault.mjs`, `server/main.mjs` | `memev.mjs`, `cli/clients.mjs`, `cli/doctor.mjs`, `cli/remote.mjs`, `cli/update.mjs` |
-| `src/cli/mcp-stdio.mjs` | `memev mcp`: an MCP server on stdio for clients that launch one | `cli/common.mjs`, `cli/daemon.mjs`, `engine/net.mjs` | `cli/main.mjs` |
+| `src/cli/mcp-stdio.mjs` | `memev mcp`: an MCP server on stdio for clients that launch one | `cli/common.mjs`, `cli/daemon.mjs`, `cli/session-link.mjs`, `engine/net.mjs` | `cli/main.mjs`, `cli/remote.mjs` |
 | `src/cli/memory-cli.mjs` | `memev why`, `memev review` and `memev audit`: the same operations as the memev_why, memev_review and memev_audit tools, from a terminal, through the... | `cli/common.mjs`, `cli/daemon.mjs` | `cli/main.mjs` |
 | `src/cli/onboarding.mjs` | The onboarding checklist: what Memev did, what is ready, and the few things only you can do | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/common.mjs`, `cli/daemon.mjs`, `cli/doctor.mjs`, `cli/import.mjs`, `cli/pathsetup.mjs`, `cli/service.mjs`, `cli/tunnel.mjs`, `engine/git.mjs`, `engine/milestones.mjs`, `engine/net.mjs`, `engine/util.mjs` | `cli/clients.mjs`, `cli/main.mjs` |
 | `src/cli/pathsetup.mjs` | Getting the memev command on PATH | `cli/common.mjs`, `engine/util.mjs` | `cli/main.mjs`, `cli/onboarding.mjs` |
 | `src/cli/preflight.mjs` | `memev preflight`: what this machine allows | `cli/common.mjs`, `cli/daemon.mjs`, `cli/service.mjs`, `cli/tunnel.mjs`, `engine/util.mjs` | `cli/doctor.mjs`, `cli/main.mjs` |
 | `src/cli/ready.mjs` | `memev ready`: the end of setup, seen from the apps | `cli/clients.mjs`, `cli/daemon.mjs`, `engine/util.mjs`, `engine/vault.mjs` | `cli/main.mjs` |
 | `src/cli/relay.mjs` | The relay client: a stable address for this vault through a relay (docs/RELAY.md) | `cli/common.mjs`, `engine/license.mjs`, `engine/util.mjs` | `cli/doctor.mjs`, `cli/licensing.mjs`, `cli/tunnel.mjs` |
-| `src/cli/remote.mjs` | Using a vault that lives on another computer | `cli/clients.mjs`, `cli/common.mjs`, `cli/main.mjs`, `engine/devices.mjs`, `engine/net.mjs`, `engine/util.mjs` | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/hooks.mjs`, `cli/main.mjs` |
+| `src/cli/remote.mjs` | Using a vault that lives on another computer | `cli/clients.mjs`, `cli/common.mjs`, `cli/main.mjs`, `cli/mcp-stdio.mjs`, `engine/devices.mjs`, `engine/net.mjs`, `engine/util.mjs` | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/hooks.mjs`, `cli/main.mjs` |
 | `src/cli/runner.mjs` | `memev runner`: an opt-in background runner per seat | `engine/bus.mjs`, `engine/util.mjs`, `engine/vault.mjs` | `cli/main.mjs` |
 | `src/cli/service.mjs` | Start Memev at login: a systemd user unit on Linux, a launchd plist on macOS, a per-user Task Scheduler entry on Windows | `cli/clients.mjs`, `cli/common.mjs`, `engine/util.mjs` | `cli/clients.mjs`, `cli/doctor.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/preflight.mjs` |
+| `src/cli/session-link.mjs` | Which app session an MCP server process belongs to, so the AI's own bus calls post as that session's seat | `engine/util.mjs` | `cli/hooks.mjs`, `cli/mcp-stdio.mjs` |
 | `src/cli/setup-remote.mjs` | Customer-side remote setup session: foreground, allowlisted, logged, revocable | `cli/clients.mjs`, `cli/common.mjs`, `engine/setup-channel.mjs` | `cli/main.mjs` |
 | `src/cli/sync.mjs` | Background jobs the daemon runs, so nothing needs a person to remember it: git sync every sync.interval_min: commit, pull (merge, never force),... | `cli/clients.mjs`, `cli/github.mjs`, `engine/devices.mjs`, `engine/git.mjs`, `engine/license.mjs`, `engine/merge.mjs`, `engine/paid-merge.mjs`, `engine/tuning.mjs`, `engine/util.mjs`, `services/providers.mjs` | `cli/tunnel.mjs`, `server/main.mjs`, `services/providers.mjs` |
 | `src/cli/transcript.mjs` | Read a session transcript (JSON lines) to recover progress: the latest todo list, files edited, the last user request and the last assistant reply | `engine/oplog.mjs` | `cli/hooks.mjs` |
@@ -628,7 +634,7 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/engine/tokens.mjs` | Capability tokens: mv_<id>_<secret> | `engine/identity.mjs`, `engine/util.mjs` | `cli/common.mjs`, `cli/doctor.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/tunnel.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/contracts.mjs`, `engine/vault.mjs` |
 | `src/engine/tournament.mjs` | Tournaments: when there are competing answers (designs, explanations, hypotheses), sessions record head-to-head judgements and Elo ratings sort them | none | `engine/vault.mjs` |
 | `src/engine/tuning.mjs` | Recall tuning from use | `engine/util.mjs` | `cli/sync.mjs`, `engine/vault.mjs` |
-| `src/engine/util.mjs` | Small shared helpers: hashing, atomic files, private files, time, paths | none | `bridge/core.mjs`, `bridge/discord.mjs`, `bridge/lark.mjs`, `bridge/state.mjs`, `bridge/telegram.mjs`, `bridge/whatsapp-auth.mjs`, `bridge/whatsapp-install.mjs`, `bridge/whatsapp.mjs`, `cli/bus-cli.mjs`, `cli/chat-cli.mjs`, `cli/clients.mjs`, `cli/common.mjs`, `cli/daemon.mjs`, `cli/deployment.mjs`, `cli/doctor.mjs`, `cli/github.mjs`, `cli/hooks.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/pathsetup.mjs`, `cli/preflight.mjs`, `cli/ready.mjs`, `cli/relay.mjs`, `cli/remote.mjs`, `cli/runner.mjs`, `cli/service.mjs`, `cli/sync.mjs`, `cli/tunnel.mjs`, `cli/update.mjs`, `engine/agentid-bind.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/contracts.mjs`, `engine/coordinator.mjs`, `engine/devices.mjs`, `engine/envelope-adapters.mjs`, `engine/evidence.mjs`, `engine/git.mjs`, `engine/graph.mjs`, `engine/importers/core.mjs`, `engine/index.mjs`, `engine/license.mjs`, `engine/milestones.mjs`, `engine/notestate.mjs`, `engine/oplog.mjs`, `engine/project-store.mjs`, `engine/relationships.mjs`, `engine/state-map.mjs`, `engine/tokens.mjs`, `engine/tuning.mjs`, `engine/vault.mjs`, `server/http.mjs`, `server/main.mjs`, `server/oauth.mjs` |
+| `src/engine/util.mjs` | Small shared helpers: hashing, atomic files, private files, time, paths | none | `bridge/core.mjs`, `bridge/discord.mjs`, `bridge/lark.mjs`, `bridge/state.mjs`, `bridge/telegram.mjs`, `bridge/whatsapp-auth.mjs`, `bridge/whatsapp-install.mjs`, `bridge/whatsapp.mjs`, `cli/bus-cli.mjs`, `cli/chat-cli.mjs`, `cli/clients.mjs`, `cli/common.mjs`, `cli/daemon.mjs`, `cli/deployment.mjs`, `cli/doctor.mjs`, `cli/github.mjs`, `cli/hooks.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/pathsetup.mjs`, `cli/preflight.mjs`, `cli/ready.mjs`, `cli/relay.mjs`, `cli/remote.mjs`, `cli/runner.mjs`, `cli/service.mjs`, `cli/session-link.mjs`, `cli/sync.mjs`, `cli/tunnel.mjs`, `cli/update.mjs`, `engine/agentid-bind.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/contracts.mjs`, `engine/coordinator.mjs`, `engine/devices.mjs`, `engine/envelope-adapters.mjs`, `engine/evidence.mjs`, `engine/git.mjs`, `engine/graph.mjs`, `engine/importers/core.mjs`, `engine/index.mjs`, `engine/license.mjs`, `engine/milestones.mjs`, `engine/notestate.mjs`, `engine/oplog.mjs`, `engine/project-store.mjs`, `engine/relationships.mjs`, `engine/state-map.mjs`, `engine/tokens.mjs`, `engine/tuning.mjs`, `engine/vault.mjs`, `server/http.mjs`, `server/main.mjs`, `server/oauth.mjs` |
 | `src/engine/vault-marker.mjs` | Whether a folder is a Memev vault, without loading the vault engine | none | `cli/hooks.mjs`, `engine/vault.mjs` |
 | `src/engine/vault.mjs` | The vault: Markdown notes you own, in git, with an append-only operation log as the write-ahead log, a recall index over sections and a memory graph | `engine/bus.mjs`, `engine/contracts.mjs`, `engine/coordinator.mjs`, `engine/devices.mjs`, `engine/diff.mjs`, `engine/git.mjs`, `engine/graph.mjs`, `engine/health.mjs`, `engine/identity.mjs`, `engine/index.mjs`, `engine/notes-worker.mjs`, `engine/notestate.mjs`, `engine/oplog.mjs`, `engine/project-store.mjs`, `engine/quality.mjs`, `engine/secrets.mjs`, `engine/segment-index.mjs`, `engine/segment.mjs`, `engine/tokens.mjs`, `engine/tournament.mjs`, `engine/tuning.mjs`, `engine/util.mjs`, `engine/vault-marker.mjs` | `cli/agentid.mjs`, `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/compact.mjs`, `cli/doctor.mjs`, `cli/import.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/ready.mjs`, `cli/runner.mjs`, `cli/update.mjs`, `cli/work-store.mjs`, `cli/work.mjs`, `engine/importers/core.mjs`, `server/http.mjs`, `server/main.mjs`, `server/mcp.mjs` |
 | `src/engine/zip.mjs` | A minimal ZIP reader for chat export files: stored and DEFLATE entries, no zip64, no encryption | none | `engine/importers/exports.mjs` |
