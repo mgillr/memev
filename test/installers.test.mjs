@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
-import net from 'node:net';
+import { freePort as reservedPort } from './helpers/cli.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,15 +20,9 @@ function cleanEnv(home, extra = {}) {
   };
 }
 
+// The run-wide reservation in helpers/cli.mjs: a port freed here could be handed to another test file before install.sh binds it (issue 457).
 function freePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const port = server.address().port;
-      server.close(() => resolve(port));
-    });
-  });
+  return Promise.resolve(reservedPort());
 }
 
 function processCommand(pid) {

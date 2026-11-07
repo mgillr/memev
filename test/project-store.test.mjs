@@ -214,25 +214,31 @@ test('SO-07-A AC07: one writer holds the lock and a second process is told to re
   const root = tmpdir();
   const id = 'proj-7';
   const dir = dirOf(root, id);
-  // the holder: opens the store, takes the lock, sleeps, then appends and releases
+  // The two processes are lined up by files, never by sleeps (issue 457): the holder says it holds the lock, the contender says it
+  // was told to retry, and only then is the holder let go. A slow start on a busy runner makes the test slower, not wrong.
+  const sig = tmpdir();
   const holder = `
+    import fs from 'node:fs';
     import { ProjectStore } from ${JSON.stringify(path.resolve('src/engine/project-store.mjs'))};
     const store = new ProjectStore(process.env.PS_ROOT, { id: process.env.PS_ID, deviceId: 'holder' }).open();
     const done = store.withWrite((s) => {
+      fs.writeFileSync(process.env.PS_SIG + '/locked', '');
       const t0 = Date.now();
-      while (Date.now() - t0 < 900) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1); }
+      while (!fs.existsSync(process.env.PS_SIG + '/release') && Date.now() - t0 < 60000) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10); }
       return s.append({ type: 'task.created', key: 'holder-1', entity: { kind: 'task', data: { title: 'held' } } });
     });
     process.stdout.write(JSON.stringify({ busy: !!done?.busy, seq: done?.seq ?? null }));
   `;
   const contender = `
+    import fs from 'node:fs';
     import { ProjectStore } from ${JSON.stringify(path.resolve('src/engine/project-store.mjs'))};
     const store = new ProjectStore(process.env.PS_ROOT, { id: process.env.PS_ID, deviceId: 'contender' }).open();
     const first = store.append({ type: 'task.created', key: 'contender-1', entity: { kind: 'task', data: { title: 'retry' } } });
     const out = { busy: !!first?.busy, seq: first?.seq ?? null };
     if (first?.busy) {
+      fs.writeFileSync(process.env.PS_SIG + '/told', '');
       const t0 = Date.now();
-      while (Date.now() - t0 < 2000) {
+      while (Date.now() - t0 < 60000) {
         const r = store.append({ type: 'task.created', key: 'contender-1', entity: { kind: 'task', data: { title: 'retry' } } });
         if (!r?.busy) { out.seq = r.seq; break; }
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
@@ -241,15 +247,21 @@ test('SO-07-A AC07: one writer holds the lock and a second process is told to re
     process.stdout.write(JSON.stringify(out));
   `;
   const run = (code) => new Promise((resolve, reject) => {
-    const p = spawn(process.execPath, ['--input-type=module', '-e', code], { env: { ...process.env, PS_ROOT: root, PS_ID: id }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(process.execPath, ['--input-type=module', '-e', code], { env: { ...process.env, PS_ROOT: root, PS_ID: id, PS_SIG: sig }, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '', err = '';
     p.stdout.on('data', (d) => { out += d; });
     p.stderr.on('data', (d) => { err += d; });
     p.on('close', (code) => (code === 0 ? resolve(out) : reject(new Error(`child exited ${code}: ${err}`))));
   });
-  const holderP = run(holder);
-  await new Promise((r) => setTimeout(r, 300));
-  const contenderOut = JSON.parse(await run(contender));
+  const until = async (ok, ms) => { const t0 = Date.now(); while (!ok()) { if (Date.now() - t0 > ms) return false; await new Promise((r) => setTimeout(r, 20)); } return true; };
+  let ended = 0;
+  const holderP = run(holder).finally(() => { ended++; });
+  assert.ok(await until(() => fs.existsSync(path.join(sig, 'locked')) || ended, 60000), 'the holder did not take the lock in 60 s');
+  const contenderP = run(contender).finally(() => { ended++; });
+  // the contender was told to retry, or it ended without being told: either way the holder is let go, and the asserts below judge
+  await until(() => fs.existsSync(path.join(sig, 'told')) || ended, 60000);
+  fs.writeFileSync(path.join(sig, 'release'), '');
+  const contenderOut = JSON.parse(await contenderP);
   const holderOut = JSON.parse(await holderP);
   assert.equal(holderOut.busy, false, 'the holder could not take the lock');
   assert.equal(contenderOut.busy, true, 'the contender was not told to retry while the lock was held');

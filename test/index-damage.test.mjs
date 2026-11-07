@@ -18,6 +18,7 @@ import { fileChecks } from '../src/cli/doctor.mjs';
 import { commandOf, isDaemonCommand, isDaemonPid, SERVING_VERBS } from '../src/engine/util.mjs';
 import { createServer } from '../src/server/http.mjs';
 import { TokenStore } from '../src/engine/tokens.mjs';
+import { freePort } from './helpers/cli.mjs';
 
 const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SEG_SRC = pathToFileUrl(path.join(PKG, 'src/engine/segment.mjs'));
@@ -420,7 +421,7 @@ test('every way of serving a vault is known as a daemon, and a new one cannot be
 });
 
 test('the image\'s entry, memev container, as a real daemon: a second daemon is refused, and memev stop stops it and it is gone', { skip: process.platform === 'win32' }, async () => {
-  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'memev-entry-')), 'vault'); made.push(path.dirname(root)); fs.mkdirSync(root); const port = 47700 + (process.pid % 200); const bin = path.join(PKG, 'bin/memev.mjs');
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'memev-entry-')), 'vault'); made.push(path.dirname(root)); fs.mkdirSync(root); const port = freePort({ span: 2 }); /* the entry's port and the second daemon's, reserved for this run (issue 457) */ const bin = path.join(PKG, 'bin/memev.mjs');
   const env = { ...process.env, MEMEV_NO_SERVICE: '1', MEMEV_NO_TUNNEL: '1', MEMEV_ROOT: root, HOME: path.dirname(root), MEMEV_PORT: String(port) };
   const c = spawn(process.execPath, [bin, 'container'], { stdio: ['ignore', 'ignore', 'pipe'], env, cwd: root }); let err = ''; c.stderr.on('data', (d) => { err += d; });
   try {

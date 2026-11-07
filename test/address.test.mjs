@@ -27,12 +27,16 @@ function listen() {
   });
 }
 
+// An address where nothing answers. A port freed again could be bound by another test file before the fetch (MEM-026 AC02 failed
+// so on a 4-way runner, issue 457), so a server that resets every connection keeps the port until this file ends.
+const unanswering = [];
+after(() => { for (const s of unanswering) s.close(); });
 async function closedUrl() {
   const server = http.createServer();
+  server.on('connection', (socket) => socket.destroy());
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const url = `http://127.0.0.1:${server.address().port}`;
-  await new Promise((resolve) => server.close(resolve));
-  return url;
+  unanswering.push(server);
+  return `http://127.0.0.1:${server.address().port}`;
 }
 
 function joined(env, { url, backup, pubkey }) {
