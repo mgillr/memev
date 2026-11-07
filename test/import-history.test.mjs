@@ -168,6 +168,15 @@ test('history import is idempotent: the same conversation never makes two notes,
   assert.equal(r2.conversations, 0, 'nothing new');
   assert.equal(r2.already, 3, 'all three counted as already imported');
   assert.equal(r2.id, null, 'no empty import is recorded');
+  // a session already imported is known by its file name: a third run does not open the file at all
+  const sessionFile = path.join(home, '.claude', 'projects', '-home-user-zephyr', '5e550000-0000-4000-8000-000000000001.jsonl');
+  if (process.platform !== 'win32' && process.getuid?.() !== 0) {
+    fs.chmodSync(sessionFile, 0o000);
+    try {
+      const r2b = await runFullImport(v, OWNER, { history: ['claude-code'], env });
+      assert.deepEqual([r2b.already, r2b.skipped], [1, 1], 'counted as already imported, not as unreadable');
+    } finally { fs.chmodSync(sessionFile, 0o644); }
+  }
   // a newer export of the same account: the conversation was renamed, and its id is the same
   const renamed = JSON.parse(fixture('chatgpt-conversations.json')); renamed[0].title = 'Renamed garden plan';
   const later = put(path.join(home, 'Downloads', 'chatgpt-export-later.zip'), makeZip([{ name: 'conversations.json', data: JSON.stringify(renamed) }]));
@@ -368,5 +377,21 @@ test('history project choice: claude-code/<project folder> imports that project 
   assert.equal(one.counts.found, 1);
   const all = await walkHistory(v, OWNER, ['claude-code'], { env });
   assert.equal(all.counts.found, 2);
+  v.close();
+});
+
+test('history damaged export: a zip cut short imports what it could read and counts the rest as unreadable, without throwing', async () => {
+  const home = tmpdir('hist-cut-');
+  // a deflated entry whose data is damaged after its first bytes; the local header and the directory say deflate
+  const raw = zlib.deflateRawSync(fixture('claude-conversations.json'));
+  const zip = put(path.join(home, 'cut.zip'), makeZip([{ name: 'conversations.json', data: Buffer.concat([raw.subarray(0, 40), Buffer.alloc(raw.length - 40, 0xff)]) }]));
+  const buf = fs.readFileSync(zip);
+  buf.writeUInt16LE(8, 8);
+  buf.writeUInt16LE(8, buf.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02])) + 10);
+  fs.writeFileSync(zip, buf);
+  const { v } = newVault();
+  const r = await runFullImport(v, OWNER, { history: [`export:${zip}`], env: { HOME: home } });
+  assert.equal(r.conversations, 0);
+  assert.ok(r.skipped >= 1, JSON.stringify(r));
   v.close();
 });

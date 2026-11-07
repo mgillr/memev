@@ -93,6 +93,7 @@ const claudeCode = {
     }
     return out;
   },
+  idHint: ({ file }) => path.basename(file, '.jsonl'),
   async *read({ file, project }) {
     const turns = []; let id = path.basename(file, '.jsonl'), title = null, cwd = null, first = null, last = null;
     for await (const r of jsonlRecords(file)) {
@@ -127,6 +128,7 @@ const codex = {
     walk(path.join(path.dirname(this.root(env)), 'archived_sessions'), 0);
     return out;
   },
+  idHint: ({ file }) => (/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i.exec(file) || [])[1] || null,
   async *read({ file }) {
     const turns = []; let id = null, cwd = null, first = null, last = null;
     for await (const r of jsonlRecords(file)) {
@@ -228,6 +230,7 @@ const qwen = {
     }
     return out;
   },
+  idHint: ({ file }) => path.basename(file, '.jsonl'),
   async *read({ file, project }) {
     const turns = []; let id = path.basename(file, '.jsonl'), cwd = null, first = null, last = null;
     for await (const r of jsonlRecords(file)) {
@@ -554,18 +557,27 @@ function sourcesFor(selection, env) {
   return out;
 }
 
-async function* conversationsOf(sel, env, { maxItemBytes = MAX_ITEM_BYTES } = {}) {
+async function* conversationsOf(sel, env, { maxItemBytes = MAX_ITEM_BYTES, known = null } = {}) {
   if (sel.kind === 'export') {
-    for await (const r of exportConversations(sel.file, { maxItemBytes })) {
-      if (r.skip) { yield { skip: r.skip, title: `conversation of ${short(path.basename(sel.file), 40)}`, app: 'export' }; continue; }
-      const appId = r.conv.format === 'chatgpt' ? 'chatgpt' : 'claude';
-      yield { conv: r.conv, appId, app: r.conv.format === 'chatgpt' ? 'ChatGPT' : 'Claude', source: `${r.conv.format === 'chatgpt' ? 'ChatGPT' : 'Claude'} export (${path.basename(sel.file)})`, sourcePath: sel.file };
+    try {
+      for await (const r of exportConversations(sel.file, { maxItemBytes })) {
+        if (r.skip) { yield { skip: r.skip, title: `conversation of ${short(path.basename(sel.file), 40)}`, app: 'export' }; continue; }
+        const appId = r.conv.format === 'chatgpt' ? 'chatgpt' : 'claude';
+        yield { conv: r.conv, appId, app: r.conv.format === 'chatgpt' ? 'ChatGPT' : 'Claude', source: `${r.conv.format === 'chatgpt' ? 'ChatGPT' : 'Claude'} export (${path.basename(sel.file)})`, sourcePath: sel.file };
+      }
+    } catch {
+      // a damaged zip or a file cut short: what was read stays imported, and the rest is counted as unreadable
+      yield { skip: 'unreadable', title: path.basename(sel.file), app: 'export' };
     }
     return;
   }
   const s = sel.source;
   for (const f of s.files(env)) {
     if (sel.project && f.project !== sel.project) continue;
+    // a session named by its id, already imported: counted without reading the file again, so a second import of
+    // gigabytes of session logs takes a directory listing
+    const hint = s.idHint ? s.idHint(f) : null;
+    if (hint && known && known.has(KEY_HASH(`${s.id}:${hint}`))) { yield { already: true }; continue; }
     try {
       for await (const conv of s.read(f)) yield { conv, appId: s.id, app: s.app, source: `${s.app} session (${f.file})`, sourcePath: f.file };
     } catch { yield { skip: 'unreadable', title: path.basename(f.file), app: s.id }; }
@@ -588,9 +600,10 @@ export async function walkHistory(vault, identity, selection, { env, importId = 
   for (const sel of sourcesFor(selection, env)) {
     const per = { id: sel.id, found: 0, new: 0, secret: 0, too_large: 0, already: 0, empty: 0, unreadable: 0 };
     bySource.set(sel.id, per);
-    for await (const r of conversationsOf(sel, env, { maxItemBytes })) {
+    for await (const r of conversationsOf(sel, env, { maxItemBytes, known })) {
       counts.found++; per.found++;
       const bump = (k) => { counts[k]++; per[k]++; };
+      if (r.already) { bump('already'); continue; }
       if (r.skip) { bump(r.skip === 'too large' ? 'too_large' : 'unreadable'); if (listed.length < listMax) listed.push({ title: r.title, reason: r.skip, source: sel.id }); continue; }
       const { conv } = r;
       const key = conversationKey(r.appId, conv, r.sourcePath);

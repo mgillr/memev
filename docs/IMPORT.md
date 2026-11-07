@@ -30,7 +30,7 @@ plan nothing.
 | Source id | App | Where Memev looks | Read from |
 |---|---|---|---|
 | `claude-code` | Claude Code | `~/.claude/projects/<project>/<session>.jsonl` (`CLAUDE_CONFIG_DIR` moves `~/.claude`) | [sessions](https://code.claude.com/docs/en/sessions), [.claude directory](https://code.claude.com/docs/en/claude-directory), [Agent SDK session reader](https://github.com/anthropics/claude-agent-sdk-python/blob/main/src/claude_agent_sdk/_internal/sessions.py) |
-| `codex` | Codex CLI | `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl` and `archived_sessions/` (`CODEX_HOME` is `~/.codex` by default) | [environment variables](https://learn.chatgpt.com/docs/config-file/environment-variables), [rollout recorder](https://github.com/openai/codex/tree/main/codex-rs/rollout/src) |
+| `codex` | Codex CLI | `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl` and `archived_sessions/` (`CODEX_HOME` is `~/.codex` by default); a compressed `.jsonl.zst` rollout is not read | [environment variables](https://learn.chatgpt.com/docs/config-file/environment-variables), [rollout recorder](https://github.com/openai/codex/tree/main/codex-rs/rollout/src) |
 | `gemini-cli` | Gemini CLI | `~/.gemini/tmp/<project>/chats/session-*.jsonl` or `.json` (`GEMINI_CLI_HOME` moves the home) | [session management](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/session-management.md?plain=1), [chat recording types](https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/services/chatRecordingTypes.ts) |
 | `qwen-code` | Qwen Code | `~/.qwen/projects/<project>/chats/<session>.jsonl` (`QWEN_RUNTIME_DIR` or `QWEN_HOME` moves `~/.qwen`) | [storage](https://github.com/QwenLM/qwen-code/blob/main/packages/core/src/config/storage.ts), [chat recording](https://github.com/QwenLM/qwen-code/blob/main/packages/core/src/services/chatRecordingService.ts) |
 | `jan` | Jan | `<Jan data folder>/threads/<thread>/messages.jsonl` and `thread.json`, in the default data folder | [data folder](https://docs.jan.ai/desktop/data-folder) |
@@ -114,7 +114,9 @@ Every conversation has a key: the app plus the conversation's own id (the ChatGP
 or Claude conversation id, or the session id). The key's hash is part of the note's
 name, so an import that finds the note already there skips that conversation. A
 later export of the same account, with a conversation renamed, does not make a
-second note. A session that went on after it was imported is not brought up to
+second note. A session file named by its session id (Claude Code, Codex,
+Qwen Code) is known from its name alone, so a second import does not read it
+again. A session that went on after it was imported is not brought up to
 date. To import it again in full, undo the import that brought it in, then
 import again.
 
