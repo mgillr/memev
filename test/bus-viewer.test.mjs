@@ -13,6 +13,8 @@ const device = { id: 'dev_viewerhost00', kind: 'host', label: 'box', status: 'ac
 const devices = { hostId: device.id, get: (id) => (id === device.id ? device : null), list: () => [device] };
 const ID = { id: 't', agent: 't', scopes: ['read', 'write'], paths: ['**'] };
 const ctxOf = (client) => ({ identity: ID, client, device });
+// the vault's own terminal, as the desktop viewer runs it
+const termOf = (client) => ({ identity: ID, client, device, cli: true, local: true });
 const dirs = []; after(() => { for (const d of dirs) fs.rmSync(d, { recursive: true, force: true }); });
 
 function fixture() {
@@ -38,12 +40,21 @@ test('unread with peek and quiet shows the messages and changes no presence, no 
   const root = fixture();
   const bus = new Bus({ root, devices });
   const before = pulseOf(root, 'beta'); const log = logOf(root);
-  const r = bus.unread(ctxOf('beta'), { seat: 'beta@box', peek: true, quiet: true, capped: true });
+  const r = bus.unread(termOf('beta'), { seat: 'beta@box', peek: true, quiet: true, capped: true });
   assert.equal(r.messages.length, 2);
   assert.deepEqual(r.acked, []);
   assert.equal(pulseOf(root, 'beta'), before, 'the pulse file changed');
   assert.equal(logOf(root), log, 'a comms check was answered');
-  assert.equal(bus.unread(ctxOf('beta'), { seat: 'beta@box', peek: true, quiet: true, capped: true }).messages.length, 2, 'messages were marked read');
+  assert.equal(bus.unread(termOf('beta'), { seat: 'beta@box', peek: true, quiet: true, capped: true }).messages.length, 2, 'messages were marked read');
+});
+
+test('an AI app asking for quiet over MCP still records presence and answers a comms check: only the terminal reads quietly', () => {
+  const root = fixture();
+  const bus = new Bus({ root, devices });
+  const before = pulseOf(root, 'beta');
+  const r = bus.unread(ctxOf('beta'), { seat: 'beta@box', peek: true, quiet: true, capped: true });
+  assert.notEqual(pulseOf(root, 'beta'), before, 'the app read without showing it is alive');
+  assert.deepEqual(r.acked, ['viewerho-2']);
 });
 
 test('unread with peek alone still records presence and answers a comms check, as before', () => {

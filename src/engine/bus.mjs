@@ -689,7 +689,8 @@ export class Bus {
     // what this call saw: the bus position and, per device, the highest counter
     const frontier = all.length ? all[all.length - 1].seq : (p.seen_seq || 0);
     const seenDseq = this.counters();
-    const silent = peek && quiet;
+    // only the vault's own terminal (the desktop viewer runs it) may read quietly; an AI app's read always shows it is alive
+    const silent = peek && quiet && !!(ctx.cli && ctx.local);
     if (!silent) this.pulse(ctx, { who, read: peek ? null : st.read, readExtra: peek ? null : st.extra, seen: peek ? null : frontier, seenDseq: peek ? null : seenDseq });
     const acked = [];
     for (const m of silent ? [] : ackOf) {
