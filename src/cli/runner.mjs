@@ -90,6 +90,17 @@ export function shouldRun(e, m, seat, now = new Date(), names = null, fromOk = (
   return { ok: true, reason: null };
 }
 
+/** Runs per day for the last `days` days, oldest first, from the kept run times (the last 1,000). UTC days. */
+export function runsByDay(e, days = 7, now = new Date()) {
+  const n = Math.max(1, Math.min(90, Math.floor(Number(days)) || 7));
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i)).toISOString().slice(0, 10);
+    out.push({ day: d, runs: (e?.runs || []).filter((ts) => String(ts).slice(0, 10) === d).length });
+  }
+  return out;
+}
+
 export function recordRun(e, ts) {
   return { ...e, runs: [...(e?.runs || []), ts].slice(-1000) };
 }
@@ -262,6 +273,7 @@ export async function command(cmd, pos, flags, { root, env }) {
       max_runs_per_day: e.max_runs_per_day ?? null,
       cmd: e.cmd || null,
       today: runsToday(e).length,
+      ...(flags.days ? { by_day: runsByDay(e, Number(flags.days)) } : {}),
     }));
     if (flags.json) {
       console.log(JSON.stringify(rows, null, 2));
