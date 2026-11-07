@@ -1600,10 +1600,10 @@
           }
         },
         {
-          "statement": "T7-c10: this contract's own record says what it is: every round of contracts/seed-readiness/redteam/SR-0.04.json begins 'second seat on the same machine' and then says whether the criteria were run or only read",
+          "statement": "T7-c10: this contract's own record says what it is: every round of contracts/seed-readiness/redteam/SR-0.04.json begins 'second seat on the same machine' and then says whether the criteria were run or only read, except round 5, whose notes began 'second seat on the same machine; the gate run' by mistake and cannot be changed; round 5 passes only while its notes are exactly the text first committed (sha256 9a1b89770bde931584e02083bfe72c133acf14afe84c1fbb1b7a0507483670ba) and round 6's notes carry the correction",
           "verifier": {
             "type": "command",
-            "cmd": "node -e \"const fs=require('fs');const p='contracts/seed-readiness/redteam/SR-0.04.json';if(!fs.existsSync(p)){console.error(p+' is missing');process.exit(1)}const r=JSON.parse(fs.readFileSync(p,'utf8'));const re=/^second seat on the same machine[;,.:]? (ran the criteria|only read the criteria)/;const bad=(r.rounds||[]).filter((x)=>!re.test(String(x.notes||'')));if(!(r.rounds||[]).length||bad.length){console.error('rounds without the opening: '+(bad.map((x)=>x.round).join(', ')||'no rounds'));process.exit(1)}\"",
+            "cmd": "node -e \"const fs=require('fs');const crypto=require('crypto');const p='contracts/seed-readiness/redteam/SR-0.04.json';if(!fs.existsSync(p)){console.error(p+' is missing');process.exit(1)}const r=JSON.parse(fs.readFileSync(p,'utf8'));const re=/^second seat on the same machine[;,.:]? (ran the criteria|only read the criteria)/;const r6=(r.rounds||[]).find((x)=>x.round===6);const fixed=!!r6&&String(r6.notes||'').includes('Correction of round 5: its notes opened with the gate run instead of saying whether the criteria were run or only read, as T7-c10 requires');const ok5=(x)=>x.round===5&&fixed&&crypto.createHash('sha256').update(String(x.notes||'')).digest('hex')==='9a1b89770bde931584e02083bfe72c133acf14afe84c1fbb1b7a0507483670ba';const bad=(r.rounds||[]).filter((x)=>!re.test(String(x.notes||''))&&!ok5(x));if(!(r.rounds||[]).length||bad.length){console.error('rounds without the opening: '+(bad.map((x)=>x.round).join(', ')||'no rounds'));process.exit(1)}\"",
             "timeout_s": 120
           }
         },

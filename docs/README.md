@@ -24,6 +24,7 @@ this folder links back here, and this page links down to every page.
 | [DESIGN.md](DESIGN.md) | the log, the index, recall, memory quality, the graph, scale |
 | [MAPPING.md](MAPPING.md) | everything Memev does without being asked |
 | [BUS.md](BUS.md) | the comms bus: seats, the lead, roster, comms checks, tasks |
+| [CHAT.md](CHAT.md) | talk with the lead from your phone: Telegram, WhatsApp, Discord and Lark |
 | [CONTRACTS.md](CONTRACTS.md) | signed, immutable work contracts |
 | [PROJECTS.md](PROJECTS.md) | the project layer: task states, the transition table, derived project status |
 | [OPERATION-ENVELOPE.md](OPERATION-ENVELOPE.md) | the one record shape for an operation: fields, canonical serialisation, content hash, merge contract hash, versioning |

@@ -10,6 +10,12 @@ import { git } from '../engine/git.mjs';
 import { commsCheckView, commsCredentialFailure, fileOf, hasRead, label } from '../engine/bus.mjs';
 import { readJson } from '../engine/util.mjs';
 
+/** Messages from one seat and/or to one seat. A message to several seats names them with commas; one to all is to every seat. */
+export function filterMessages(messages, { from = null, to = null } = {}) {
+  const f = from ? String(from) : null; const t = to ? String(to) : null;
+  return (messages || []).filter((m) => (!f || m.from === f) && (!t || m.to === 'all' || String(m.to || '').split(',').map((x) => x.trim()).includes(t)));
+}
+
 // ---- setting the bus up: init, connect and the doctor share this
 // Every app that is found gets a seat at once. The lead (operator) seat is always the person's
 // choice: asked on a terminal, given with --lead or MEMEV_LEAD, or left for later. Never automatic.
@@ -152,7 +158,9 @@ export async function command(cmd, pos, flags, { root, env }) {
   }
   if (sub === 'tail' || sub === 'since') {
     const r = sub === 'tail' ? await call('bus_tail', { n: Number(flags.n || 20), type: flags.type }) : await call('bus_since', { seq: Number(pos[1] || 0), limit: Number(flags.n || 50) });
-    if (flags.json) json(r.messages); else for (const m of r.messages) console.log(line(m));
+    // --from and --to filter what the bus returned; nothing is marked read (a viewer such as the desktop app follows one seat this way)
+    const msgs = filterMessages(r.messages, { from: flags.from, to: flags.to });
+    if (flags.json) json(msgs); else for (const m of msgs) console.log(line(m));
     return 0;
   }
   if (sub === 'tasks') {
@@ -161,7 +169,7 @@ export async function command(cmd, pos, flags, { root, env }) {
     for (const t of r.tasks) console.log(`  ${t.id.padEnd(14)} ${t.state.padEnd(8)} → ${t.to.padEnd(22)} ${t.claimed_by ? `claimed by ${t.claimed_by}` : 'unclaimed'}${t.operator ? '' : ' (agent request)'}  ${t.body.slice(0, 80)}`);
     return 0;
   }
-  if (sub === 'unread') { const r = await call('bus_unread', { seat: pos[1] }); if (flags.json) json(r); else { if (r.hold) out.warn(`on hold: ${r.hold.reason}`); for (const m of r.messages) console.log(line(m)); } return 0; }
+  if (sub === 'unread') { const r = await call('bus_unread', { seat: pos[1], ...(flags.peek ? { peek: true, quiet: true } : {}) }); if (flags.json) json(r); else { if (r.hold) out.warn(`on hold: ${r.hold.reason}`); for (const m of r.messages) console.log(line(m)); } return 0; }
   if (sub === 'watch') {
     const seat = pos[1]; if (!seat) throw new Error('memev bus watch <seat>  (memev bus roster lists them)');
     const every = Math.max(2, Number(flags.interval || 5)) * 1000;

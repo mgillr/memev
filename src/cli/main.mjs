@@ -58,6 +58,7 @@ Setup
                                    (Business and Corporate; verify is free)
   memev report [status [--json]|on|off|show|send]  the anonymous milestone report: off unless you turn it on; show prints what would be sent
   memev bus roster|check|send|tail|tasks|watch <seat>|operator <seat>   the comms bus between your AI apps
+  memev chat status|telegram|whatsapp|lark ...   talk with your lead from your phone (memev chat help; docs/CHAT.md)
   memev runner on|off|watch|status <seat> [--max-runs-per-day N] [--command CMD]   an opt-in background runner: a headless turn of the
                                     seat's app when the operator posts it a task, at most N runs a day (you give N; there is no default)
 
@@ -93,7 +94,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', deployment: './deployment.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', agentid: './agentid.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', update: './update.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs', compact: './compact.mjs', setup: './setup-remote.mjs', import: './import.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', deployment: './deployment.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', chat: './chat-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', agentid: './agentid.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', update: './update.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs', compact: './compact.mjs', setup: './setup-remote.mjs', import: './import.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
@@ -101,12 +102,20 @@ const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
  * The launcher every app runs on macOS and Linux. It uses node from PATH when that is Node 22 or newer, and otherwise
  * the Node recorded at install, so a Node upgrade that removes the old binary does not stop Memev in every app.
  */
-export function launcherScript(node, target) {
+/**
+ * Folders an installer bundles tools in (its own git, for example), from MEMEV_TOOLS_PATH at install: each must be an absolute
+ * path to an existing folder. The launcher puts them first on PATH, so the core run by an AI app or the login service uses them too.
+ */
+export function toolsPath(env = process.env) {
+  return String(env.MEMEV_TOOLS_PATH || '').split(path.delimiter).filter((d) => d && path.isAbsolute(d) && fs.existsSync(d) && fs.statSync(d).isDirectory());
+}
+
+export function launcherScript(node, target, tools = []) {
   return `#!/bin/sh
 # node from PATH when it is Node 22 or newer, otherwise the Node recorded at install
 REC=${sq(node)}
 JS=${sq(target)}
-N=$(command -v node 2>/dev/null)
+${tools.length ? `# the tools the installer bundled come first on PATH\nPATH=${sq(tools.join(':'))}:"$PATH"; export PATH\n` : ''}N=$(command -v node 2>/dev/null)
 if [ -n "$N" ] && [ "$N" != "$REC" ]; then
   V=$("$N" --version 2>/dev/null); V=\${V#v}; V=\${V%%.*}
   case "$V" in ''|*[!0-9]*) ;; *) [ "$V" -ge 22 ] && exec "$N" "$JS" "$@" ;; esac
@@ -149,6 +158,12 @@ export function recordedNode(env = process.env) {
   return process.execPath;
 }
 
+/** The Windows launcher: the bundled tools first on PATH, inside setlocal so the caller's PATH is untouched. */
+export function windowsLauncher(node, target, tools = []) {
+  const pre = tools.length ? `@setlocal\r\n@set "PATH=${tools.join(';')};%PATH%"\r\n` : '';
+  return `${pre}@"${node}" "${target}" %*\r\n`;
+}
+
 export function installRuntime(env = process.env) {
   const dir = path.join(configDir(env), 'runtime', VERSION);
   if (path.resolve(PKG) !== path.resolve(dir)) {
@@ -158,8 +173,8 @@ export function installRuntime(env = process.env) {
   const bin = path.join(configDir(env), 'bin');
   fs.mkdirSync(bin, { recursive: true });
   const target = path.join(dir, 'bin', 'memev.mjs');
-  if (process.platform === 'win32') fs.writeFileSync(path.join(bin, 'memev.cmd'), `@"${process.execPath}" "${target}" %*\r\n`);
-  else writeAtomic(path.join(bin, 'memev'), launcherScript(recordedNode(env), target), 0o755);
+  if (process.platform === 'win32') fs.writeFileSync(path.join(bin, 'memev.cmd'), windowsLauncher(process.execPath, target, toolsPath(env)));
+  else writeAtomic(path.join(bin, 'memev'), launcherScript(recordedNode(env), target, toolsPath(env)), 0o755);
   return { dir, launcher: path.join(bin, process.platform === 'win32' ? 'memev.cmd' : 'memev') };
 }
 

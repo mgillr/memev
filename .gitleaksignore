@@ -4,3 +4,7 @@ d27b85b3fc209cc6444f7e644dd8c3607b50b76d:test/support.test.mjs:aws-access-token:
 
 # test-only key header string from 9518b98, not key material
 9518b981b3fad5af35f7ea8cd9b387ebe45fd242:src/engine/agentid-bind.mjs:private-key:221
+
+# A fake AWS key in a test fixture (test/chat-bridge.test.mjs, commit 86bc7a1, branch core/chat-bridge), kept in history because
+# history is never rewritten. The test will build the value from parts.
+86bc7a1faa26da8df088ce6d19cf6edb90fc85e3:test/chat-bridge.test.mjs:aws-access-token:153
