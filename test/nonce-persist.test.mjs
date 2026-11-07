@@ -77,22 +77,29 @@ test('T4-c03: a nonce used before a server restart is refused after it', async (
   assert.equal((await post(r.url, sign(r))).status, 200, 'signed after the restart');
 });
 
-test('killed daemon restart', async () => {
-  const r = await rig();
+/** The real daemon on this rig's vault, as its own process: start it, and kill it with no warning. */
+function daemonOn(r) {
   const conf = tmpdir('nonce-persist-conf-'); const port = freePort();
-  await r.close();
   const env = { ...process.env, HOME: conf, MEMEV_CONFIG_DIR: conf, MEMEV_NO_TUNNEL: '1', MEMEV_NO_SERVICE: '1' };
-  const daemon = async () => {
+  const url = `http://127.0.0.1:${port}`;
+  const start = async (withinMs = 30000) => {
     const child = spawn(process.execPath, [path.join(PKG, 'src', 'server', 'main.mjs'), '--root', r.root, '--port', String(port)], { env, stdio: 'ignore' });
     kids.add(child); child.once('exit', () => kids.delete(child));
-    const until = Date.now() + 30000;
+    const until = Date.now() + withinMs;
     for (;;) {
-      try { if ((await fetch(`http://127.0.0.1:${port}/healthz`)).ok) return child; } catch { /* not up yet */ }
-      assert.ok(Date.now() < until, 'the daemon came up');
-      await new Promise((res) => setTimeout(res, 100));
+      try { if ((await fetch(`${url}/healthz`)).ok) return child; } catch { /* not up yet */ }
+      assert.ok(Date.now() < until, `the daemon answered /healthz within ${withinMs} ms`);
+      await new Promise((res) => setTimeout(res, 50));
     }
   };
-  const url = `http://127.0.0.1:${port}`;
+  const kill = async (child) => { const gone = new Promise((res) => child.once('exit', res)); child.kill('SIGKILL'); await gone; };
+  return { url, start, kill };
+}
+
+test('killed daemon restart', async () => {
+  const r = await rig();
+  await r.close();
+  const { url, start, kill } = daemonOn(r);
   // the signal goes in the same tick the response headers arrive, so what is on disk then is all there is
   const sendThenKill = (headers, child) => new Promise((resolve, reject) => {
     const gone = new Promise((res) => child.once('exit', res));
@@ -100,14 +107,70 @@ test('killed daemon restart', async () => {
     req.on('error', reject); req.end(BODY);
   });
 
-  let child = await daemon();
+  let child = await start();
   const headers = sign(r);
   assert.equal(await sendThenKill(headers, child), 200);
-  child = await daemon();
+  child = await start();
   try {
     refusedAsUsed(await post(url, headers), 'replayed after a killed daemon came back');
     assert.equal((await post(url, sign(r))).status, 200, 'a fresh request is served');
-  } finally { child.kill('SIGKILL'); await new Promise((res) => child.once('exit', res)); }
+  } finally { await kill(child); }
+});
+
+const halve = (f) => fs.writeFileSync(f, fs.readFileSync(f).subarray(0, Math.floor(fs.statSync(f).size / 2)));
+const word = (w) => (f) => fs.writeFileSync(f, w);
+const canLockOut = process.platform !== 'win32' && process.getuid?.() !== 0;
+const lockOut = (f) => fs.chmodSync(f, 0o000);
+
+/** Use a request on the real daemon, kill it, damage the store, and start again. The replay and a fresh request are the caller's. */
+async function damagedDaemon(damage) {
+  const r = await rig();
+  await r.close();
+  const d = daemonOn(r);
+  let child = await d.start();
+  const old = sign(r);
+  assert.equal((await post(d.url, old)).status, 200, 'the first use');
+  await d.kill(child);
+  damage(r.store);
+  child = await d.start(6000);
+  return { r, d, old, child };
+}
+
+test('damaged store', async () => {
+  for (const damage of [halve, word('not json')]) {
+    const { r, d, old, child } = await damagedDaemon(damage);
+    try {
+      assert.equal((await post(d.url, old)).status, 401, 'the replay');
+      assert.equal((await post(d.url, sign(r))).status, 200, 'a fresh request');
+    } finally { await d.kill(child); }
+  }
+});
+
+test('unreadable or malformed store', async () => {
+  for (const damage of [word('null'), word('42'), ...(canLockOut ? [lockOut] : [])]) {
+    const { r, d, old, child } = await damagedDaemon(damage);
+    try {
+      const replay = await post(d.url, old);
+      assert.equal(replay.status, 401, 'the replay');
+      assert.notEqual(replay.json.error, 'unauthorized');
+      assert.equal((await post(d.url, sign(r))).status, 200, 'a fresh request');
+    } finally { await d.kill(child); }
+  }
+});
+
+test('damage is not forgotten', async () => {
+  for (const damage of [halve, word('not json'), word('null'), ...(canLockOut ? [lockOut] : [])]) {
+    const { r, d, old, child } = await damagedDaemon(damage);
+    assert.equal((await post(d.url, sign(r))).status, 200, 'a fresh request after the damage');
+    await d.kill(child);
+    const again = await d.start();
+    try {
+      const replay = await post(d.url, old);
+      assert.equal(replay.status, 401, 'the replay, one more restart on');
+      assert.equal(replay.json.error, 'device_key');
+      assert.equal((await post(d.url, sign(r))).status, 200, 'and a fresh one');
+    } finally { await d.kill(again); }
+  }
 });
 
 test('bounded by the window: the store is pruned while the server runs, by the age of what was signed', async () => {
@@ -158,7 +221,6 @@ for (const [label, damage] of [
 ]) {
   test(`a store that is ${label} neither stops the server nor reopens an old request`, { skip: label === 'unreadable' && (process.platform === 'win32' || process.getuid?.() === 0) }, async (t) => {
     const said = []; t.mock.method(console, 'error', (...a) => said.push(a.join(' ')));
-    mock.timers.enable({ apis: ['Date'], now: T0 });
     const r = await rig();
     const old = sign(r);
     assert.equal((await post(r.url, old)).status, 200);
@@ -168,17 +230,36 @@ for (const [label, damage] of [
     assert.match(said.join('\n'), new RegExp(r.store.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'the damage is said, naming the file');
     assert.equal(fs.readdirSync(path.dirname(r.store)).filter((f) => f.startsWith('nonces.json.damaged-')).length, 1, 'the damaged file is kept aside');
     refusedAsUsed(await post(r.url, old), 'signed before the damage was found');
-    // fail closed: a time inside the skew cannot be told from a clock running ahead, so a fresh request waits too
-    refusedAsUsed(await post(r.url, sign(r)), 'signed now, right after the damage');
+    assert.equal((await post(r.url, sign(r))).status, 200, 'a fresh request is served');
     // and the damage is not forgotten at the next start: the old request is still inside its window
     await r.restart();
     refusedAsUsed(await post(r.url, old), 'after one more restart');
-    mock.timers.setTime(T0 + 300001);
-    assert.equal((await post(r.url, sign(r))).status, 200, 'served once the skew has passed');
   });
 }
 
-test('signed ahead of the clock, used, store torn, restart: the replay is refused for as long as it could be accepted', async (t) => {
+test('after the window has passed, a damaged store leaves nothing behind that refuses', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  mock.timers.enable({ apis: ['Date'], now: T0 });
+  const r = await rig();
+  assert.equal((await post(r.url, sign(r))).status, 200);
+  await r.close();
+  fs.writeFileSync(r.store, 'not json');
+  await r.open();
+  // signed before the damage was found, and sent while the window holds: refused
+  mock.timers.setTime(T0 - 1000);
+  const before = sign(r);
+  mock.timers.setTime(T0 + 1000);
+  refusedAsUsed(await post(r.url, before), 'older than the damage');
+  mock.timers.setTime(T0 + 301e3);
+  assert.equal((await post(r.url, sign(r))).status, 200);
+  assert.equal(JSON.parse(fs.readFileSync(r.store, 'utf8')).not_before, null, 'the mark is gone once no request that old could be accepted');
+});
+
+// A known limit, pinned so that a change to it is seen. The store that remembered this nonce is gone, and all that is left
+// to judge the replay by is its signed time, which a clock running ahead puts after the moment the damage was found. It stays
+// accepted because SR-1.03 signs that a fresh request is served right after damage: a signed time inside the skew cannot be
+// told from a fresh one, so refusing this would refuse every signed request for up to 5 minutes, and that needs a change to SR-1.03.
+test('known limit: signed ahead of the clock within the skew, used, store torn, restart: the replay is accepted', async (t) => {
   t.mock.method(console, 'error', () => {});
   mock.timers.enable({ apis: ['Date'], now: T0 });
   const r = await rig();
@@ -191,35 +272,9 @@ test('signed ahead of the clock, used, store torn, restart: the replay is refuse
   fs.writeFileSync(r.store, fs.readFileSync(r.store).subarray(0, 15));
   await r.open();
   const replay = await post(r.url, ahead);
-  assert.equal(replay.status, 401, `replayed after the store was torn: ${replay.text}`);
+  assert.equal(replay.status, 200, `the replay after the store was torn: ${replay.text}`);
   assert.equal(first.status, 200);
-  refusedAsUsed(replay, 'replayed after the store was torn');
-  // its own signature lasts until 240 s + the skew: the last moment it could be accepted
-  mock.timers.setTime(T0 + 539e3);
-  refusedAsUsed(await post(r.url, ahead), 'at the far end of its signature');
-});
-
-test('the mark a damaged store leaves is gone once no request from before it could be accepted', async (t) => {
-  t.mock.method(console, 'error', () => {});
-  mock.timers.enable({ apis: ['Date'], now: T0 });
-  const r = await rig();
-  assert.equal((await post(r.url, sign(r))).status, 200);
-  await r.close();
-  fs.writeFileSync(r.store, 'not json');
-  await r.open();
-  // signed inside the skew of the damage: refused, whichever side of it the time falls
-  for (const stamp of [T0 - 1000, T0 + 299e3]) {
-    mock.timers.setTime(stamp);
-    const h = sign(r);
-    mock.timers.setTime(T0 + 200e3);
-    refusedAsUsed(await post(r.url, h), `signed at ${stamp - T0} ms from the damage`);
-  }
-  mock.timers.setTime(T0 + 301e3);
-  assert.equal((await post(r.url, sign(r))).status, 200);
-  assert.equal(JSON.parse(fs.readFileSync(r.store, 'utf8')).not_before, T0, 'kept until no request from before it can be accepted');
-  mock.timers.setTime(T0 + 601e3);
-  assert.equal((await post(r.url, sign(r))).status, 200);
-  assert.equal(JSON.parse(fs.readFileSync(r.store, 'utf8')).not_before, null, 'and then gone');
+  refusedAsUsed(await post(r.url, ahead), 'accepted that once: from here it is remembered again');
 });
 
 test('a not_before past the clock by more than the skew is damage, so it cannot refuse for good', async (t) => {
@@ -228,14 +283,14 @@ test('a not_before past the clock by more than the skew is damage, so it cannot 
   const r = await rig();
   assert.equal((await post(r.url, sign(r))).status, 200);
   const write = (notBefore) => fs.writeFileSync(r.store, JSON.stringify({ v: 1, not_before: notBefore, nonces: {} }));
+  const aside = () => fs.readdirSync(path.dirname(r.store)).filter((f) => f.startsWith('nonces.json.damaged-')).length;
   await r.close();
   write(1e300);
   await r.open();
-  mock.timers.setTime(T0 + 301e3);
   const after = await post(r.url, sign(r));
-  assert.equal(after.status, 200, `a mark far in the future must not refuse for good: ${after.text}`);
+  assert.equal(after.status, 200, `a mark far in the future must not refuse: ${after.text}`);
   assert.match(said.join('\n'), /damaged/);
-  assert.equal(fs.readdirSync(path.dirname(r.store)).filter((f) => f.startsWith('nonces.json.damaged-')).length, 1);
+  assert.equal(aside(), 1);
 
   // inside the skew it is a clock that differs a little, and no damage
   await r.close();
@@ -246,13 +301,13 @@ test('a not_before past the clock by more than the skew is damage, so it cannot 
   assert.equal(said.length, 0, said.join('\n'));
   assert.equal(JSON.parse(fs.readFileSync(r.store, 'utf8')).not_before, at + 300e3);
 
-  // a good mark, and then the clock steps back a long way: found once, and served again after the skew from there
+  // a good mark, and then the clock steps back a long way: found once, and the mark becomes the time of the step back
   mock.timers.setTime(at - 3600e3);
-  refusedAsUsed(await post(r.url, sign(r)), 'just after the step back');
-  const count = fs.readdirSync(path.dirname(r.store)).filter((f) => f.startsWith('nonces.json.damaged-')).length;
-  mock.timers.setTime(at - 3600e3 + 301e3);
-  assert.equal((await post(r.url, sign(r))).status, 200, 'the mark is the time of the step back, and not the one in the future');
-  assert.equal(fs.readdirSync(path.dirname(r.store)).filter((f) => f.startsWith('nonces.json.damaged-')).length, count, 'and it was found once');
+  assert.equal((await post(r.url, sign(r))).status, 200, 'served after the step back');
+  assert.equal(aside(), 2);
+  assert.equal(JSON.parse(fs.readFileSync(r.store, 'utf8')).not_before, at - 3600e3);
+  assert.equal((await post(r.url, sign(r))).status, 200);
+  assert.equal(aside(), 2, 'and it was found once');
 });
 
 test('a nonce outside its form is refused before it can reach the store, whatever its signature', async () => {

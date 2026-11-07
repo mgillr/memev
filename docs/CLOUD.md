@@ -102,8 +102,10 @@ which overwrites `cf-connecting-ip`, so there that header is the caller. Everyon
 Tailscale, or a reverse proxy of your own, arrives from one address and shares one limit.
 A computer's signed request can be used once, also across a restart: what was used is kept in
 `.memev/nonces.json`. If that file is found damaged it is set aside as `nonces.json.damaged-<time>`, the
-vault keeps running, and signed requests may be refused as already used for up to 5 minutes, because one
-already used could not be told from a new one. Admin routes are local only. Contract signing is
+vault keeps running, a request signed before that moment is refused and a fresh one is served. The known
+limit: after a damaged store, a request from a device whose clock ran ahead can be replayed within the
+skew of five minutes. Removing this would refuse every signed request for up to 5 minutes and needs a
+change to SR-1.03. Admin routes are local only. Contract signing is
 available remotely; a contract signed from a remote origin records that origin, and its command
 criteria do not run on this machine until a local operator approves it with
 `memev contract approve <id>`. `memev cloud rotate-key` changes the legacy shared key, for apps

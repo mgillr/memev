@@ -240,10 +240,11 @@ export function verifyProof(pubkey, { method, path: p, ts, nonce, sig, body = ''
  * out and writes the result, and throws if it cannot, with the nonce kept in memory so a replay is still refused. An entry
  * goes only when its signed time has left the window, so a count never pushes one out and a clock stepping back drops
  * nothing; the store holds what signatures could still be accepted, no more. A damaged store is set aside under
- * <store>.damaged-<time> and the time it was found is kept as not_before. What it held is gone, and a signed time says
- * nothing exact, since a device's clock may run ahead by the skew: so it fails closed. Every signed request with a time
- * before not_before + skew is refused as used, which means a request from a correct clock waits up to 5 minutes after the
- * damage. The mark goes once now is past not_before + 2 skew, when no request from before the damage could be accepted.
+ * <store>.damaged-<time> and the time it was found is kept as not_before: what it held is gone, so a request with a signed
+ * time before then is refused as used until no such request could be accepted any more. Fresh requests are served all along.
+ * The known limit: after a damaged store, a request from a device whose clock ran ahead can be replayed within the skew,
+ * since its signed time falls after not_before. Removing this would refuse every signed request for up to 5 minutes and
+ * needs a change to SR-1.03, which signs that a fresh request is served right after damage.
  */
 export class NonceCache {
   constructor(file, { skewMs = 5 * 60e3 } = {}) {
@@ -280,21 +281,20 @@ export class NonceCache {
     const aside = `${this.file}.damaged-${at}`;
     let moved = true;
     try { fs.renameSync(this.file, aside); } catch { moved = false; }
-    console.error(`[memev] the store of used signed requests ${this.file} is damaged (${why})${moved ? `; kept as ${aside}` : ''}. Signed requests may be refused for up to ${Math.ceil(this.skew / 60e3)} minutes, because a request already used could not be told from a new one.`);
+    console.error(`[memev] the store of used signed requests ${this.file} is damaged (${why})${moved ? `; kept as ${aside}` : ''}. Requests signed before now are refused until they could no longer be accepted.`);
     this.notBefore = this.notBefore !== null && this.notBefore <= at + this.skew ? Math.max(this.notBefore, at) : at;
     // said at once so a kill before the next signed request forgets nothing; if this fails too, the next write reports it
     try { this._write(at); } catch (e) { console.error(`[memev] ${e.message}`); }
   }
   _write(at) {
     for (const [k, ts] of this.m) if (at - ts > this.skew) this.m.delete(k);
-    if (this.notBefore !== null && at - this.notBefore > 2 * this.skew) this.notBefore = null;
+    if (this.notBefore !== null && at - this.notBefore > this.skew) this.notBefore = null;
     writePrivate(this.file, JSON.stringify({ v: 1, not_before: this.notBefore, nonces: Object.fromEntries(this.m) }));
   }
   /** True when this key is free, and it is now on disk. False when it was used. Throws when it could not be written. */
   use(key, signedAt, at = Date.now()) {
     this._read(at);
-    const marked = this.notBefore !== null && at - this.notBefore <= 2 * this.skew && signedAt < this.notBefore + this.skew;
-    if (this.m.has(key) || marked) return false;
+    if (this.m.has(key) || (this.notBefore !== null && signedAt < this.notBefore && at - this.notBefore <= this.skew)) return false;
     this.m.set(key, signedAt);
     this._write(at);
     return true;

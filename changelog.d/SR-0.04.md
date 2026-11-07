@@ -6,6 +6,6 @@
 
 - The OAuth issuer now comes from `remote.issuer`, or the running relay or tunnel, and never from the Host header of the request. When upgrading: behind a reverse proxy or a tailnet with no tunnel or relay, discovery answers 503 until `remote.issuer` is set.
 
-- A signed request stays used across a restart: the nonces in the skew window are on disk, pruned by age, before the request is served. A damaged store is set aside and the server keeps running, but it fails closed: signed requests may be refused for up to 5 minutes after the damage is found, because one already used could not be told from a new one.
+- A signed request stays used across a restart: the nonces in the skew window are on disk, pruned by age, before the request is served. A damaged store is set aside and the server keeps running, refusing requests signed before the damage was found until they could no longer be accepted. Known limit: after a damaged store, a request from a device whose clock ran ahead can be replayed within the skew; removing this would refuse every signed request for up to 5 minutes and needs a change to SR-1.03.
 
 - The relay client now refuses a peer whose certificate does not verify: besides the key the address is made from, the certificate must be signed by that key, in date and for that name, all checked before any of the request is sent.
