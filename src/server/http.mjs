@@ -279,7 +279,9 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       // that computer's apps, so there the header picks which of them is calling.
       const client = String(local ? identity.agent : req.headers['x-memev-client'] || identity.agent).slice(0, 40);
       const session = req.headers['x-memev-session'] ? String(req.headers['x-memev-session']).slice(0, 64) : null;
-      const ctx = { identity, client, session, local, device: dev, cli: local && client === 'cli', subject: resolved.subject, scope: resolved.scope };
+      // the bus session: the app session an MCP server was linked to (src/cli/session-link.mjs), so its bus calls take that session's seat
+      const busSession = req.headers['x-memev-bus-session'] ? String(req.headers['x-memev-bus-session']).slice(0, 96) : null;
+      const ctx = { identity, client, session, busSession, local, device: dev, cli: local && client === 'cli', subject: resolved.subject, scope: resolved.scope };
 
       if (route === '/mcp') {
         if (req.method !== 'POST') return send(405, { error: 'method_not_allowed' }, { allow: 'POST' });
@@ -322,7 +324,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
         if (route === '/v1/journal') return send(200, vault.journal(identity, { ...body, client }));
         if (route === '/v1/contract-gate') return send(200, { open: vault.contractGate(body.session) });
         if (route === '/v1/remember') return send(200, vault.remember(identity, { ...body, client }));
-        if (route === '/v1/bus-pulse') { const u = vault.bus.unread(ctx, { peek: !!body.peek }); return send(200, { ...u, text: renderBus(u, { lead: !!body.lead }) }); }
+        if (route === '/v1/bus-pulse') { const bs = ctx.busSession || body.bus_session || body.session; const u = vault.bus.unread({ ...ctx, busSession: bs ? String(bs).slice(0, 96) : null, seatHint: typeof body.seat === 'string' ? body.seat : null }, { peek: !!body.peek }); return send(200, { ...u, text: renderBus(u, { lead: !!body.lead }) }); }
         if (route === '/v1/bus-register') { if (local) vault._seedBus(); const reg = []; for (const cl of [].concat(body.clients || [])) { try { reg.push(vault.bus.resolve({ ...ctx, client: String(cl).slice(0, 40), cli: false }).seat); } catch {} } if (ctx.cli && body.operator && !vault.bus.operator()) try { vault.bus.setOperator(body.operator); } catch {} /* only the terminal picks the first lead (issue 248, the sibling route) */ vault.commits.flush(); return send(200, { seats: reg, operator: vault.bus.operator() }); }
         if (route === '/v1/bus-operator' && ctx.cli) { const seat = body.seat ? vault.bus.seatFor(body.seat) || body.seat : null; const op = vault.bus.setOperator(seat, { by: body.by || 'terminal' }); vault.commits.flush(); return send(200, { operator: op }); }
         if (route === '/v1/reload' && local && identity.scopes.includes('admin')) { vault.emit('reload'); return send(200, { ok: true }); }

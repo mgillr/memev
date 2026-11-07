@@ -77,6 +77,10 @@ export async function runHook(event, flags, env = process.env) {
   const remote = loadRemote ? loadRemote(env) : null; // this computer uses a vault elsewhere (memev join)
   const stateFile = remote ? path.join(configDir(env), 'hooks', `${slug(session, 64)}.json`) : path.join(root, '.memev', 'hooks', `${slug(session, 64)}.json`);
   const st = readJson(stateFile, { offset: 0, todos: null });
+  // each live session of an app has its own bus seat (Bus.sessionSeat), keyed by the session; a runner's headless turn
+  // is pinned to the runner's seat (MEMEV_SEAT). The seat is kept in the session's state and sent as a hint each time.
+  const busSession = env.MEMEV_SEAT ? `seat:${String(env.MEMEV_SEAT).slice(0, 90)}` : session;
+  const busBody = (extra = {}) => ({ bus_session: busSession, ...(st.seat ? { seat: st.seat } : {}), ...extra });
   try {
     let call;
     if (remote) call = (route, body) => remoteFetch(remote, `v1/${route}`, { body: { session, project, ...body }, env, headers: { 'x-memev-client': client }, timeoutMs: 8000 }).then((r) => { if (!r.ok) throw new Error(`${route}: ${r.status}`); return r.json; });
@@ -108,12 +112,19 @@ export async function runHook(event, flags, env = process.env) {
       const isSetup = fresh && !asked;
       const lead = await import('../engine/bus.mjs');
       if (isSetup && opFile) lead.markLeadAsked(root);
-      const bus = await call('bus-pulse', { lead: isSetup }).catch(() => null);
+      const bus = await call('bus-pulse', busBody({ lead: isSetup })).catch(() => null);
+      if (bus?.seat) {
+        st.seat = bus.seat;
+        // the MCP server this app started for the session finds the session through the processes they share
+        const link = await import('./session-link.mjs');
+        link.writeLink(path.dirname(stateFile), link.ancestors(process.pid, link.procTable()), { session: busSession, seat: bus.seat, client });
+      }
       // while no lead is set: the setup session gets the question with its own seat suggested; once it has
       // asked, the others get one quiet line telling them not to ask again
       const leadLines = [];
       if (bus?.lead_needed && isSetup && bus.seat) leadLines.push(`[Memev bus] ${lead.leadSuggestion(bus.seat)}`);
       if (bus?.lead_needed && fresh && asked) leadLines.push(`[Memev bus] ${lead.LEAD_ASKED_LINE}`);
+      if (bus?.seat?.includes('/')) leadLines.push(`[Memev bus] ${lead.sessionSeatLine(bus.seat)}`);
       await call('journal', { role: 'event', text: `session ${source} (${client}${project ? `, ${project}` : ''})` }).catch(() => {});
       // the card goes in when the context does not hold it: at a fresh start, after a compaction, or when it changed
       const card = sha256(String(r.text || ''));
@@ -138,7 +149,7 @@ export async function runHook(event, flags, env = process.env) {
         const recallP = isContinuation(prompt) ? null : withBudget(call('recall', { query: prompt.slice(0, 1000), limit: 4, exclude: st.injected || [] })).catch(() => null);
         // Cursor cannot show prompt context anyway, so it only peeks: a task that is already waiting
         // when the person types must stay unread for the stop hook's follow-up, not be swallowed here
-        const busP = withBudget(call('bus-pulse', { peek: format === 'cursor' })).catch(() => null);
+        const busP = withBudget(call('bus-pulse', busBody({ peek: format === 'cursor' }))).catch(() => null);
         call('journal', { role: 'user', text: prompt }).catch(() => {}); // no result is wanted; it must not hold the hook
         const r = await recallP;
         if (r?.hits?.length) st.injected = [...new Set([...(st.injected || []), ...r.hits.map((h) => `${h.path}#${h.heading || ''}`)])].slice(-500);
@@ -170,10 +181,10 @@ export async function runHook(event, flags, env = process.env) {
       // loop_count 3 is the loop_limit set on the stop entry in hooks.json: at that point Cursor
       // would loop anyway, so the hook stops following up
       if (format === 'cursor' && Number(input.loop_count ?? 0) < 3) {
-        const u = await call('bus-pulse', { peek: true }).catch(() => null);
+        const u = await call('bus-pulse', busBody({ peek: true })).catch(() => null);
         const waiting = (u?.messages || []).filter((m) => m.type === 'task' && m.operator);
         if (waiting.length) {
-          await call('bus-pulse', {}).catch(() => null); // the follow-up claims these tasks, so they are read
+          await call('bus-pulse', busBody()).catch(() => null); // the follow-up claims these tasks, so they are read
           const lines = waiting.slice(-3).map((m) => `#${m.seq} ${String(m.body).slice(0, 300)}`);
           process.stdout.write(JSON.stringify({
             followup_message: `[Memev] The operator has ${waiting.length} task${waiting.length > 1 ? 's' : ''} waiting for you:\n${lines.join('\n')}\nClaim each (bus_send, type claim, ref = its id), restate it, then do it.`,

@@ -212,12 +212,15 @@ export async function runRemoteStdio(remote, client, env = process.env) {
   const write = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
   const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
   const inflight = new Set();
+  // the same session link as a local MCP server, from the hook state this computer keeps for a vault elsewhere
+  const { busSessionHeaders, chainOnce } = await import('./mcp-stdio.mjs');
+  const chain = chainOnce(); const linkDir = path.join(configDir(env), 'hooks');
   rl.on('line', (line) => {
     if (!line.trim()) return;
     let msg; try { msg = JSON.parse(line); } catch { write({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'parse error' } }); return; }
     const p = (async () => {
       try {
-        const r = await remoteFetch(remote, 'mcp', { body: msg, env, headers: { 'x-memev-client': client } });
+        const r = await remoteFetch(remote, 'mcp', { body: msg, env, headers: { 'x-memev-client': client, ...(msg.method === 'tools/call' ? busSessionHeaders(linkDir, client, chain) : {}) } });
         if (r.status === 202) return;
         if (!r.ok && !r.json?.jsonrpc) { if (msg.id !== undefined) write({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: `Memev vault: ${r.json?.error_description || r.status}` } }); return; }
         if (r.text) process.stdout.write(`${r.text.trim()}\n`);
