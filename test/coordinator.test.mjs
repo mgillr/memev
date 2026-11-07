@@ -130,15 +130,29 @@ class Store {
     if (held !== null) {
       const pid = parseInt(held.trim(), 10);
       if (pid !== process.pid && Store.pidAlive(pid)) return true;
-      try { fs.unlinkSync(this.lockPath); } catch {}
+      // as in the real store (project-store.mjs _tryAcquireLock): a lock with no pid yet is a writer between creating and
+      // filling it, so busy, not stale; and it is removed only if it is still the stale lock read above (issue 457)
+      if (!Number.isInteger(pid)) {
+        let age = Infinity;
+        try { age = Date.now() - fs.statSync(this.lockPath).mtimeMs; } catch {}
+        if (age < 5000) return true;
+      }
+      try { if (fs.readFileSync(this.lockPath, 'utf8') === held) fs.unlinkSync(this.lockPath); } catch {}
     }
+    // the lock appears whole or not at all: the pid goes to a private file, which is then linked to the lock name
+    const tmp = `${this.lockPath}.${process.pid}.${crypto.randomBytes(3).toString('hex')}`;
     try {
-      const fd = fs.openSync(this.lockPath, 'wx', 0o600);
-      fs.writeSync(fd, String(process.pid));
-      fs.closeSync(fd);
+      fs.writeFileSync(tmp, String(process.pid), { mode: 0o600 });
+      try { fs.linkSync(tmp, this.lockPath); }
+      catch (e) {
+        if (e.code === 'EEXIST') return true;
+        if (!['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV'].includes(e.code)) throw e;
+        try { fs.writeFileSync(this.lockPath, String(process.pid), { flag: 'wx', mode: 0o600 }); }
+        catch (e2) { if (e2.code === 'EEXIST') return true; throw e2; }
+      }
       this._lockDepth = 1;
       return false;
-    } catch (e) { if (e.code === 'EEXIST') return true; throw e; }
+    } finally { try { fs.unlinkSync(tmp); } catch {} }
   }
   _releaseLock() {
     if (this._lockDepth <= 0) return;
