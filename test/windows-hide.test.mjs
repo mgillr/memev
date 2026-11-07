@@ -10,11 +10,18 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.mjs') ? [path.join(d, e.name)] : []));
 
-test('every spawn, spawnSync, execFile, execFileSync and execSync call in src/ passes windowsHide: true', () => {
+test('every child_process call in src/, under its own name or an alias, passes windowsHide: true', () => {
   const missing = [];
   for (const f of walk(path.join(ROOT, 'src'))) {
     const s = fs.readFileSync(f, 'utf8');
-    for (const m of s.matchAll(/\b(spawn|spawnSync|execFileSync|execFile|execSync)\(/g)) {
+    // the names this file gives the child_process functions, aliases included (import { spawn as spawnChild })
+    const names = new Set();
+    for (const imp of s.matchAll(/import\s*\{([^}]*)\}\s*from\s*'node:child_process'/g)) {
+      for (const part of imp[1].split(',')) { const [orig, alias] = part.trim().split(/\s+as\s+/); if (/^(spawn|spawnSync|execFileSync|execFile|execSync|exec|fork)$/.test(orig)) names.add((alias || orig).trim()); }
+    }
+    for (const n of ['spawn', 'spawnSync', 'execFileSync', 'execFile', 'execSync']) names.add(n);
+    const callRe = new RegExp(`\\b(${[...names].join('|')})\\(`, 'g');
+    for (const m of s.matchAll(callRe)) {
       const before = s.slice(Math.max(0, m.index - 30), m.index);
       if (/import\s*\{[^}]*$|function\s+$|\/\/[^\n]*$/.test(before)) continue; // an import list, a declaration or a comment
       // the call's own text, up to its closing parenthesis

@@ -90,7 +90,7 @@ export function runAsync(cmd, args = [], { cwd, env, timeout = 0, maxBuffer = 10
       resolve({ ok: status === 0 && !error, status: error ? null : status, stdout, stderr, error, timedOut, tooLarge });
     };
     const killGroup = () => { try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch { /* already gone */ } } };
-    try { child = spawnChild(cmd, args, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { return resolve({ ok: false, status: null, stdout: '', stderr: '', error: e.message, timedOut: false, tooLarge: false }); }
+    try { child = spawnChild(cmd, args, { windowsHide: true, cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { return resolve({ ok: false, status: null, stdout: '', stderr: '', error: e.message, timedOut: false, tooLarge: false }); }
     const take = (which) => (b) => {
       if (done || tooLarge) return;
       size += b.length;
