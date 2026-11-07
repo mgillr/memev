@@ -1338,6 +1338,46 @@
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
+      "id": "PG-W-21D",
+      "type": "programme work package",
+      "area": "PG-W",
+      "title": "Device pairing and recovery: a one-tap signed act pairs a new device at low trust, and a lost device is recovered through the owner's recovery key or an operator re-grant (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP21-D1 (a gap named by the owner's answers on ADR 8 of 1 Nov 2026; proposed 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "PG-W-21A.2",
+          "boundary": "owns the trust record, its signature block, the required verification level, reserved delegation, root records with succession and the personal-scope rule; PG-W-21D hands the trust book a grant proposal and writes no record"
+        },
+        {
+          "contract": "PG-W-21B",
+          "boundary": "owns the trust book, GRANT_AUTHORITY (provisional under ADR 5) and the marking overlay; PG-W-21D calls its grant and revoke with a resolved actor"
+        },
+        {
+          "contract": "SO-F-01",
+          "boundary": "owns the subject, scope, membership and resolveActor model of src/engine/identity.mjs, reused unchanged"
+        },
+        {
+          "contract": "PG-W-21E",
+          "boundary": "gates multi-site and cross-organisation trust; pairing one's own devices is local trust and is not gated"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SO-F-01 (identity) and src/engine/devices.mjs (the registry, the invite and the device key) are the build layer, reused unchanged; this spec adds only src/engine/federation/pairing.mjs, its test and the documentation",
+      "depends_on": [
+        "PG-W-21A.2",
+        "SO-F-01",
+        "PG-W-21B"
+      ],
+      "tasks": 2,
+      "criteria": 32,
+      "spec": "specs/PG-W-21D.json",
+      "base": "4db303071c67c32e2e5b3ecd508a10748b5b5a34 (the memev main commit this spec was written against)",
+      "status": "proposed, unsigned; no red-team record; the base is recorded; depends on PG-W-21A.2 (proposed in parallel) and the amended PG-W-21B for the book; the topology of work breakdown row 1.3.6, ADR 3, ADR 5, ADR 7 and SO-A-05 stay open",
+      "kind": "feature"
+    },
+    {
       "id": "PG-19.1",
       "type": "programme work package",
       "area": "PG-19",
