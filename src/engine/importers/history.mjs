@@ -245,11 +245,11 @@ const qwen = {
 };
 
 // Jan keeps each thread in <data folder>/threads/<thread id>/: thread.json {id, title, created, updated} and
-// messages.jsonl, one message per line {role, content: [{type: text, text: {value}}], created_at}.
+// messages.jsonl, one message per line {role, content: [{type: text, text: {value}}], created_at}. The data folder is
+// the default one for the platform; a folder moved in Jan's settings is not found.
 const jan = {
   id: 'jan', app: 'Jan', kind: 'sessions',
   root(env) {
-    if (env.MEMEV_JAN_DATA) return path.join(env.MEMEV_JAN_DATA, 'threads');
     const home = homeOf(env);
     if (process.platform === 'darwin') return path.join(home, 'Library', 'Application Support', 'Jan', 'data', 'threads');
     if (process.platform === 'win32') return path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Jan', 'data', 'threads');

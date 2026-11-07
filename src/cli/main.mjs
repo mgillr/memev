@@ -73,6 +73,8 @@ Daily
   memev compact [--dry-run] [--json]  measure and shrink the vault: archive sealed op-log segments and move old
                                     journal sessions out of the index; --dry-run only prints the size report
   memev import [--path DIR ...] [--ai-history] [--export FILE.zip ...] [--preview] [--yes] [--keep ID,ID]
+  memev import scan [--json] [--export FILE.zip ...] [--quick]   list every history source found, importing nothing
+  memev import --source ID [--source ID ...] [--preview] [--yes]   import the chosen sources from the scan
   memev import list                list previous imports
   memev import undo [IMPORT-ID]    remove a previous import and its notes
   memev checkpoint --project P [--task T] [--done a,b] [--doing x] [--next c,d]
@@ -181,6 +183,8 @@ async function run(argv, env) {
     console.log(own.length ? `${own.join('\n')}\n\nmemev help lists every command.` : HELP);
     return 0;
   }
+  // memev import takes --source and --export more than once: each value is kept, here only, not in the shared parser
+  if (cmd === 'import') for (const k of ['source', 'export']) { const all = []; for (let i = 0; i < rest.length; i++) { if (rest[i] === `--${k}` && i + 1 < rest.length && !rest[i + 1].startsWith('--')) all.push(rest[++i]); else if (rest[i].startsWith(`--${k}=`)) all.push(rest[i].slice(k.length + 3)); } if (all.length > 1) flags[k] = all; }
   if (OPTIONAL[cmd]) { const m = await import(OPTIONAL[cmd]); return m.command(cmd, pos, flags, { root, env }); }
   switch (cmd) {
     case 'help': case '--help': case '-h': console.log(HELP); return 0;

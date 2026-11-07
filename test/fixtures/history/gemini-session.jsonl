@@ -1,0 +1,11 @@
+{"sessionId":"9e000000-0000-4000-8000-000000000001","projectHash":"zephyr","startTime":"2026-11-03T07:00:00.000Z","lastUpdated":"2026-11-03T07:00:00.000Z","kind":"main"}
+{"id":"m1","timestamp":"2026-11-03T07:00:01.000Z","type":"user","content":[{"text":"First try at the question"}]}
+{"id":"m2","timestamp":"2026-11-03T07:00:02.000Z","type":"gemini","content":"An answer that was rewound"}
+{"$rewindTo":"m1"}
+{"id":"m3","timestamp":"2026-11-03T07:00:03.000Z","type":"user","content":[{"text":"How many quokkas fit in a zephyr?"}]}
+{"id":"m4","timestamp":"2026-11-03T07:00:04.000Z","type":"gemini","content":"Draft","toolCalls":[{"id":"t1","name":"google_web_search","args":{"query":"quokka"},"status":"success","timestamp":"2026-11-03T07:00:04.000Z","result":[{"text":"search results that must not be imported"}]}],"model":"gemini-2.5-pro"}
+{"$patch":{"id":"m4","content":"Seven, if they are small."}}
+{"id":"m5","timestamp":"2026-11-03T07:00:05.000Z","type":"info","content":"Request cancelled."}
+{"id":"m6","timestamp":"2026-11-03T07:00:06.000Z","type":"user","content":"a message later removed"}
+{"$patch":{"removeIds":["m6"]}}
+{"$set":{"lastUpdated":"2026-11-03T07:00:06.000Z","summary":"Quokkas in a zephyr"}}

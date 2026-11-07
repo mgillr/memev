@@ -8,6 +8,7 @@ const TOOL_LINE_MAX = 80;
 
 const iso = (t) => {
   if (t === null || t === undefined || t === '') return null;
+  if (typeof t === 'string' && /^\d+(?:\.\d+)?$/.test(t.trim())) t = Number(t); // a time written as a number in a string
   if (typeof t === 'number' && Number.isFinite(t)) return new Date(t > 1e12 ? t : t * 1000).toISOString(); // seconds, or milliseconds
   const d = new Date(String(t));
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
@@ -62,7 +63,6 @@ export function chatgptConversation(c) {
     if (m.metadata?.is_visually_hidden_from_conversation === true) continue;
     const role = m.author?.role;
     const ct = m.content?.content_type;
-    if (CHATGPT_HIDDEN.has(ct)) continue;
     const at = iso(m.create_time);
     if (role === 'tool') {
       // a tool's output (browsing, code run, file search): one short line, never its body
@@ -71,6 +71,7 @@ export function chatgptConversation(c) {
       continue;
     }
     if (role !== 'user' && role !== 'assistant') continue;
+    if (CHATGPT_HIDDEN.has(ct)) continue;
     let text = '';
     if (Array.isArray(m.content?.parts)) text = m.content.parts.map(chatgptPartText).filter(Boolean).join('\n');
     else if (ct === 'code' && typeof m.content?.text === 'string') {
