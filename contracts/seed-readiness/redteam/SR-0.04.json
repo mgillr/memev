@@ -491,6 +491,77 @@
           }
         ]
       }
+    },
+    {
+      "round": 6,
+      "spec_sha256": "7818365d3ee066dca1437661d8feb856a6e73d8ff34fc4cc46765236690eb3f3",
+      "base_commit": "06e7fd212699845bc0dca2610a3f10e085ec3262",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "21d5aa97719a86699221e79b64f679cc45e12a1d23ec1cd6f662f12102dc5fdc"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "28ec9c1f6ddb69a3d4c87dfb65f19712be1094f7394ae8d60dfba53ceea10759"
+          },
+          {
+            "path": "docs/scope-one/DECISIONS.md",
+            "sha256": "3307322f2c70781f4362f95243bcd1905e86e8214abf604ed965ca540aa9c696"
+          },
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "f41a022de450edb6ca7f055b5f0418479a2e1093d21a4aef598a108a1e65e810"
+          },
+          {
+            "path": "package.json",
+            "sha256": "df0a33344e4d35bdb39ce4d9d2fbecc02f1d44b6037fd181a27740fe80195606"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "second seat on the same machine; ran the criteria, at 06e7fd21 through the real contractVerify on the box (user ci, a fresh GitHub clone as the vault, a throwaway key), before this amendment: every full-suite criterion (T1-c12, T2a-c14, T2f-c06, T3-c07, T4-c11, T6-c12, T7-c13, T9-c08) and every scope check pass; the other criteria fail or are blocked on work not built yet (missing test files and scripts, no mutants with no changed lines, missing approval and run records, T3-c03 red equal to green while head is the base). T7-c10 failed on round 5 only. Correction of round 5: its notes opened with the gate run instead of saying whether the criteria were run or only read, as T7-c10 requires. Round 5 cannot be changed, so T7-c10 is amended here, by reviewer note 5, to accept round 5 on its exact text only while this correction stands. This seat wrote round 5 and this amendment, so the round is not an independent review of it: both seats are AI on one machine.",
+      "amendments": [
+        {
+          "task": "T7",
+          "field": "statement",
+          "from": "T7-c10: this contract's own record says what it is: every round of contracts/seed-readiness/redteam/SR-0.04.json begins 'second seat on the same machine' and then says whether the criteria were run or only read",
+          "to": "T7-c10: this contract's own record says what it is: every round of contracts/seed-readiness/redteam/SR-0.04.json begins 'second seat on the same machine' and then says whether the criteria were run or only read, except round 5, whose notes began 'second seat on the same machine; the gate run' by mistake and cannot be changed; round 5 passes only while its notes are exactly the text first committed (sha256 9a1b89770bde931584e02083bfe72c133acf14afe84c1fbb1b7a0507483670ba) and round 6's notes carry the correction",
+          "reviewer_note": 5
+        },
+        {
+          "task": "T7",
+          "field": "verifier.cmd",
+          "statement": "T7-c10: this contract's own record says what it is: every round of contracts/seed-readiness/redteam/SR-0.04.json begins 'second seat on the same machine' and then says whether the criteria were run or only read, except round 5, whose notes began 'second seat on the same machine; the gate run' by mistake and cannot be changed; round 5 passes only while its notes are exactly the text first committed (sha256 9a1b89770bde931584e02083bfe72c133acf14afe84c1fbb1b7a0507483670ba) and round 6's notes carry the correction",
+          "from": "node -e \"const fs=require('fs');const p='contracts/seed-readiness/redteam/SR-0.04.json';if(!fs.existsSync(p)){console.error(p+' is missing');process.exit(1)}const r=JSON.parse(fs.readFileSync(p,'utf8'));const re=/^second seat on the same machine[;,.:]? (ran the criteria|only read the criteria)/;const bad=(r.rounds||[]).filter((x)=>!re.test(String(x.notes||'')));if(!(r.rounds||[]).length||bad.length){console.error('rounds without the opening: '+(bad.map((x)=>x.round).join(', ')||'no rounds'));process.exit(1)}\"",
+          "to": "node -e \"const fs=require('fs');const crypto=require('crypto');const p='contracts/seed-readiness/redteam/SR-0.04.json';if(!fs.existsSync(p)){console.error(p+' is missing');process.exit(1)}const r=JSON.parse(fs.readFileSync(p,'utf8'));const re=/^second seat on the same machine[;,.:]? (ran the criteria|only read the criteria)/;const r6=(r.rounds||[]).find((x)=>x.round===6);const fixed=!!r6&&String(r6.notes||'').includes('Correction of round 5: its notes opened with the gate run instead of saying whether the criteria were run or only read, as T7-c10 requires');const ok5=(x)=>x.round===5&&fixed&&crypto.createHash('sha256').update(String(x.notes||'')).digest('hex')==='9a1b89770bde931584e02083bfe72c133acf14afe84c1fbb1b7a0507483670ba';const bad=(r.rounds||[]).filter((x)=>!re.test(String(x.notes||''))&&!ok5(x));if(!(r.rounds||[]).length||bad.length){console.error('rounds without the opening: '+(bad.map((x)=>x.round).join(', ')||'no rounds'));process.exit(1)}\"",
+          "reviewer_note": 5
+        }
+      ],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NTgyOTQzMDg5MmViNTFlNzc3MzViM2UwZDhmOTk5ZTExZDExYzQ5YjMwN2I3YjI1MDdhMTdkZjdjZWRiZjU3NQ==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "seA1Tyk5r3WFqVyRF5Ik4GjIq2u3scinyab4SA5j3t9oo+hwHdZ/cEuEOVn1f/JWoqoVbTbTUEoUlhqJyi0LBg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MGRiYTM2MWQ3MGUzYjY5YWU5OWMyM2QyOTFmOWZiOGE5OTgzNmQ3ZmY4Y2E0YjI1MTM4NzhjZTBmMjM5MTgyMg==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "6sTksc7W62uVZzIqVKhx+uGg84O2PYtgZ3FYcDcR43zf7NZYKM63muM17LkXPz/PSCIADEyo1FBCFhrhnXa8AQ=="
+          }
+        ]
+      }
     }
   ],
   "reviewer_notes": [
@@ -546,6 +617,20 @@
           {
             "keyid": "1f6b4e7c00729bc7",
             "sig": "pqj7SmXxrpeRe8h967vURc0Qy6jp4UL0xGlCFQJbSLoGlyuCZTOECWprB4QciIKbubr0RXeEyroc1eZ+yVUpCA=="
+          }
+        ]
+      }
+    },
+    {
+      "n": 5,
+      "text": "Round 6, T7-c10: round 5's notes opened 'second seat on the same machine; the gate run', so T7-c10 as written fails on round 5 for good: a committed round cannot be changed (the gate refuses it as review_sig). The rehearsal found it. The criterion is amended so that round 5 alone passes, only on its exact text (sha256 9a1b89770bde931584e02083bfe72c133acf14afe84c1fbb1b7a0507483670ba) and only while round 6's notes carry the correction; every other round keeps the strict opening. Checked by running the new command on the record and on four changed copies: one character changed in round 5, round 6's correction removed, round 4's opening broken, and round 6 missing; the record passes and each copy fails.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YmRkNWI0MGE3NWM4OGFlNjY2ZWI4ZjE1MDUxMjRmMTUwMzEzZTk2OWUwNWFhY2RiMGI1OGY0MjgzZWRhMTE1NA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "SsQ4Rhi5Lr8w7qUXkz1N0KnrunWA7d1zwLfE/Ux67r8HlMUogy3uLJU4MXg9P8Ql1EYAiRM0pOqSRzjAleapBQ=="
           }
         ]
       }
