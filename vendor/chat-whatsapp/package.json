@@ -1,0 +1,10 @@
+{
+  "name": "memev-chat-whatsapp",
+  "private": true,
+  "description": "The WhatsApp connection for the Memev chat bridge, installed only when the person turns WhatsApp on.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "dependencies": {
+    "@whiskeysockets/baileys": "7.0.0-rc14"
+  }
+}

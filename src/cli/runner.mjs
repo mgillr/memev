@@ -20,7 +20,9 @@ export const HEADLESS = { 'claude-code': 'claude -p', codex: 'codex exec', 'gemi
 const limitHint = (seat) => `the runner needs a limit: memev runner on ${seat} --max-runs-per-day N`;
 
 export const runnerFile = (root) => path.join(root, '.memev', 'runner.json');
-export const pidFile = (root, seat) => path.join(root, '.memev', `runner-${seat}.pid`);
+// a sub-seat's '/' becomes '+', as the bus names its own files (fileOf), so runner-my-app@pc+2.pid sits beside the others;
+// '@' is kept, so the pid file of a seat that already ran keeps its name
+export const pidFile = (root, seat) => path.join(root, '.memev', `runner-${String(seat).replace(/\//g, '+')}.pid`);
 export function loadRunner(root) {
   return readJson(runnerFile(root), {}) || {};
 }
@@ -90,6 +92,17 @@ export function shouldRun(e, m, seat, now = new Date(), names = null, fromOk = (
   return { ok: true, reason: null };
 }
 
+/** Runs per day for the last `days` days, oldest first, from the kept run times (the last 1,000). UTC days. */
+export function runsByDay(e, days = 7, now = new Date()) {
+  const n = Math.max(1, Math.min(90, Math.floor(Number(days)) || 7));
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i)).toISOString().slice(0, 10);
+    out.push({ day: d, runs: (e?.runs || []).filter((ts) => String(ts).slice(0, 10) === d).length });
+  }
+  return out;
+}
+
 export function recordRun(e, ts) {
   return { ...e, runs: [...(e?.runs || []), ts].slice(-1000) };
 }
@@ -98,10 +111,11 @@ export function recordRun(e, ts) {
  * Start one headless turn: the seat's command, with the task body as its prompt on stdin, so a
  * body that starts with a dash is read as the prompt, not as an option.
  */
-export function runTurn({ cmd, body, cwd, env = process.env } = {}) {
+export function runTurn({ cmd, body, cwd, seat = null, env = process.env } = {}) {
   const parts = String(cmd).split(/\s+/).filter(Boolean);
   return new Promise((resolve) => {
-    const p = spawn(parts[0], parts.slice(1), { cwd, env, stdio: ['pipe', 'ignore', 'ignore'] });
+    // MEMEV_SEAT pins the turn's session to the runner's seat, so its hooks and its bus calls post as that seat
+    const p = spawn(parts[0], parts.slice(1), { cwd, env: seat ? { ...env, MEMEV_SEAT: seat } : env, stdio: ['pipe', 'ignore', 'ignore'] });
     p.stdin.on('error', () => {});
     p.stdin.write(String(body));
     p.stdin.end();
@@ -162,7 +176,7 @@ export async function sweep({ root, bus, seat, run = runTurn, log = () => {} } =
       saveRunner(root, s);
       started.push(m.id);
       log(`run ${m.id}`);
-      await run({ cmd: entry(root, seat).cmd, body: m.body, cwd: root });
+      await run({ cmd: entry(root, seat).cmd, body: m.body, cwd: root, seat: names[0] });
     } else {
       skipped.push({ id: m.id, reason: d.reason });
       log(`skip ${m.id}: ${d.reason}`);
@@ -201,6 +215,27 @@ export async function watch({ root, seat, pollMs = 250, stop = () => false, run 
   }
 }
 
+/**
+ * The sub-seats for --agents N: my-app@my-laptop/2, /3 ... in order, each one this app's runner already holds, or one no
+ * live session holds (by the roster's live rule), so N background agents never share a seat with a session in use.
+ */
+export function agentSeats(bus, app, n, state = {}) {
+  const device = bus.devices.get(bus.devices.hostId);
+  const base = bus.ownSeatName(app, device);
+  const out = [];
+  for (let i = 2; i < 100 && out.length < n; i++) {
+    const name = `${base}/${i}`; const r = bus.seat(name);
+    if (state[name]) { out.push(name); continue; }
+    if (!r) { out.push(name); continue; }
+    if (r.removed || r.device !== device.id || r.client !== app) continue;
+    if (!bus._liveNow(r, bus._pulse(r.seat))) out.push(r.seat);
+  }
+  if (out.length < n) throw new Error(`only ${out.length} free sub-seat(s) for ${app}`);
+  return out.map((name) => bus.seat(name) || bus.register({ client: app, device, seat: name }));
+}
+/** The runner seats of one app (an app id rather than a seat): every seat in the runner state whose app it is. */
+const seatsOfApp = (bus, state, app) => Object.keys(state).filter((n) => bus.seat(n)?.client === app);
+
 export async function command(cmd, pos, flags, { root, env }) {
   if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`);
   const sub = pos[0] || 'status';
@@ -210,34 +245,44 @@ export async function command(cmd, pos, flags, { root, env }) {
   try {
     if (sub === 'on') {
       if (!seat) throw new Error('memev runner on <seat> --max-runs-per-day N');
-      const rec = v.bus.seat(seat);
-      if (!rec) throw new Error(`no seat ${seat}; memev bus roster lists them`);
       if (flags['max-runs-per-day'] === undefined) throw new Error(limitHint(seat));
       const n = Number(flags['max-runs-per-day']);
       if (!Number.isInteger(n) || n < 1) throw new Error('--max-runs-per-day is a whole number of 1 or more');
-      const turn = commandFor(rec.client, flags.command);
-      if (!turn) throw new Error(`no headless command is known for ${rec.client}: pass --command "cmd"`);
+      let recs;
+      if (flags.agents !== undefined) {
+        // N background agents of one app: memev runner on my-app --agents 3 takes the sub-seats /2, /3, /4
+        const k = Number(flags.agents);
+        if (!Number.isInteger(k) || k < 1 || k > 20) throw new Error('--agents is a whole number from 1 to 20');
+        if (seat.includes('@')) throw new Error(`--agents takes an app, not a seat: memev runner on ${seat.split('@')[0]} --agents ${k} --max-runs-per-day ${n}`);
+        recs = agentSeats(v.bus, seat, k, loadRunner(root));
+      } else {
+        let rec = v.bus.seat(seat);
+        // a sub-seat of a seat on this computer is made when a runner is turned on for it
+        const parent = !rec && seat.includes('/') ? v.bus.seat(seat.split('/')[0]) : null;
+        if (parent && !parent.removed && parent.device === v.devices.hostId) rec = v.bus.register({ client: parent.client, device: v.devices.get(parent.device), seat });
+        if (!rec) throw new Error(`no seat ${seat}; memev bus roster lists them`);
+        recs = [rec];
+      }
       const s = loadRunner(root);
-      s[seat] = {
-        enabled: true,
-        max_runs_per_day: n,
-        cmd: turn,
-        runs: s[seat]?.runs || [],
-        ran: s[seat]?.ran || [],
-        seen: cursors(v.bus),
-      };
+      for (const rec of recs) {
+        const turn = commandFor(rec.client, flags.command);
+        if (!turn) throw new Error(`no headless command is known for ${rec.client}: pass --command "cmd"`);
+        const name = rec.seat;
+        s[name] = { enabled: true, max_runs_per_day: n, cmd: turn, runs: s[name]?.runs || [], ran: s[name]?.ran || [], seen: cursors(v.bus) };
+        console.log(`Runner for ${name}: on, at most ${n} run(s) a day, each a headless turn of ${turn}.`);
+      }
       saveRunner(root, s);
-      console.log(`Runner for ${seat}: on, at most ${n} run(s) a day, each a headless turn of ${turn}.`);
-      console.log(`It starts when the operator posts a task to ${seat}. memev runner watch ${seat} runs it; memev runner off ${seat} stops it.`);
+      const what = recs.length > 1 ? seat : recs[0].seat;
+      console.log(`It starts when the operator posts a task to ${recs.map((r) => r.seat).join(', ')}. memev runner watch ${what} runs it; memev runner off ${what} stops it.`);
       return 0;
     }
     if (sub === 'off') {
       if (!seat) throw new Error('memev runner off <seat>');
       const s = loadRunner(root);
-      if (!s[seat]) throw new Error(`no runner for ${seat}`);
-      s[seat] = { ...s[seat], enabled: false };
+      const list = s[seat] ? [seat] : seat.includes('@') ? [] : seatsOfApp(v.bus, s, seat);
+      if (!list.length) throw new Error(`no runner for ${seat}`);
+      for (const n of list) { s[n] = { ...s[n], enabled: false }; console.log(`Runner for ${n}: off.`); }
       saveRunner(root, s);
-      console.log(`Runner for ${seat}: off.`);
       return 0;
     }
     if (sub === 'watch') {
@@ -247,8 +292,13 @@ export async function command(cmd, pos, flags, { root, env }) {
       process.once('SIGINT', onSig);
       process.once('SIGTERM', onSig);
       try {
-        console.log(`Watching the bus for operator tasks for ${seat}; each starts a headless turn until the day's limit.`);
-        await watch({ root, seat, stop: () => stop });
+        // an app rather than a seat watches every runner seat of that app at once, each with its own pid file and state
+        const s = loadRunner(root);
+        const list = s[seat] || seat.includes('@') ? [seat] : seatsOfApp(v.bus, s, seat).filter((n) => s[n].enabled);
+        if (!list.length) throw new Error(`no runner is on for ${seat}: memev runner on ${seat} --agents N --max-runs-per-day N`);
+        console.log(`Watching the bus for operator tasks for ${list.join(', ')}; each starts a headless turn until the day's limit.`);
+        const done = await Promise.allSettled(list.map((n) => watch({ root, seat: n, stop: () => stop })));
+        const failed = done.find((d) => d.status === 'rejected'); if (failed) throw failed.reason;
       } finally {
         process.removeListener('SIGINT', onSig);
         process.removeListener('SIGTERM', onSig);
@@ -262,6 +312,7 @@ export async function command(cmd, pos, flags, { root, env }) {
       max_runs_per_day: e.max_runs_per_day ?? null,
       cmd: e.cmd || null,
       today: runsToday(e).length,
+      ...(flags.days ? { by_day: runsByDay(e, Number(flags.days)) } : {}),
     }));
     if (flags.json) {
       console.log(JSON.stringify(rows, null, 2));

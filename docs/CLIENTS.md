@@ -26,6 +26,7 @@ background connect back on.
 | Aider | a conventions file in `~/.config/memev/aider-conventions.md`, listed under `read:` in `~/.aider.conf.yml` | conventions file (no MCP) |
 | OpenCode | `mcp` entry in `~/.config/opencode/opencode.json`; a block in the OpenCode rules file (skipped if the Claude rules file exists and the OpenCode one is missing) | instructions |
 | GitHub Copilot CLI | `mcpServers` entry in `~/.copilot/mcp-config.json` and a block in `~/.copilot/copilot-instructions.md` (in `$COPILOT_HOME` when it is set) | instructions |
+| Grok Build | `[mcp_servers.memev]` (stdio: `command`, `args`) in `~/.grok/config.toml`; a table the user already has is left as-is | instructions |
 
 More apps, each at the path and key its own MCP docs give. `~` is your home folder (`%USERPROFILE%` on
 Windows). Where the docs name no Windows location, Memev connects the app on macOS and Linux only; on
