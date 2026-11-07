@@ -24,6 +24,10 @@ const ALLOW = [
   { cmd: 'setup', args: ['remote', 'log', '<sid>'] },
 ];
 
+// The modes a session may set. Each is one that src/cli/deployment.mjs holds (a test keeps it so); cloud-hosted is left out
+// because that service is only planned.
+export const SESSION_MODES = ['local', 'on-prem'];
+
 export function checkAllowlist(argv, root) {
   if (!Array.isArray(argv) || argv.length === 0) return { ok: false, reason: 'empty command' };
   for (const a of argv) {
@@ -38,8 +42,8 @@ export function checkAllowlist(argv, root) {
   if (cmd === 'deployment') {
     if (rest[0] === 'show' && rest.length === 1) return { ok: true };
     if (rest[0] === 'set' && rest.length === 2) {
-      if (rest[1] !== 'local' && rest[1] !== 'container')
-        return { ok: false, reason: `deployment mode must be local or container, got ${rest[1]}` };
+      if (!SESSION_MODES.includes(rest[1]))
+        return { ok: false, reason: `deployment mode must be ${SESSION_MODES.join(' or ')}, got ${rest[1]}` };
       return { ok: true };
     }
     return { ok: false, reason: `deployment: unknown subcommand ${rest[0] || '(none)'}` };

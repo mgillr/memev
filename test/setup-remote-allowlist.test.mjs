@@ -11,6 +11,7 @@ import { freePort } from './helpers/cli.mjs';
 import { initVault } from '../src/engine/vault.mjs';
 import { readJson } from '../src/engine/util.mjs';
 import { Session, checkAllowlist } from '../src/cli/setup-remote.mjs';
+import { MODES } from '../src/cli/deployment.mjs';
 
 after(cleanup);
 
@@ -49,8 +50,6 @@ test('T4-c08: a command on the setup-remote allowlist is accepted and runs, and 
     assert.equal(set.code, 0, `deployment set local must run as allowlisted: ${set.out}`);
     assert.equal(readJson(path.join(root, '.memev', 'config.json'), {}).deployment?.mode, 'local', 'and it records the mode');
     assert.match(set.out, /deployment set: mode local/);
-
-    // `deployment set container` is on the allowlist too, and memev has no such mode: which mode it means is an open decision
 
     // a licence file is checked as a path inside the vault, so it must be read from there and not from wherever the session runs
     assert.notEqual(elsewhere, root);
@@ -99,4 +98,26 @@ test('T4-c08: a command on the setup-remote allowlist is accepted and runs, and 
     spawnSync(process.execPath, [path.join(PKG, 'bin', 'memev.mjs'), 'stop'], { env: { ...process.env, MEMEV_ROOT: root }, encoding: 'utf8', timeout: 30000 });
     restore();
   }
+});
+
+test('every deployment mode the allowlist takes is one memev holds, and it runs', async () => {
+  const home = tmpdir('allowlist-'); const root = path.join(home, 'vault');
+  const restore = sandboxEnv(home);
+  initVault(root, { template: path.join(PKG, 'templates', 'vault'), port: freePort() });
+  const op = operator(root);
+  try {
+    assert.equal(checkAllowlist(['deployment', 'set', 'on-prem'], root).ok, true, 'on-prem is what a container install records');
+    assert.equal(checkAllowlist(['deployment', 'set', 'container'], root).ok, false, 'memev has no mode called container');
+    const { SESSION_MODES } = await import('../src/cli/setup-remote.mjs');
+    assert.ok(SESSION_MODES.length > 0);
+    for (const mode of SESSION_MODES) {
+      assert.ok(MODES.includes(mode), `the allowlist takes ${mode}, and the modes are ${MODES.join(', ')}`);
+      assert.equal(checkAllowlist(['deployment', 'set', mode], root).ok, true, mode);
+      const r = await op.send(['deployment', 'set', mode]);
+      assert.equal(r.code, 0, `${mode}: ${r.out}`);
+      assert.equal(readJson(path.join(root, '.memev', 'config.json'), {}).deployment?.mode, mode);
+    }
+    // nothing outside the list: a mode memev holds and a session does not offer is refused, as the managed service is only planned
+    for (const mode of MODES.filter((m) => !SESSION_MODES.includes(m))) assert.equal(checkAllowlist(['deployment', 'set', mode], root).ok, false, mode);
+  } finally { restore(); }
 });
