@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { PassThrough, Readable } from 'node:stream';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpdir, cleanup, OWNER, newVault } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
@@ -215,16 +216,15 @@ test('history big export: a 30 MB conversations.json streams one conversation at
   assert.ok(data.length > 30 * 1024 * 1024, `${data.length} bytes`);
   const zip = put(path.join(home, 'export.zip'), makeZip([{ name: 'conversations.json', data }]));
   convs.length = 0;
-  global.gc?.();
-  const rss0 = process.memoryUsage().rss;
-  let count = 0, skipped = 0, peak = rss0;
-  for await (const r of exportConversations(zip, { maxItemBytes: 1024 * 1024 })) {
-    if (r.skip) { skipped++; assert.equal(r.skip, 'too large'); } else count++;
-    if (count % 500 === 0) peak = Math.max(peak, process.memoryUsage().rss);
-  }
-  assert.equal(count, 6000, 'every conversation read');
-  assert.equal(skipped, 1, 'only the one over the limit skipped');
-  assert.ok(peak - rss0 < data.length, `memory grew ${Math.round((peak - rss0) / 1e6)} MB for a ${Math.round(data.length / 1e6)} MB file`);
+  // measured in a child with --expose-gc that collects before each sample: live memory, not what the collector has yet
+  // to free, so the number is the same on any runner. Streaming holds about one conversation; reading the file whole
+  // would hold all of it.
+  const child = spawnSync(process.execPath, ['--expose-gc', path.join(path.dirname(fileURLToPath(import.meta.url)), 'helpers', 'export-memory.mjs'), zip, String(1024 * 1024)], { encoding: 'utf8', timeout: 120000 });
+  assert.equal(child.status, 0, child.stderr);
+  const m = JSON.parse(child.stdout);
+  assert.equal(m.count, 6000, 'every conversation read');
+  assert.equal(m.skipped, 1, 'only the one over the limit skipped');
+  assert.ok(m.peak < data.length / 3, `live memory grew ${Math.round(m.peak / 1e6)} MB for a ${Math.round(data.length / 1e6)} MB file`);
   const s = (await scanHistory({ env: { HOME: home }, exports: [zip], findDownloads: false, maxItemBytes: 1024 * 1024 }))[0];
   assert.equal(s.count, 6000);
   assert.equal(s.too_large, 1, 'the scan reports the skip count');

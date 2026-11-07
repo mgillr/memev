@@ -64,7 +64,11 @@ test('remote: needs a per-device remote token (the old shared key is optional, b
   v.config.remote.enabled = false;
   assert.equal((await call(`/c/${remoteTok}/mcp`, { body, headers: viaTunnel })).status, 403);
   v.config.remote.enabled = true;
-  assert.ok(fs.readFileSync(path.join(v.state, 'access.jsonl'), 'utf8').length > 0, 'remote access is audited');
+  // the server appends each audit line without waiting for the disk (fs.appendFile with a callback), so the file can
+  // land a moment after the response: wait for it, up to 5 s, before reading it
+  const auditFile = path.join(v.state, 'access.jsonl');
+  for (let i = 0; i < 100 && !(fs.existsSync(auditFile) && fs.statSync(auditFile).size > 0); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.ok(fs.readFileSync(auditFile, 'utf8').length > 0, 'remote access is audited');
 });
 
 test('remote requests are rate limited', async () => {
