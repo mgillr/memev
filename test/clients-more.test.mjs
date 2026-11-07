@@ -39,6 +39,24 @@ const JSON_APPS = [
     entry: { command: BIN, args: linuxArgs('iflow') }, win: (h) => path.join(h, '.iflow', 'settings.json') },
   { id: 'warp', dir: (h) => path.join(h, '.warp'), file: (h) => path.join(h, '.warp', '.mcp.json'), key: ['mcpServers'],
     entry: { command: BIN, args: linuxArgs('warp') }, win: false },
+  { id: 'lmstudio', dir: (h) => path.join(h, '.lmstudio'), file: (h) => path.join(h, '.lmstudio', 'mcp.json'), key: ['mcpServers'],
+    entry: { command: BIN, args: linuxArgs('lmstudio') }, win: (h) => path.join(h, '.lmstudio', 'mcp.json') },
+  { id: 'anythingllm', dir: (h) => path.join(h, '.config', 'anythingllm-desktop', 'storage'), file: (h) => path.join(h, '.config', 'anythingllm-desktop', 'storage', 'plugins', 'anythingllm_mcp_servers.json'), key: ['mcpServers'],
+    entry: { command: BIN, args: linuxArgs('anythingllm') }, win: (h) => path.join(h, 'AppData', 'Roaming', 'anythingllm-desktop', 'storage', 'plugins', 'anythingllm_mcp_servers.json') },
+  { id: 'oterm', dir: (h) => path.join(h, '.local', 'share', 'oterm'), file: (h) => path.join(h, '.local', 'share', 'oterm', 'config.json'), key: ['mcpServers'],
+    entry: { command: BIN, args: linuxArgs('oterm') }, win: (h) => path.join(h, 'AppData', 'Roaming', 'oterm', 'config.json') },
+  { id: 'muse-code', dir: (h) => path.join(h, '.config', 'muse'), file: (h) => path.join(h, '.config', 'muse', 'settings.json'), key: ['mcp_servers'],
+    entry: { transport: 'stdio', command: BIN, args: linuxArgs('muse-code'), mode: 'optional' }, win: false },
+  { id: 'zcode', dir: (h) => path.join(h, '.zcode'), file: (h) => path.join(h, '.zcode', 'cli', 'config.json'), key: ['mcp', 'servers'],
+    entry: { command: BIN, args: linuxArgs('zcode') }, win: false },
+  { id: 'mcphub-nvim', dir: (h) => path.join(h, '.config', 'mcphub'), file: (h) => path.join(h, '.config', 'mcphub', 'servers.json'), key: ['mcpServers'],
+    entry: { command: BIN, args: linuxArgs('mcphub-nvim') }, win: false },
+  { id: 'codebuddy', dir: (h) => path.join(h, '.codebuddy'), file: (h) => path.join(h, '.codebuddy', '.mcp.json'), key: ['mcpServers'],
+    entry: { type: 'stdio', command: BIN, args: linuxArgs('codebuddy') }, win: false },
+  { id: 'qoder', dir: (h) => path.join(h, '.qoder'), file: (h) => path.join(h, '.qoder', 'settings.json'), key: ['mcpServers'],
+    entry: { command: BIN, args: linuxArgs('qoder') }, win: false },
+  { id: 'openhands', dir: (h) => path.join(h, '.openhands'), file: (h) => path.join(h, '.openhands', 'mcp.json'), key: ['mcpServers'],
+    entry: { command: BIN, args: linuxArgs('openhands') }, win: false },
 ];
 
 const plant = (f, obj) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, `${JSON.stringify(obj, null, 2)}\n`); return fs.readFileSync(f); };
@@ -159,4 +177,46 @@ test('kimi-code: KIMI_CODE_HOME moves both the folder looked for and the file', 
   assert.equal(detect(e2, BIN, 'linux').find((c) => c.id === 'kimi-code').found, true);
   connect('kimi-code', { env: e2, launcher: BIN, platform: 'linux' });
   assert.ok(fs.existsSync(path.join(kh, 'mcp.json')));
+});
+
+test('anythingllm and oterm: the macOS data folders are the ones their docs name, and OTERM_DATA_DIR moves oterm', () => {
+  const { home, env } = sandboxEnv();
+  const mac = clientDefs(env, BIN, 'darwin');
+  const sup = path.join(home, 'Library', 'Application Support');
+  assert.equal(mac.find((d) => d.id === 'anythingllm').edits()[0].file, path.join(sup, 'anythingllm-desktop', 'storage', 'plugins', 'anythingllm_mcp_servers.json'));
+  assert.equal(mac.find((d) => d.id === 'oterm').edits()[0].file, path.join(sup, 'oterm', 'config.json'));
+  const od = path.join(home, 'oterm-data');
+  assert.equal(clientDefs({ ...env, OTERM_DATA_DIR: od }, BIN, 'linux').find((d) => d.id === 'oterm').edits()[0].file, path.join(od, 'config.json'));
+});
+
+test('muse-code: a new settings file gets schema_version 1, which Muse Code needs, and an existing one keeps its own', () => {
+  const { home, env } = sandboxEnv();
+  fs.mkdirSync(path.join(home, '.config', 'muse'), { recursive: true });
+  connect('muse-code', { env, launcher: BIN, platform: 'linux' });
+  const f = path.join(home, '.config', 'muse', 'settings.json');
+  assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).schema_version, 1);
+  disconnect('muse-code', { env, platform: 'linux' });
+  assert.equal(fs.existsSync(f), false, 'the file Memev created is removed again');
+});
+
+test('codebuddy: Memev edits the first file CodeBuddy reads, so an older mcp.json is never shadowed by a new .mcp.json', () => {
+  const { home, env } = sandboxEnv();
+  const old = plant(path.join(home, '.codebuddy', 'mcp.json'), { mcpServers: { theirs: { command: 'x' } } });
+  connect('codebuddy', { env, launcher: BIN, platform: 'linux' });
+  assert.equal(fs.existsSync(path.join(home, '.codebuddy', '.mcp.json')), false, 'no new file ahead of theirs');
+  const j = JSON.parse(fs.readFileSync(path.join(home, '.codebuddy', 'mcp.json'), 'utf8'));
+  assert.ok(j.mcpServers.memev && j.mcpServers.theirs);
+  disconnect('codebuddy', { env, platform: 'linux' });
+  assert.ok(fs.readFileSync(path.join(home, '.codebuddy', 'mcp.json')).equals(old));
+});
+
+test('codebuddy: a JSONC file with comments keeps its comments', () => {
+  const { home, env } = sandboxEnv();
+  const f = path.join(home, '.codebuddy', '.mcp.json');
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, '{\n  // my servers\n  "mcpServers": {\n    "theirs": { "command": "x" },\n  },\n}\n');
+  assert.equal(connect('codebuddy', { env, launcher: BIN, platform: 'linux' }).status, 'added');
+  const t = fs.readFileSync(f, 'utf8');
+  assert.match(t, /\/\/ my servers/);
+  assert.match(t, /"memev"/);
 });

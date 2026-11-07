@@ -42,6 +42,15 @@ instructions mode.
 | iFlow CLI | `mcpServers` entry in `~/.iflow/settings.json` | yes | [settings](https://platform.iflow.cn/en/cli/configuration/settings), [MCP](https://platform.iflow.cn/en/cli/examples/mcp) |
 | Warp | `mcpServers` entry in `~/.warp/.mcp.json` | not documented | [MCP](https://docs.warp.dev/knowledge-and-collaboration/mcp) |
 | Mistral Vibe | a `[[mcp_servers]]` table named memev in `~/.vibe/config.toml` (in `$VIBE_HOME` when it is set), between `# memev:start` and `# memev:end`; left alone if you already have a server named memev | yes | [configuration](https://docs.mistral.ai/vibe/code/cli/configuration), [reference](https://docs.mistral.ai/vibe/code/cli/configuration-reference) |
+| LM Studio | `mcpServers` entry in `~/.lmstudio/mcp.json`; LM Studio asks before each tool call | yes | [blog](https://lmstudio.ai/blog/mcp), [MCP](https://lmstudio.ai/docs/app/mcp) |
+| AnythingLLM | `mcpServers` entry in `plugins/anythingllm_mcp_servers.json` in the storage folder (`~/.config/anythingllm-desktop/storage` on Linux, `~/Library/Application Support/anythingllm-desktop/storage` on macOS, `%APPDATA%\anythingllm-desktop\storage` on Windows) | yes | [MCP](https://docs.anythingllm.com/mcp-compatibility/overview), [storage](https://docs.anythingllm.com/installation-desktop/storage) |
+| oterm | `mcpServers` entry in `config.json` in the data folder (`~/.local/share/oterm` or `$XDG_DATA_HOME/oterm` on Linux, `~/Library/Application Support/oterm` on macOS, `%APPDATA%\oterm` on Windows, `$OTERM_DATA_DIR` when set) | yes | [app config](https://ggozad.github.io/oterm/app_config/), [MCP](https://ggozad.github.io/oterm/mcp/) |
+| Muse Code | `mcp_servers` entry (`transport: stdio`, `mode: optional`, so a run goes on if Memev cannot start) in `~/.config/muse/settings.json`; a new file gets the `schema_version: 1` Muse Code needs | not documented | [extending](https://dev.meta.ai/docs/muse-code/extending.md), [configuration](https://dev.meta.ai/docs/muse-code/configuration.md) |
+| ZCode | `mcp.servers` entry in `~/.zcode/cli/config.json` | not documented | [MCP services](https://zcode.z.ai/en/docs/mcp-services) |
+| MCPHub (Neovim) | `mcpServers` entry in `~/.config/mcphub/servers.json` | not documented | [servers.json](https://ravitemer.github.io/mcphub.nvim/mcp/servers_json.html) |
+| CodeBuddy Code | `mcpServers` entry in the first of `~/.codebuddy/.mcp.json`, `~/.codebuddy/mcp.json`, `~/.codebuddy.json` that exists (the one CodeBuddy reads), else the first | not documented | [MCP](https://www.codebuddy.ai/docs/cli/mcp) |
+| Qoder CLI | `mcpServers` entry in `~/.qoder/settings.json` | not documented | [MCP reference](https://docs.qoder.com/cli/mcp-reference) |
+| OpenHands CLI | `mcpServers` entry in `~/.openhands/mcp.json` | not documented | [MCP servers](https://docs.openhands.dev/openhands/usage/cli/mcp-servers) |
 
 **Aider** has no MCP and no hooks, so the hand-off is different: `memev card --aider` writes the
 resume card to a conventions file and adds it to the `read:` list in `~/.aider.conf.yml`, which Aider
