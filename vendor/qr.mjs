@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// A byte-mode QR symbol, error correction L, versions 1 to 9. Enough for an invite link.
+// A byte-mode QR symbol, error correction L, versions 1 to 9, 11 and 13 (the two larger ones have equal
+// blocks). Enough for an invite link or a WhatsApp link code.
 // The mask is 0. Version 7 and above carry the version information bits.
 
 const SPEC = {
@@ -12,7 +13,12 @@ const SPEC = {
   7: { data: 156, ecc: 20, blocks: 2, align: [6, 22, 38] },
   8: { data: 194, ecc: 24, blocks: 2, align: [6, 24, 42] },
   9: { data: 232, ecc: 30, blocks: 2, align: [6, 26, 46] },
+  11: { data: 324, ecc: 20, blocks: 4, align: [6, 30, 54] },
+  13: { data: 428, ecc: 26, blocks: 4, align: [6, 34, 62] },
 };
+const VERSIONS = Object.keys(SPEC).map(Number).sort((a, b) => a - b);
+// byte mode counts its length in 8 bits up to version 9 and in 16 bits from version 10
+const countBits = (version) => (version >= 10 ? 16 : 8);
 
 const EXP = new Uint8Array(512);
 const LOG = new Uint8Array(256);
@@ -47,11 +53,11 @@ function rsRemainder(data, nsym) {
 
 function bytesOf(text) { return Buffer.from(String(text), 'utf8'); }
 
-function dataCodewords(payload, count) {
+function dataCodewords(payload, count, version = 1) {
   const bits = [];
   const push = (value, n) => { for (let i = n - 1; i >= 0; i--) bits.push((value >>> i) & 1); };
   push(0b0100, 4);
-  push(payload.length, 8);
+  push(payload.length, countBits(version));
   for (const b of payload) push(b, 8);
   const cap = count * 8;
   if (bits.length > cap) throw new Error('the invite link is too long for a QR code');
@@ -64,8 +70,8 @@ function dataCodewords(payload, count) {
   return out;
 }
 
-function codewords(payload, spec) {
-  const data = dataCodewords(payload, spec.data);
+function codewords(payload, spec, version) {
+  const data = dataCodewords(payload, spec.data, version);
   const size = spec.data / spec.blocks;
   const blocks = [];
   const eccs = [];
@@ -173,8 +179,8 @@ function placeData(mod, res, words, version) {
 export function qrMatrix(text) {
   const payload = bytesOf(text);
   let version = 0; let spec = null;
-  for (let v = 1; v <= 9; v++) {
-    const overhead = 4 + 8;
+  for (const v of VERSIONS) {
+    const overhead = 4 + countBits(v);
     if ((SPEC[v].data * 8) >= overhead + payload.length * 8) { version = v; spec = SPEC[v]; break; }
   }
   if (!version) throw new Error('the invite link is too long for a QR code');
@@ -191,7 +197,7 @@ export function qrMatrix(text) {
   }
   reserveFormat(res);
   drawVersion(mod, res, version);
-  placeData(mod, res, codewords(payload, spec), version);
+  placeData(mod, res, codewords(payload, spec, version), version);
   drawFormat(mod, formatBits(0));
   return mod;
 }

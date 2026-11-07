@@ -8,7 +8,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { configDir, exists, writeAtomic, sha256 } from '../engine/util.mjs';
 import { config } from './common.mjs';
 import { VERSION } from '../engine/vault.mjs';
-import { installRuntime, launcherScript, recordedNode } from './main.mjs';
+import { installRuntime, launcherScript, recordedNode, toolsPath, windowsLauncher } from './main.mjs';
 import { healthy } from './daemon.mjs';
 
 /** The static version file the opt-in check reads, from the vault config. Empty when it is not set. */
@@ -98,8 +98,8 @@ export function installFromTarball(tarball, env = process.env, { sha256: expecte
     const bin = path.join(cfgDir, 'bin');
     fs.mkdirSync(bin, { recursive: true });
     const target = path.join(dir, 'bin', 'memev.mjs');
-    if (process.platform === 'win32') fs.writeFileSync(path.join(bin, 'memev.cmd'), `@"${process.execPath}" "${target}" %*\r\n`);
-    else writeAtomic(path.join(bin, 'memev'), launcherScript(recordedNode(env), target), 0o755);
+    if (process.platform === 'win32') fs.writeFileSync(path.join(bin, 'memev.cmd'), windowsLauncher(process.execPath, target, toolsPath(env)));
+    else writeAtomic(path.join(bin, 'memev'), launcherScript(recordedNode(env), target, toolsPath(env)), 0o755);
     return { dir, launcher: path.join(bin, process.platform === 'win32' ? 'memev.cmd' : 'memev'), version: ver };
   } finally {
     fs.rmSync(work, { recursive: true, force: true });

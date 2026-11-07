@@ -61,7 +61,7 @@ server.listen(port, bind, async () => {
   console.error(`[memev] serving ${root} on http://${bind}:${port}`);
   // the first prompt should not pay for reading the bus, and the health check should not wait for it
   vault.bus.warm().catch(() => {});
-  for (const mod of ['../cli/tunnel.mjs', '../cli/sync.mjs']) {
+  for (const mod of ['../cli/tunnel.mjs', '../cli/sync.mjs', '../bridge/supervise.mjs']) {
     try { const m = await import(mod); if (m.supervise) extras.push(m.supervise(vault, { root, port })); } catch (e) { if (e.code !== 'ERR_MODULE_NOT_FOUND') console.error(`[memev] ${mod}: ${e.message}`); }
   }
   // a start trusts a note's stat, so every note's bytes are checked once behind it
