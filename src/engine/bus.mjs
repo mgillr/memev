@@ -166,6 +166,48 @@ export class Bus {
     }
     throw new BusError('conflict', `no free seat name for ${fresh}`);
   }
+  /** Live by the roster's one rule: the seat has joined and its last heartbeat is within the live window. */
+  _liveNow(rec, p, at = Date.now()) { return !!(rec?.joined && p?.last_seen && ago(p.last_seen, at) <= this.liveMin); }
+  /** Sub-seats a background runner holds (memev runner on <seat>): a new session never takes one of them. */
+  _runnerSeats() { const r = readJson(path.join(this.root, '.memev', 'runner.json'), {}) || {}; return new Set(Object.entries(r).filter(([, e]) => e?.enabled).map(([n]) => n)); }
+  /**
+   * The seat of one session of an app on a computer. Each live session of the app has its own seat:
+   *   1. the seat this session already holds (its pulse names the session), so a resume or compaction keeps it, or
+   *      the seat of the session it replaced in the same app process (prev, from the session link);
+   *   2. else the plain seat (my-app@my-laptop), when it is not live, or live with no session holding it (a vault
+   *      from before session seats, or an app that names no session);
+   *   3. else the first sub-seat my-app@my-laptop/2, /3 ... that is not live and no runner holds.
+   * A seat comes free when its session has been gone longer than the roster's live window. A session named
+   * seat:<name> (a runner's headless turn, MEMEV_SEAT) is pinned to that seat, when it is this app's on this computer.
+   * The heartbeat that follows records the session on the seat; nothing here writes.
+   */
+  sessionSeat(client, device, session, { hint = null, prev = null, at = Date.now() } = {}) {
+    const base = this.ownSeatName(client, device);
+    const app = label(client);
+    const ours = (r) => r && !r.removed && r.device === device.id && r.client === app;
+    if (session.startsWith('seat:')) {
+      const want = session.slice(5); const r = this.seat(want);
+      if (r ? ours(r) : (want === base || want.startsWith(`${base}/`)) && SEAT_RE.test(want)) return r ? r.seat : want;
+      throw new BusError('forbidden', `${want} is not a seat of ${app} on this computer`);
+    }
+    if (this.seat(base)?.removed) return base; // a removed app stays off the bus: resolve refuses it
+    const names = [base]; for (let i = 2; i < 100; i++) names.push(`${base}/${i}`);
+    const held = (n) => { const r = this.seat(n); return r && ours(r) && this._pulse(r.seat).session === session ? r.seat : null; };
+    if (hint) { const h = held(hint); if (h) return h; }
+    for (const r of this.seats()) if (ours(r) && this._pulse(r.seat).session === session) return r.seat;
+    // the same app process started a new session (a /clear can do that): the seat of the one it replaced passes to it
+    if (prev && prev !== session) for (const r of this.seats()) if (ours(r) && this._pulse(r.seat).session === prev) return r.seat;
+    const reserved = this._runnerSeats();
+    for (const n of names) {
+      if (n !== base && reserved.has(n)) continue;
+      const r = this.seat(n);
+      if (!r) return n;
+      if (!ours(r) || (n !== base && reserved.has(r.seat))) continue;
+      const p = this._pulse(r.seat);
+      if (!this._liveNow(r, p, at) || (n === base && !p.session)) return r.seat;
+    }
+    throw new BusError('conflict', `no free seat for another session of ${app}`);
+  }
   /** True when the machine part of a seat name is this vault's own computer (or the older 'host' word). */
   _onHost(seat) {
     const at = String(seat).split('@');
@@ -330,15 +372,22 @@ export class Bus {
     const dev = ctx.device || this.devices.get(this.devices.hostId);
     const computer = dev?.kind === 'local-client' ? this.devices.get(this.devices.hostId) : dev;
     if (!computer || computer.status !== 'active') throw new BusError('forbidden', 'this computer was removed from the vault, so it is off the bus');
-    const own = this.ownSeatName(ctx.client, computer);
+    const base = this.ownSeatName(ctx.client, computer);
+    // a session the app named (the hooks, and the MCP server linked to them) has a seat of its own: see sessionSeat
+    const sess = !ctx.cli && computer.kind !== 'cloud-connector' && ctx.busSession ? String(ctx.busSession) : null;
+    const own = sess ? this.sessionSeat(ctx.client, computer, sess, { hint: ctx.seatHint || null, prev: ctx.prevSession || null }) : base;
     let name = seat || own;
-    if (seat) {
+    if (seat && sess) {
+      // a session posts only as its own seat: not as the plain seat when it holds a sub-seat, nor as another session's
+      const asked = this.seat(seat);
+      if (seat !== own && !(asked && asked.seat === this.seat(own)?.seat)) throw new BusError('forbidden', `${seat} is another session's seat; this session posts as ${own}`);
+    } else if (seat) {
       // the terminal on the vault's computer may act for any seat on that computer (memev bus watch)
       const rec = this.seat(seat);
       // an app posts only as its own seat: a recorded seat must be on this computer and registered by this app, so a local
       // app cannot speak as another app's seat, the lead's included (issue 263)
-      const mine = ctx.cli && ctx.local ? (rec ? rec.device === computer.id : this._onHost(seat)) : rec ? rec.device === computer.id && rec.client === label(ctx.client) : seat.split('/')[0] === own;
-      if (!mine) throw new BusError('forbidden', `${seat} belongs to another app or computer; you can only post as your own seat (${own})`);
+      const mine = ctx.cli && ctx.local ? (rec ? rec.device === computer.id : this._onHost(seat)) : rec ? rec.device === computer.id && rec.client === label(ctx.client) : seat.split('/')[0] === base;
+      if (!mine) throw new BusError('forbidden', `${seat} belongs to another app or computer; you can only post as your own seat (${base})`);
     }
     let rec = this.seat(name);
     if (rec && rec.seat !== name) name = rec.seat; // the seat was renamed: post under its current name
@@ -705,7 +754,7 @@ export class Bus {
     who ||= this.resolve(ctx);
     if (who.seat === OPERATOR) return null;
     const p = this._pulse(who.seat);
-    const rec = { seat: who.seat, device: who.device.id, last_seen: new Date(at).toISOString(), session: session || ctx.session || p.session || null, beats: (p.beats || 0) + 1, read: read || p.read || {}, read_extra: readExtra || p.read_extra || {}, seen_seq: seen == null ? (p.seen_seq || 0) : seen, seen_dseq: seenDseq || p.seen_dseq || null };
+    const rec = { seat: who.seat, device: who.device.id, last_seen: new Date(at).toISOString(), session: session || ctx.busSession || ctx.session || p.session || null, beats: (p.beats || 0) + 1, read: read || p.read || {}, read_extra: readExtra || p.read_extra || {}, seen_seq: seen == null ? (p.seen_seq || 0) : seen, seen_dseq: seenDseq || p.seen_dseq || null };
     const f = `${fileOf(who.seat)}.json`;
     this._w(this._p('pulse', f));
     fs.mkdirSync(this._p('pulse'), { recursive: true });
@@ -734,7 +783,7 @@ export class Bus {
       const last = lastOf(view, view.byFrom, names);
       let state = 'never joined';
       if (s.removed || !dev || dev.status !== 'active') state = 'removed';
-      else if (s.joined && p.last_seen) state = ago(p.last_seen, at) <= this.liveMin ? 'live' : 'stale';
+      else if (s.joined && p.last_seen) state = this._liveNow(s, p, at) ? 'live' : 'stale';
       const claimed = names.length > 1 ? [...new Set(names)].flatMap((n) => view.claimsBy.get(n) || []).sort((a, b) => placeOf(view, a) - placeOf(view, b)) : view.claimsBy.get(names[0]) || [];
       const claims = claimed.filter((m) => !view.verdicts.has(m.ref)).map((m) => m.ref);
       const status = lastOf(view, view.statusBy, names);
@@ -802,6 +851,8 @@ export const LEAD_ASKED_LINE = 'The lead AI is not chosen yet. The person was al
 /** The suggestion the setup session gets with the question: its own seat, for the person to accept or not. */
 export const leadSuggestion = (seat) => `Suggested: ${seat} (the app in this session, which ran first after setup). The person decides.`;
 
+/** The line a session on a sub-seat gets at its start: its own seat, for any bus tool call that does not take it already. */
+export const sessionSeatLine = (seat) => `This session's bus seat is ${seat} (another session of this app holds the plain seat). Your bus tools post as it; if a bus tool answers as another seat, pass seat: "${seat}".`;
 /** Record that the setup session has asked which AI should lead, so other sessions get a quiet line instead of the question. */
 export function markLeadAsked(root) {
   const f = path.join(root, BUS_DIR, 'operator.json');

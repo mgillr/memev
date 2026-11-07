@@ -18,6 +18,38 @@ old name still reach it. Each app joins the first
 time it opens a session. Apps on a computer that joins with `memev join` get their seats the same
 way, and a cloud app gets a seat like `chatgpt@cloud` on its first call.
 
+### More than one session of an app
+
+Open several sessions of one app on one computer (two Claude Code terminals, say) and each is its own seat,
+with nothing to set up. The first live session keeps the plain seat, `claude-code@my-laptop`, so a vault used
+one session at a time, and the lead seat, do not change. Each further live session takes the first free
+sub-seat: `claude-code@my-laptop/2`, then `/3` and so on. A sub-seat comes free when its session has been
+gone longer than the roster's live window (15 minutes, `bus.live_min`); until then the roster shows it
+**stale**, and the next new session takes it. A session that is resumed or compacted keeps its seat, and
+a new session the same app process starts (after a clear, say) takes over the seat of the one it replaced. A
+session that sat idle past the window and lost its seat to a new one takes the next free seat when it
+comes back.
+
+- Each seat has its own read position, unread messages, holds and comms-check answers. A message to
+  `claude-code@my-laptop` reaches the session on the plain seat only; a message to `all` reaches every
+  session's seat. A hold is per seat too: hold each sub-seat, or hold `all`.
+- `memev bus roster` lists every session's seat as live or stale. The lead can send a task to any
+  sub-seat, and `memev bus rename claude-code@my-laptop/2 claude-code@my-laptop/review` names one; its
+  session keeps it under the new name.
+- A session posts only as its own seat: not as the plain seat when it holds a sub-seat, and not as
+  another session's. This keeps sessions from mixing up their seats; it is not a wall between them,
+  since every session of one app on one computer shares the app's one credential.
+- How it works: the session-start hook names the session (the app passes its id to the hook), asks
+  the vault for the session's seat and keeps it in the session's hook state. The MCP server the app
+  starts for the session is told no session id, so the hook also records, for the processes above it,
+  which session they run; the MCP server looks up the nearest of its own parent processes and sends
+  that session with each tool call. Where the process table cannot be read (Windows), the session's
+  start-up context tells the AI its seat, and the AI passes it as `seat` on bus calls.
+- This applies to the apps Memev connects with hooks: Claude Code, Codex CLI, Gemini CLI and Cursor.
+  Apps connected with MCP and instructions only (Claude Desktop, VS Code, GitHub Copilot CLI and the
+  rest) keep one seat per app per computer, because nothing tells Memev which of their sessions is
+  calling.
+
 ### Choosing the lead
 
 One seat can lead: it coordinates the others and speaks for you (the operator seat). Memev never
@@ -115,6 +147,16 @@ another computer's log syncs in and the messages' numbers move, and a task that 
 earlier stamp still runs. One watch per seat: a second `memev runner watch <seat>` is refused while
 the first still runs. `memev runner status` shows what is on and how many runs each seat has had
  today; `memev runner off <seat>` stops it.
+
+A sub-seat can have a runner of its own, so several background agents of one app run side by side:
+`memev runner on claude-code@my-laptop/2 --max-runs-per-day N` and `/3` are separate, each with its
+own pid file (`.memev/runner-claude-code@my-laptop+2.pid`), cursor, daily limit and list of tasks
+already run. `memev runner on claude-code --agents 3 --max-runs-per-day N` turns on three at once,
+on the first sub-seats no live session holds (`/2`, `/3`, `/4` on a computer with one session open),
+and running it again keeps the same seats. `memev runner watch claude-code` then watches every
+runner seat of that app in one process, and `memev runner off claude-code` stops them all. The
+headless turn a runner starts posts as the runner's seat (the runner passes it as `MEMEV_SEAT`), and
+a new interactive session never takes a sub-seat a runner holds.
 
 ## Cloud seats
 
