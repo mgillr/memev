@@ -41,7 +41,7 @@
       "tasks": 7,
       "criteria": 31,
       "spec": "specs/SR-1.35-memev-is-fast-on-every-axis-we-measured.json",
-      "status": "version 2 proposed and unsigned; signs after its red-team round and supersedes the owner's version 1 of 6 Nov, which could not pass as signed (its full-suite command and a cut request); its code landed by PR 437, its fixes by PRs 446 to 448"
+      "status": "version 3 proposed and unsigned; signs after its red-team round and supersedes the owner's version 2 of 7 Nov, which could not pass as signed (the leak scan on the owner's merge subject, and the SR-1.29 start-up test under a later base); version 2 superseded version 1 of 6 Nov (its full-suite command and a cut request); its code landed by PR 437, its fixes by PRs 446 to 448 and 453"
     },
     {
       "id": "SR-1.01",
