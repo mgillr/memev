@@ -147,3 +147,14 @@ test('SR-2.09.2 T2: Amp uses settings.jsonc when that is the file that exists, a
   assert.match(t, /\/\/ my theme/);
   assert.match(t, /"amp\.mcpServers"/);
 });
+
+test('SR-2.09.2 T2: Cline follows CLINE_DATA_DIR, as Cline itself does', () => {
+  const { home, env, w } = fixtureHome();
+  w('.cline/keep.txt', 'x');
+  const dataDir = path.join(home, 'elsewhere', 'cline-data');
+  const r = connectAll({ env: { ...env, CLINE_DATA_DIR: dataDir }, launcher: '/x/memev', platform: 'linux' }).find((x) => x.id === 'cline');
+  assert.equal(r.status, 'added');
+  const j = JSON.parse(fs.readFileSync(path.join(dataDir, 'settings', 'cline_mcp_settings.json'), 'utf8'));
+  assert.deepEqual(j.mcpServers.memev.args, ['mcp', '--client', 'cline']);
+  assert.equal(fs.existsSync(path.join(home, '.cline', 'data', 'settings', 'cline_mcp_settings.json')), false);
+});

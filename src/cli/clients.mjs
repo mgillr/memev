@@ -308,8 +308,10 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
         mdBlock(path.join(home, '.kiro', 'steering', 'memev.md'))],
       manual: 'Kiro loads MCP servers only when its MCP support setting is on.' },
     // Cline: every Cline app reads ~/.cline/data/settings/cline_mcp_settings.json (mcpServers, plain JSON), and global rules in Documents/Cline/Rules.
-    { id: 'cline', name: 'Cline', mode: 'instructions', detect: () => exists(path.join(home, '.cline')),
-      edits: () => [json(path.join(env.CLINE_MCP_SETTINGS_PATH || path.join(home, '.cline', 'data', 'settings', 'cline_mcp_settings.json')), setServer('mcpServers', { ...stdio('cline'), disabled: false }), delServer('mcpServers')),
+    { id: 'cline', name: 'Cline', mode: 'instructions', detect: () => exists((env.CLINE_DIR || '').trim() || path.join(home, '.cline')),
+      // Cline's own order: CLINE_MCP_SETTINGS_PATH, then CLINE_DATA_DIR/settings, then CLINE_DIR (default ~/.cline)/data/settings.
+      edits: () => [json((env.CLINE_MCP_SETTINGS_PATH || '').trim() || ((env.CLINE_DATA_DIR || '').trim() ? path.join(env.CLINE_DATA_DIR.trim(), 'settings', 'cline_mcp_settings.json')
+        : path.join((env.CLINE_DIR || '').trim() || path.join(home, '.cline'), 'data', 'settings', 'cline_mcp_settings.json')), setServer('mcpServers', { ...stdio('cline'), disabled: false }), delServer('mcpServers')),
         mdBlock(path.join(home, 'Documents', 'Cline', 'Rules', 'memev.md'))] },
     // Amp: the user settings file holds servers under the flat key "amp.mcpServers"; settings.jsonc is used when it is the one that exists.
     { id: 'amp', name: 'Amp', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'amp')),
