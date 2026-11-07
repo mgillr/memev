@@ -9,6 +9,7 @@ import { TokenStore } from '../engine/tokens.mjs';
 import { writeAtomic, configDir, slug } from '../engine/util.mjs';
 import { renderCard } from '../engine/card.mjs';
 import { fetchOut } from '../engine/net.mjs';
+export const INIT_DAEMON_WAIT_MS = 30000;
 
 const HELP = `memev ${VERSION}: one memory shared by every AI session you run
 
@@ -289,7 +290,8 @@ async function run(argv, env) {
         fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 });
         out.warn(`Port ${wanted} is in use by another program; Memev is using ${port}`);
       }
-      const up = await startDaemon(root, { quiet: true });
+      // a first start can be slow (on Windows the virus scanner checks Node as it starts): wait up to 30 s, returning as soon as it answers
+      const up = await startDaemon(root, { quiet: true, waitMs: INIT_DAEMON_WAIT_MS });
       up ? out.ok(`Memev is running on http://127.0.0.1:${daemonInfo(root)?.port ?? config(root).port}`) : out.bad('Memev did not start: run memev doctor');
       const onboarding = await import('./onboarding.mjs').catch(() => null);
       if (onboarding) return onboarding.firstRun({ root, env, flags, launcher: rt.launcher, daemonUp: up });
