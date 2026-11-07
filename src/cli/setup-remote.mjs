@@ -18,7 +18,7 @@ const ALLOW = [
   { cmd: 'license', args: ['status'] },
   { cmd: 'license', args: ['install', '<file>'] },
   { cmd: 'devices', args: ['list'] },
-  { cmd: 'connect', args: ['<app>'] },
+  { cmd: 'connect', args: ['<app>', '...'] },
   { cmd: 'ready', args: [] },
   { cmd: 'setup', args: ['remote', 'log'] },
   { cmd: 'setup', args: ['remote', 'log', '<sid>'] },
@@ -56,15 +56,18 @@ export function checkAllowlist(argv, root) {
     return { ok: false, reason: `license: unknown subcommand ${rest[0] || '(none)'}` };
   }
   if (cmd === 'devices' && rest[0] === 'list' && rest.length === 1) return { ok: true };
-  if (cmd === 'connect' && rest.length === 1) {
-    if (rest[0] === 'all')
-      return { ok: false, reason: 'connect: "all" is not allowed, name one app' };
+  // the setup screen sends the apps the person ticked: each must be named, found and supported
+  if (cmd === 'connect' && rest.length >= 1) {
+    if (rest.includes('all'))
+      return { ok: false, reason: 'connect: "all" is not allowed, name the apps' };
     const apps = detect();
-    const app = apps.find((a) => a.id === rest[0]);
-    if (!app)
-      return { ok: false, reason: `connect: unknown app ${rest[0]}` };
-    if (!app.found || app.supported === false)
-      return { ok: false, reason: `connect: app ${rest[0]} is not found and supported on this install` };
+    for (const id of rest) {
+      const app = apps.find((a) => a.id === id);
+      if (!app)
+        return { ok: false, reason: `connect: unknown app ${id}` };
+      if (!app.found || app.supported === false)
+        return { ok: false, reason: `connect: app ${id} is not found and supported on this install` };
+    }
     return { ok: true };
   }
   if (cmd === 'ready' && rest.length === 0) return { ok: true };

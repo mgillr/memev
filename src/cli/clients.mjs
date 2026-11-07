@@ -34,6 +34,17 @@ export function platformDirs(env = process.env) {
   return { home, appData };
 }
 
+// The folders an app's docs name, for the platform given (not the one this runs on), so a test can ask
+// for the Windows paths on any machine. appData is the per-user settings folder (Roaming on Windows),
+// localAppData is Local on Windows, xdg is the XDG config folder elsewhere.
+export function osDirs(env = process.env, platform = process.platform) {
+  const home = homeDir(env);
+  const xdg = env.XDG_CONFIG_HOME || path.join(home, '.config');
+  if (platform === 'win32') return { home, xdg, appData: env.APPDATA || path.join(home, 'AppData', 'Roaming'), localAppData: env.LOCALAPPDATA || path.join(home, 'AppData', 'Local') };
+  if (platform === 'darwin') { const a = path.join(home, 'Library', 'Application Support'); return { home, xdg, appData: a, localAppData: a }; }
+  return { home, xdg, appData: xdg, localAppData: xdg };
+}
+
 const isOurs = (cmd) => typeof cmd === 'string' && /memev/.test(cmd) && / hook /.test(cmd);
 const hookCmd = (launcher, event, client, format) => `${launcher} hook ${event} --client ${client}${format ? ` --format ${format}` : ''}`;
 
@@ -310,8 +321,141 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
     { id: 'grok-build', name: 'Grok Build', mode: 'instructions', detect: () => exists(path.join(home, '.grok')),
       edits: () => [text(path.join(home, '.grok', 'config.toml'), (t) => upsertMcpToml(t, mcpTomlBlock(win, bin, 'grok-build')), (t) => removeBlock(t, [TOML_START, TOML_END]), tomlSkipNote('Grok Build'))],
       note: 'Grok Build also reads ~/.claude.json, so when Claude Code is connected too it may list memev twice; grok mcp list shows the servers it loaded.' },
+    ...moreApps(env, platform, stdio),
   ];
-  return defs;
+  // An app whose docs give no Windows location is not connected on Windows; unsupportedDefs lists it there instead.
+  return platform === 'win32' && !opts.allPlatforms ? defs.filter((d) => d.windows !== false) : defs;
+}
+
+// ---- More apps. Every path, key and entry shape below is the one the app's own MCP docs give; docs/CLIENTS.md
+// cites each page. windows: false marks an app whose docs name no Windows location, so it is not connected there.
+// True only when an [[mcp_servers]] table (from its header to the next table header) holds name = "memev": a
+// name = "memev" line under any other table, such as [[profiles]], is not a server.
+function vibeHasMemev(t) {
+  let inServers = false;
+  for (const line of String(t).split('\n')) {
+    const header = /^\s*\[\[?\s*([^\]]+?)\s*\]\]?\s*(#.*)?$/.exec(line);
+    if (header) { inServers = /^\[\[/.test(line.trim()) && header[1] === 'mcp_servers'; continue; }
+    if (inServers && /^\s*name\s*=\s*["']memev["']/.test(line)) return true;
+  }
+  return false;
+}
+function upsertVibeToml(t, block) {
+  const base = removeBlock(t, [TOML_START, TOML_END]);
+  if (vibeHasMemev(base)) return base; // the person already has a server named memev: leave it as it is
+  return addBlock(base, block, [TOML_START, TOML_END]);
+}
+const vibeSkipNote = (b) => (b && vibeHasMemev(removeBlock(b, [TOML_START, TOML_END])) ? 'Mistral Vibe already has an mcp_servers table named memev in config.toml, so Memev left it as-is' : null);
+function moreApps(env, platform, stdio) {
+  const { home } = osDirs(env, platform);
+  const kimiHome = env.KIMI_CODE_HOME || path.join(home, '.kimi-code');
+  const vibeHome = env.VIBE_HOME || path.join(home, '.vibe');
+  const { appData } = osDirs(env, platform);
+  // AnythingLLM names ~/.config on Linux (not XDG), Application Support on macOS and AppData\\Roaming on Windows
+  const anythingStorage = path.join(platform === 'win32' || platform === 'darwin' ? appData : path.join(home, '.config'), 'anythingllm-desktop', 'storage');
+  const otermDir = env.OTERM_DATA_DIR || path.join(platform === 'win32' || platform === 'darwin' ? appData : (env.XDG_DATA_HOME || path.join(home, '.local', 'share')), 'oterm');
+  const mcpJson = (file, id, key = 'mcpServers', extra = {}) => json(file, setServer(key, { ...extra, ...stdio(id) }), delServer(key));
+  return [
+    // https://qwenlm.github.io/qwen-code-docs/en/users/features/mcp : "~/.qwen/settings.json" (~ is your home directory)
+    { id: 'qwen-code', name: 'Qwen Code', mode: 'instructions', detect: () => exists(path.join(home, '.qwen')),
+      edits: () => [mcpJson(path.join(home, '.qwen', 'settings.json'), 'qwen-code')] },
+    // https://www.kimi.com/code/docs/en/kimi-code-cli/customization/mcp.html : "~/.kimi-code/mcp.json (or $KIMI_CODE_HOME/mcp.json)"
+    { id: 'kimi-code', name: 'Kimi Code CLI', mode: 'instructions', detect: () => exists(kimiHome),
+      edits: () => [mcpJson(path.join(kimiHome, 'mcp.json'), 'kimi-code')] },
+    // https://docs.factory.com/cli/configuration/mcp : "~/.factory/mcp.json", type "stdio"
+    { id: 'factory-droid', name: 'Factory Droid', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.factory')),
+      edits: () => [mcpJson(path.join(home, '.factory', 'mcp.json'), 'factory-droid', 'mcpServers', { type: 'stdio' })] },
+    // https://docs.augmentcode.com/cli/integrations : "~/.augment/settings.json"
+    { id: 'augment', name: 'Augment (Auggie CLI)', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.augment')),
+      edits: () => [mcpJson(path.join(home, '.augment', 'settings.json'), 'augment')] },
+    // https://docs.tabnine.com/main/getting-started/tabnine-agent/mcp-intro-and-setup/mcp-server-config : "~/.tabnine/agent/settings.json" (macOS/Linux)
+    { id: 'tabnine', name: 'Tabnine CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.tabnine', 'agent')),
+      edits: () => [mcpJson(path.join(home, '.tabnine', 'agent', 'settings.json'), 'tabnine')] },
+    // https://platform.iflow.cn/en/cli/configuration/settings : "~/.iflow/settings.json" (~ represents your home directory)
+    { id: 'iflow', name: 'iFlow CLI', mode: 'instructions', detect: () => exists(path.join(home, '.iflow')),
+      edits: () => [mcpJson(path.join(home, '.iflow', 'settings.json'), 'iflow')] },
+    // https://docs.warp.dev/knowledge-and-collaboration/mcp : global "~/.warp/.mcp.json"
+    { id: 'warp', name: 'Warp', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.warp')),
+      edits: () => [mcpJson(path.join(home, '.warp', '.mcp.json'), 'warp')],
+      manual: 'If Warp asks you to approve the change to its MCP config, approve it; memev then starts on its own.' },
+    // https://docs.mistral.ai/vibe/code/cli/configuration : "~/.vibe/config.toml" (VIBE_HOME moves it); one [[mcp_servers]] table per server
+    { id: 'mistral-vibe', name: 'Mistral Vibe', mode: 'instructions', detect: () => exists(vibeHome),
+      edits: () => { const e = stdio('mistral-vibe'); return [text(path.join(vibeHome, 'config.toml'), (t) => upsertVibeToml(t, `${TOML_START}\n[[mcp_servers]]\nname = "memev"\ntransport = "stdio"\ncommand = ${tomlEsc(e.command)}\nargs = [${e.args.map(tomlEsc).join(', ')}]\n${TOML_END}`), (t) => removeBlock(t, [TOML_START, TOML_END]), vibeSkipNote)]; } },
+    // https://lmstudio.ai/blog/mcp : "~/.lmstudio/mcp.json on macOS and Linux", "%USERPROFILE%/.lmstudio/mcp.json on Windows";
+    // https://lmstudio.ai/docs/app/mcp : "follows Cursor's mcp.json notation"
+    { id: 'lmstudio', name: 'LM Studio', mode: 'instructions', detect: () => exists(path.join(home, '.lmstudio')),
+      edits: () => [mcpJson(path.join(home, '.lmstudio', 'mcp.json'), 'lmstudio')],
+      manual: 'LM Studio asks before each tool call; allow the memev tools when it asks.' },
+    // https://docs.anythingllm.com/mcp-compatibility/overview : "anythingllm_mcp_servers.json ... in your AnythingLLM storage plugins directory";
+    // https://docs.anythingllm.com/installation-desktop/storage : the storage folder per OS
+    { id: 'anythingllm', name: 'AnythingLLM', mode: 'instructions', detect: () => exists(anythingStorage),
+      edits: () => [mcpJson(path.join(anythingStorage, 'plugins', 'anythingllm_mcp_servers.json'), 'anythingllm')] },
+    // https://ggozad.github.io/oterm/app_config/ : config.json in the data folder (OTERM_DATA_DIR, else XDG_DATA_HOME/oterm on Linux)
+    // https://ggozad.github.io/oterm/mcp/ : "Add MCP servers under the mcpServers key"
+    { id: 'oterm', name: 'oterm', mode: 'instructions', detect: () => exists(otermDir),
+      edits: () => [mcpJson(path.join(otermDir, 'config.json'), 'oterm')] },
+    // https://dev.meta.ai/docs/muse-code/extending.md : mcp_servers, transport stdio, mode optional skips a server that cannot start;
+    // https://dev.meta.ai/docs/muse-code/configuration.md : "~/.config/muse/settings.json", which "must set schema_version: 1"
+    { id: 'muse-code', name: 'Muse Code', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.config', 'muse')),
+      edits: () => [json(path.join(home, '.config', 'muse', 'settings.json'), (j) => { j.schema_version ??= 1; return setServer('mcp_servers', { transport: 'stdio', ...stdio('muse-code'), mode: 'optional' })(j); }, delServer('mcp_servers'))] },
+    // https://zcode.z.ai/en/docs/mcp-services : user native "~/.zcode/cli/config.json", key "mcp.servers"
+    { id: 'zcode', name: 'ZCode', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.zcode')),
+      edits: () => [json(path.join(home, '.zcode', 'cli', 'config.json'),
+        (j) => { j.mcp = j.mcp && typeof j.mcp === 'object' ? j.mcp : {}; setServer('servers', stdio('zcode'))(j.mcp); return j; },
+        (j) => { if (j.mcp && typeof j.mcp === 'object') { delServer('servers')(j.mcp); if (!Object.keys(j.mcp).length) delete j.mcp; } return j; })] },
+    // https://ravitemer.github.io/mcphub.nvim/mcp/servers_json.html : "~/.config/mcphub/servers.json", key mcpServers
+    { id: 'mcphub-nvim', name: 'MCPHub (Neovim)', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.config', 'mcphub')),
+      edits: () => [mcpJson(path.join(home, '.config', 'mcphub', 'servers.json'), 'mcphub-nvim')] },
+    // https://www.codebuddy.ai/docs/cli/mcp : ~/.codebuddy/.mcp.json, then ~/.codebuddy/mcp.json, then ~/.codebuddy.json;
+    // "reads the first existing file", so Memev edits that one (JSONC allowed)
+    { id: 'codebuddy', name: 'CodeBuddy Code', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.codebuddy')),
+      edits: () => {
+        const files = [path.join(home, '.codebuddy', '.mcp.json'), path.join(home, '.codebuddy', 'mcp.json'), path.join(home, '.codebuddy.json')];
+        return [json(files.find((f) => exists(f)) || files[0], setServer('mcpServers', { type: 'stdio', ...stdio('codebuddy') }), delServer('mcpServers'))];
+      } },
+    // https://docs.qoder.com/cli/mcp-reference : user level "~/.qoder/settings.json", key mcpServers
+    { id: 'qoder', name: 'Qoder CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.qoder')),
+      edits: () => [mcpJson(path.join(home, '.qoder', 'settings.json'), 'qoder')] },
+    // https://docs.cline.bot/mcp/configuring-mcp-servers : "CLI: ~/.cline/data/settings/cline_mcp_settings.json (override with the
+    // CLINE_MCP_SETTINGS_PATH env var)"; https://docs.cline.bot/getting-started/config : ~/.cline/ is shared by the IDE, CLI and SDK
+    { id: 'cline', name: 'Cline', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.cline')),
+      edits: () => [mcpJson(env.CLINE_MCP_SETTINGS_PATH || path.join(home, '.cline', 'data', 'settings', 'cline_mcp_settings.json'), 'cline', 'mcpServers', { disabled: false })],
+      manual: 'In the Cline extension for VS Code, check MCP Servers, Configure: the extension keeps its own MCP settings file, which its docs do not name.' },
+    // https://kiro.dev/docs/mcp/configuration/ : "User Level: ~/.kiro/settings/mcp.json", for the IDE, the CLI and the web
+    { id: 'kiro', name: 'Kiro', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.kiro')),
+      edits: () => [mcpJson(path.join(home, '.kiro', 'settings', 'mcp.json'), 'kiro')],
+      manual: 'In the Kiro IDE, turn on the MCP support setting if it is off.' },
+    // https://junie.jetbrains.com/docs/junie-cli-mcp-configuration.html : "User scope: ~/.junie/mcp/mcp.json", the IDE plugin and CLI share it
+    { id: 'junie', name: 'Junie', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.junie')),
+      edits: () => [mcpJson(path.join(home, '.junie', 'mcp', 'mcp.json'), 'junie')] },
+    // https://ampcode.com/docs/cli/settings : ~/.config/amp/settings.json or settings.jsonc, on Windows %USERPROFILE%\.config\amp\...;
+    // https://ampcode.com/docs/customize/mcp : the "amp.mcpServers" key with command and args
+    { id: 'amp', name: 'Amp', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'amp')),
+      edits: () => {
+        const dir = path.join(home, '.config', 'amp');
+        const f = exists(path.join(dir, 'settings.json')) || !exists(path.join(dir, 'settings.jsonc')) ? path.join(dir, 'settings.json') : path.join(dir, 'settings.jsonc');
+        return [mcpJson(f, 'amp', 'amp.mcpServers')];
+      } },
+    // https://kilo.ai/docs/automate/mcp/using-in-kilo-code : "Global Configuration: ~/.config/kilo/kilo.jsonc" (or kilo.json),
+    // on Windows C:\Users\<username>\.config\kilo\kilo.jsonc; key mcp, type local, the command as one array
+    { id: 'kilo-code', name: 'Kilo Code', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'kilo')),
+      edits: () => {
+        const dir = path.join(home, '.config', 'kilo');
+        const f = !exists(path.join(dir, 'kilo.jsonc')) && exists(path.join(dir, 'kilo.json')) ? path.join(dir, 'kilo.json') : path.join(dir, 'kilo.jsonc');
+        const e = stdio('kilo-code');
+        return [json(f, setServer('mcp', { type: 'local', command: [e.command, ...e.args], enabled: true }), delServer('mcp'))];
+      },
+      manual: 'Kilo asks before each Memev tool call; to allow them, add "permission": { "memev_*": "allow" } to kilo.jsonc.' },
+    // https://github.com/aws/amazon-q-developer-cli/blob/main/docs/agent-format.md : the legacy file "~/.aws/amazonq/mcp.json for global";
+    // .../docs/default-agent-behavior.md : the default agent "includes MCP servers from the legacy global configuration file".
+    // The CLI is now Kiro CLI; this is for installs that remain.
+    { id: 'amazon-q-cli', name: 'Amazon Q Developer CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.aws', 'amazonq')),
+      edits: () => [mcpJson(path.join(home, '.aws', 'amazonq', 'mcp.json'), 'amazon-q-cli')],
+      note: 'Custom agents read their own mcpServers; the default agent reads this file.' },
+    // https://docs.openhands.dev/openhands/usage/cli/mcp-servers : "~/.openhands/mcp.json", key mcpServers
+    { id: 'openhands', name: 'OpenHands CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.openhands')),
+      edits: () => [mcpJson(path.join(home, '.openhands', 'mcp.json'), 'openhands')] },
+  ];
 }
 
 /** Whether Claude Code's settings.json allows Memev's memory tools right now (any of the per-tool entries in permissions.allow). */
@@ -323,18 +467,34 @@ export function claudeToolsAllowed(env = process.env) {
 
 /** The apps Memev detects but does not support yet. They are listed as found, not supported, and their files are never changed.
  *  Each app is looked up at the directory its own docs name, which differs per app and per platform. */
-export function unsupportedDefs(env) {
+export function unsupportedDefs(env, platform = process.platform) {
   const { home, appData } = platformDirs(env);
   const xdg = env.XDG_CONFIG_HOME || path.join(home, '.config');
-  const win = process.platform === 'win32';
+  const win = platform === 'win32';
   return [
-    { id: 'cline', name: 'Cline', detect: () => exists(path.join(home, '.cline')) },
-    { id: 'roo', name: 'Roo', detect: () => exists(path.join(home, '.roo')) },
-    { id: 'continue', name: 'Continue', detect: () => exists(path.join(home, '.continue')) },
-    { id: 'kiro', name: 'Kiro', detect: () => exists(path.join(home, '.kiro')) },
-    { id: 'jetbrains-ai', name: 'JetBrains AI', detect: () => exists(path.join(appData, 'JetBrains')) },
-    { id: 'amp', name: 'Amp', detect: () => exists(win ? path.join(home, '.config', 'amp') : path.join(xdg, 'amp')) },
-    { id: 'goose', name: 'Goose', detect: () => exists(win ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(xdg, 'goose')) },
+    { id: 'roo', name: 'Roo', detect: () => exists(path.join(home, '.roo')),
+      manual: 'Roo keeps its global MCP servers in mcp_settings.json inside VS Code, at a place its docs do not name: add memev from Roo\'s MCP settings (Edit Global MCP).' },
+    { id: 'continue', name: 'Continue', detect: () => exists(path.join(home, '.continue')),
+      manual: 'Continue lists MCP servers in ~/.continue/config.yaml, a YAML list Memev does not edit yet: add a stdio entry named memev under mcpServers.' },
+    { id: 'jetbrains-ai', name: 'JetBrains AI', detect: () => exists(path.join(appData, 'JetBrains')),
+      manual: 'JetBrains AI Assistant keeps MCP servers in its settings only: Settings | Tools | AI Assistant | Model Context Protocol (MCP), Add.' },
+    { id: 'goose', name: 'Goose', detect: () => exists(win ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(xdg, 'goose')),
+      manual: 'Goose keeps extensions in config.yaml, a YAML map Memev does not edit yet: add memev under extensions with type: stdio, cmd and args.' },
+    // MCP servers kept in the app's own settings screen or a file whose format the docs do not give: found, never changed
+    { id: 'jan', name: 'Jan', detect: () => exists(path.join(platform === 'win32' || platform === 'darwin' ? osDirs(env, platform).appData : path.join(home, '.local', 'share'), 'Jan', 'data')),
+      manual: 'Jan adds MCP servers in its settings only: Settings, MCP Servers, + Add MCP Server, transport STDIO, then toggle the server on.' },
+    { id: 'cherry-studio', name: 'Cherry Studio', detect: () => exists(path.join(osDirs(env, platform).appData, 'CherryStudio')),
+      manual: 'Cherry Studio adds MCP servers in its settings only: Settings, MCP, MCP Servers, Add.' },
+    { id: 'boltai', name: 'BoltAI', detect: () => platform === 'darwin' && exists(path.join(home, '.boltai')),
+      manual: 'BoltAI\'s docs name ~/.boltai/mcp.json but not its format: add memev in Settings, Plugins, then Reload Config.' },
+    { id: 'lingma', name: 'Lingma', detect: () => exists(path.join(home, '.lingma')),
+      manual: 'Lingma adds MCP servers through a JSON form in the IDE, then asks you to restart the IDE.' },
+    { id: 'rovodev', name: 'Rovo Dev CLI', detect: () => exists(path.join(home, '.rovodev')),
+      manual: 'Rovo Dev\'s docs name two different MCP files (mcp.json and mcp_config.json): run acli rovodev mcp to add memev in the file your version opens.' },
+    { id: 'crush', name: 'Crush', detect: () => exists(path.join(home, '.config', 'crush')),
+      manual: 'Crush now reads a crushrc file of mcp add lines (its JSON config is deprecated): add memev with an mcp add line in ~/.config/crush/crushrc.' },
+    // apps connected on macOS and Linux whose docs name no Windows location: found on Windows, never changed there
+    ...(win ? clientDefs(env, 'memev', platform, { allPlatforms: true }).filter((d) => d.windows === false).map((d) => ({ id: d.id, name: d.name, detect: d.detect, manual: `${d.name}'s docs give no Windows location for its MCP config, so Memev does not change it on Windows yet.` })) : []),
   ];
 }
 
@@ -502,13 +662,24 @@ export const RESTART = {
   cursor: 'Open a new Cursor chat', 'claude-desktop': 'Quit and reopen Claude Desktop', windsurf: 'Quit and reopen Windsurf',
   vscode: 'Reload the VS Code window (Developer: Reload Window)', zed: 'Quit and reopen Zed',
   opencode: 'Quit and reopen OpenCode', 'copilot-cli': 'Start a new Copilot CLI session', 'grok-build': 'Start a new Grok Build session',
+  'qwen-code': 'Restart Qwen Code in the same project', 'kimi-code': 'Start a new Kimi Code CLI session',
+  'factory-droid': 'Nothing to do: Droid reloads mcp.json when it changes', augment: 'Start a new Auggie session (check with /mcp)',
+  tabnine: 'Run /mcp reload in Tabnine CLI', iflow: 'Run /mcp refresh in iFlow CLI', warp: 'Open a new Warp agent session',
+  'mistral-vibe': 'Start a new Mistral Vibe session',
+  lmstudio: 'Restart LM Studio', anythingllm: 'Reload the MCP servers from the config file in AnythingLLM\'s MCP management screen',
+  oterm: 'Restart oterm', 'muse-code': 'Start a new Muse Code session', zcode: 'Open ZCode settings, MCP Servers, and check memev is enabled',
+  'mcphub-nvim': 'Nothing to do: MCPHub picks up servers.json changes in every Neovim', codebuddy: 'Restart CodeBuddy Code',
+  qoder: 'Run /mcp reload in Qoder CLI', openhands: 'Start a new OpenHands conversation',
+  cline: 'Restart Cline', kiro: 'Nothing to do: Kiro applies a saved mcp.json between turns', junie: 'Start a new Junie session',
+  amp: 'Run the Reload MCP command in Amp', 'kilo-code': 'Restart Kilo Code',
+  'amazon-q-cli': 'Start a new q chat session',
 };
 // Apps whose session-start hook brings the protocol, so their MCP instructions need not repeat it.
 export const HOOK_CLIENTS = new Set(clientDefs({}, 'memev').filter((d) => d.mode === 'hooks').map((d) => d.id));
 export function detect(env = process.env, launcher = 'memev', platform = process.platform) {
   const st = loadState(env);
   const supported = clientDefs(env, launcher, platform).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}`, supported: true }));
-  const unsupported = unsupportedDefs(env).map((d) => ({ id: d.id, name: d.name, found: !!d.detect(), supported: false }));
+  const unsupported = unsupportedDefs(env, platform).map((d) => ({ id: d.id, name: d.name, found: !!d.detect(), supported: false, manual: d.manual || null }));
   return [...supported, ...unsupported];
 }
 
@@ -517,12 +688,30 @@ export function connectAll({ env = process.env, launcher, force = false, platfor
   return detect(env, launcher, platform).filter((c) => c.found && c.supported && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform, project, allowTools }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
 }
 
+/** Connect exactly the named apps, in the order given (a repeated name counts once). Every name is checked
+ *  before any file changes: an unknown name throws and nothing is connected. A named app is connected even
+ *  when it was declined before (naming it is the yes); a found app that is not supported is reported, never
+ *  changed. */
+export function connectSelected(ids, { env = process.env, launcher, dryRun = false, platform = process.platform, project = null, allowTools } = {}) {
+  const list = [...new Set(ids.map(String))];
+  if (!list.length) throw new Error('name at least one app (memev clients lists them)');
+  if (list.includes('all')) throw new Error('all connects every app: use it alone');
+  const known = detect(env, launcher, platform);
+  const unknown = list.filter((id) => !known.some((c) => c.id === id));
+  if (unknown.length) throw new Error(`unknown app${unknown.length > 1 ? 's' : ''}: ${unknown.join(', ')} (memev clients lists the apps)`);
+  return list.map((id) => {
+    const c = known.find((x) => x.id === id);
+    if (!c.supported) return { id, name: c.name, status: 'unsupported', reason: c.found ? 'found, not supported yet' : 'not supported yet' };
+    try { return connect(id, { env, launcher, dryRun, platform, project, allowTools }); } catch (e) { return { id, name: c.name, status: 'failed', reason: e.message }; }
+  });
+}
+
 export function launcherPath(env = process.env) { return path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev'); }
 
 export async function command(cmd, pos, flags, { env, root }) {
   const launcher = launcherPath(env);
   if (!exists(launcher)) { const { installRuntime } = await import('./main.mjs'); installRuntime(env); }
-  const target = pos[0] || 'all';
+  const target = pos.length > 1 ? 'several' : (pos[0] || 'all');
   if (cmd === 'clients') {
     for (const c of detect(env, launcher)) console.log(`  ${c.connected ? '\u2713' : c.found ? '\u00b7' : ' '} ${c.name.padEnd(15)} ${c.found ? (c.supported ? (c.connected ? `connected (${c.mode === 'hooks' ? 'hooks + MCP' : 'MCP + instructions'})` : c.declined ? 'found, disconnected by you' : 'found, not connected') : 'found, not supported yet') : 'not found'}`);
     return 0;
@@ -536,10 +725,12 @@ export async function command(cmd, pos, flags, { env, root }) {
     return 0;
   }
   if (cmd === 'connect') {
-    if (target !== 'all') {
+    if (target !== 'all' && target !== 'several') {
       const c = detect(env, launcher).find((x) => x.id === target);
-      if (c && c.found && !c.supported) { out.info(`${c.name}: found, not supported yet (see docs/CLIENTS.md to ask for it)`); return 0; }
+      if (c && !c.supported) { out.info(`${c.name}: ${c.found ? 'found, ' : ''}not supported yet${c.manual ? `; ${c.manual}` : ''} (see docs/CLIENTS.md to ask for it)`); return 0; }
     }
+    // memev connect claude-code cursor vscode: exactly those apps, checked before anything changes
+    if (target === 'several' && pos.includes('all')) throw new Error('memev connect all connects every app: use it alone, or name the apps');
     // the stored consent (the init question or an earlier --allow-tools) keeps applying: a plain connect
     // re-adds the entries after a disconnect, and the flag still forces them on or off
     const v = flags['no-allow-tools'] ? false : flags['allow-tools'];
@@ -547,16 +738,19 @@ export async function command(cmd, pos, flags, { env, root }) {
     const ob = await import('./onboarding.mjs');
     if (explicit !== undefined && !flags['dry-run']) ob.setAllowTools(env, explicit);
     const allowTools = explicit ?? (ob.allowToolsSettings(env).enabled || undefined);
-    const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, project: flags.project, allowTools }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project, allowTools })];
+    const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, project: flags.project, allowTools })
+      : target === 'several' ? connectSelected(pos, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project, allowTools })
+      : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project, allowTools })];
     if (!res.length) {
       const unsup = detect(env, launcher).filter((c) => c.found && !c.supported);
       if (unsup.length) { console.log(`Found ${unsup.map((c) => c.name).join(', ')} but Memev does not support ${unsup.length > 1 ? 'them' : 'it'} yet (see docs/CLIENTS.md to ask for it).`); return 0; }
     }
-    if (!res.length) console.log('No AI apps found. Install one (Codex, Cursor, Gemini CLI, Windsurf, VS Code, Zed, OpenCode, GitHub Copilot CLI, Grok Build, or a Claude product) and run memev connect again.');
+    if (!res.length) console.log('No AI apps found. Install one (Codex, Cursor, Gemini CLI, Windsurf, VS Code, Zed, OpenCode, GitHub Copilot CLI, Grok Build, a Claude product, or another app in docs/CLIENTS.md) and run memev connect again.');
     for (const r of res) {
       if (r.status === 'added') out.ok(`${r.name}: connected (${r.mode === 'hooks' ? 'hooks + MCP + instructions' : 'MCP + instructions'})`);
       else if (r.status === 'already') out.ok(`${r.name}: already connected`);
       else if (r.status === 'would-change') out.info(`${r.name}: would change ${r.files.join(', ') || 'nothing'}`);
+      else if (r.status === 'unsupported') out.info(`${r.name}: ${r.reason} (see docs/CLIENTS.md to ask for it)`);
       else out.bad(`${r.name}: ${r.reason}`);
       if (r.status === 'needs-manual' && r.file) out.info(`add it by hand: memev connect ${r.id} --print shows what to paste`);
       if (r.manual) out.warn(r.manual);

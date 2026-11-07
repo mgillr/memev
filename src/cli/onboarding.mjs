@@ -32,7 +32,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   }
   const found = clients.detect(env, launcher);
   for (const c of found.filter((x) => x.found)) {
-    if (!c.supported) { add('unsupported', c.name, 'found, not supported yet (see docs/CLIENTS.md to ask for it)', { app: c.id }); continue; }
+    if (!c.supported) { add('unsupported', c.name, `found, not supported yet${c.manual ? `; ${c.manual}` : ''} (see docs/CLIENTS.md to ask for it)`, { app: c.id }); continue; }
     if (c.connected) { let detail = c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions'; if (c.id === 'claude-code') { const allowed = clients.claudeToolsAllowed(env); detail += allowed ? '; Memev tools are allowed, so no prompt per call' : '; Memev tools: Claude Code prompts before each call, allow them with memev connect claude-code --allow-tools'; } add(firstRun ? 'added' : 'ready', c.name, detail, { app: c.id }); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual, { app: c.id, note: true }); }
     else if (c.declined) add('skipped', c.name, 'you disconnected it (memev connect ' + c.id + ' to undo)', { app: c.id });
     else {

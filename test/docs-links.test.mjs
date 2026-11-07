@@ -34,6 +34,7 @@ test('every page under docs/ can be reached from docs/README.md by following lin
   while (queue.length) {
     const page = queue.pop();
     for (const m of read(page).replace(/```[\s\S]*?```/g, '').matchAll(/\]\(([^)#\s]+\.md)(?:#[^)\s]*)?\)/g)) {
+      if (/^(https?:|mailto:)/.test(m[1])) continue; // a vendor page that happens to end in .md is not a docs page
       const next = path.relative(ROOT, path.resolve(path.dirname(path.join(ROOT, page)), m[1])).split(path.sep).join('/');
       if (next.startsWith('docs/') && !seen.has(next)) { seen.add(next); queue.push(next); }
     }

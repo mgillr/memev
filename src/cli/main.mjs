@@ -25,7 +25,7 @@ Setup
                                     creates a vault and says how a second computer uses memev init --join.
                                    --org: an organisation install; remote access starts off. --lead or MEMEV_LEAD
                                    picks the AI that leads the others; on a terminal init asks, otherwise none is set)
-  memev connect [client|all]       register Memev in an AI app (MCP, hooks, instructions); backs up first
+  memev connect [client ...|all]   register Memev in AI apps (MCP, hooks, instructions); backs up first
   memev disconnect [client|all]    remove it again, restoring the app's config
   memev uninstall [--purge]        disconnect everything and stop; --purge also removes the service files
   memev clients                    which AI apps are installed and connected
