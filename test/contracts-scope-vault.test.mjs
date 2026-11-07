@@ -5,9 +5,39 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Vault } from '../src/engine/vault.mjs';
 import { newVault, cleanup, tmpdir } from './helpers/tmp.mjs';
 import { repoAt, put, signScope, scopeResults, OWNER } from './helpers/scope.mjs';
 after(cleanup);
+
+test('a checkout that is its own vault, as a contract with no workdir needs: the bus folder opening it seeds is not listed, and any other file still is', async () => {
+  const { dir, base } = repoAt({ 'src/ok.js': 'ok\n', '.gitignore': '.memev/\n' });
+  fs.mkdirSync(path.join(dir, '.memev'), { mode: 0o700 }); fs.writeFileSync(path.join(dir, '.memev', 'config.json'), JSON.stringify({ version: 1, contracts: { enabled: true } }));
+  const v = new Vault(dir, { git: false, fsync: false, keyDir: tmpdir('scope-keys-') }).open();
+  try {
+    assert.ok(fs.existsSync(path.join(dir, 'bus', 'config.json')), 'the control: opening the vault seeded bus/');
+    const id = signScope(v, { workdir: null, base, tasks: { T1: ['src/**', 'memory/**'] } }); // signing here remembers the decision, which a body signed elsewhere does not
+    const clean = scopeResults(await v.contractVerify(OWNER, { id })).T1;
+    assert.equal(clean.status, 'PASS', clean.detail);
+    put(dir, { 'other/out.txt': 'outside\n' });
+    const again = scopeResults(await v.contractVerify(OWNER, { id })).T1;
+    assert.equal(again.status, 'FAIL', again.detail);
+    assert.ok(again.detail.includes('other/out.txt'), again.detail);
+    assert.ok(!again.detail.includes('bus/'), `the detail lists bus/: ${again.detail}`);
+  } finally { v.close(); }
+});
+
+test('in a project repository that tracks bus/x.json, changing that file is FAIL naming it: only a vault\'s own folder is left out', async () => {
+  const { v } = newVault({ git: false });
+  try {
+    const { dir, base } = repoAt({ 'src/a/ok.js': 'ok\n', 'bus/x.json': '{}\n' });
+    const id = signScope(v, { workdir: dir, base, tasks: { T1: ['src/**'] } });
+    put(dir, { 'bus/x.json': '{"changed":true}\n' });
+    const r = scopeResults(await v.contractVerify(OWNER, { id })).T1;
+    assert.equal(r.status, 'FAIL', r.detail);
+    assert.ok(r.detail.includes('bus/x.json'), r.detail);
+  } finally { v.close(); }
+});
 
 test('in a project repository that tracks contracts/signed/x.json, changing that file is FAIL naming it', async () => {
   const { v } = newVault({ git: false });

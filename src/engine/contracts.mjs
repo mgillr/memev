@@ -593,8 +593,8 @@ export function attach(Vault) {
         const head = G.out(top, ['rev-parse', '--verify', 'HEAD^{commit}']).trim();
         if (!SHA40.test(head)) throw new ScopeBlocked('HEAD is not a commit');
         const vaultRepo = (() => { try { return fs.realpathSync(top) === fs.realpathSync(this.root); } catch { return false; } })();
-        // the receipts and signed files of the vault are never part of the comparison when the workdir is the vault itself
-        const skip = (p) => vaultRepo && (p === 'contracts' || p.startsWith('contracts/'));
+        // the receipts and signed files of the vault are never part of the comparison when the workdir is the vault itself, and nor is bus/, which opening a vault seeds
+        const skip = (p) => vaultRepo && (p === 'contracts' || p.startsWith('contracts/') || p === 'bus' || p.startsWith('bus/'));
         const taskIds = new Set(c.tasks.map((t) => t.id));
         const sources = [];
         const dedupe = (paths) => [...new Set(paths)].filter((p) => !skip(p));
