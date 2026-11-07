@@ -84,11 +84,14 @@ export function pidAlive(pid) { if (!pid) return false; try { process.kill(pid, 
 // CODEX_CLI, GEMINI_CLI and WINDSURF_CLI are unverified, I could not confirm those apps set them.
 export const ENV_MARKERS = { CLAUDECODE: 'claude-code', CODEX_CLI: 'codex', GEMINI_CLI: 'gemini-cli', WINDSURF_CLI: 'windsurf' };
 const MARKER_OF = Object.fromEntries(Object.entries(ENV_MARKERS).map(([k, id]) => [id, k]));
-const KNOWN_APPS = new Set(['claude-code', 'codex', 'gemini-cli', 'cursor', 'claude-desktop', 'windsurf', 'grok-build']);
+const KNOWN_APPS = new Set(['claude-code', 'codex', 'gemini-cli', 'cursor', 'claude-desktop', 'windsurf', 'grok-build',
+  // more apps whose binary has the app's own id, as their docs show it (iflow mcp add, tabnine mcp list)
+  'iflow', 'tabnine']);
 // Keyed by the parent's raw process name, case-sensitive: the claude-code CLI binary is named
 // claude, the desktop app's binary is named Claude, and only the former maps to claude-code.
 // Grok Build's binary is named grok; it also loads servers from ~/.claude.json, so a memev it starts may claim claude-code.
-const PARENT_NAME_AS_APP = { claude: 'claude-code', grok: 'grok-build' };
+// The others are binaries their docs name in commands: qwen mcp add, auggie mcp add, vibe mcp add.
+const PARENT_NAME_AS_APP = { claude: 'claude-code', grok: 'grok-build', qwen: 'qwen-code', auggie: 'augment', vibe: 'mistral-vibe' };
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
 
 /** The name of the parent process, or null when it cannot be read. */
