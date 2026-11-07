@@ -95,7 +95,8 @@ export function listImports(vault) {
       if (!m) continue;
       // an item is a heading followed by its Source, Import and Hash lines; a heading inside an item's own text is not one
       const count = (note.body.match(new RegExp(`^### .*\\nSource: .*\\nImport: ${m[1]}\\nHash: `, 'gm')) || []).length;
-      const conversations = (note.body.match(/^Note: memory\/imports\/history\/\S+\.md$/gm) || []).length;
+      // a long conversation is written in parts (<name>-part-2.md and on); it is still one conversation
+      const conversations = (note.body.match(/^Note: memory\/imports\/history\/\S+\.md$/gm) || []).filter((l) => !/-part-\d+\.md$/.test(l)).length;
       out.push({ id: m[1], path: rel, items: count + conversations, conversations });
     } catch {}
   }
@@ -130,16 +131,16 @@ export function undoImport(vault, identity, id) {
  * One import: the file items (project folders, AI memory files) go into the record itself, and every new conversation
  * of the chosen history sources becomes its own note, named in the record as it is written. Returns the counts.
  */
-export async function runFullImport(vault, identity, { items = [], history = [], env, maxItemBytes } = {}) {
+export async function runFullImport(vault, identity, { items = [], history = [], env, maxItemBytes, maxNoteBytes } = {}) {
   const id = importId();
   const selected = items.filter((it) => !it.skip);
   const rel = `${IMPORTS_DIR}/${id}.md`;
   let wrote = false;
   if (selected.length) { runImport(vault, identity, items, { id }); wrote = true; }
-  let walk = { counts: { imported: 0, found: 0, secret: 0, too_large: 0, already: 0, empty: 0, unreadable: 0 }, sources: [] };
+  let walk = { counts: { imported: 0, notes: 0, split: 0, found: 0, secret: 0, too_large: 0, already: 0, empty: 0, unreadable: 0 }, sources: [] };
   if (history.length) {
     walk = await walkHistory(vault, identity, history, {
-      env, importId: id, write: true, maxItemBytes,
+      env, importId: id, write: true, maxItemBytes, maxNoteBytes,
       onNote: (note) => {
         if (!wrote) { vault.write(identity, { path: rel, body: `# Import ${id}\n\n`, client: 'import' }); wrote = true; }
         vault.append(identity, { path: rel, text: `Note: ${note}`, client: 'import' });
@@ -149,7 +150,7 @@ export async function runFullImport(vault, identity, { items = [], history = [],
   const c = walk.counts;
   return {
     id: wrote ? id : null, note: wrote ? rel : null,
-    imported: selected.length + c.imported, files: selected.length, conversations: c.imported,
+    imported: selected.length + c.imported, files: selected.length, conversations: c.imported, notes: c.notes, split: c.split,
     skipped: items.length - selected.length + c.secret + c.too_large + c.already + c.empty + c.unreadable,
     secret: items.filter((it) => it.skip && it.reason === 'secret').length + c.secret,
     too_large: c.too_large, already: c.already + items.filter((it) => it.skip && it.reason === 'already imported').length,
@@ -254,6 +255,9 @@ export function sourceList(sources, { markMax = DEFAULT_MARK_MAX } = {}) {
     const where = s.kind === 'export' || s.kind === 'files' ? ` (${s.path})` : '';
     lines.push(`  ${i + 1}. [${s.marked ? 'x' : ' '}] ${s.app}${where}: ${what}${when}`);
   });
+  const sum = (list) => ({ n: list.reduce((a, s) => a + (s.count || 0), 0), b: list.reduce((a, s) => a + (s.bytes || 0), 0) });
+  const all = sum(sources), marked = sum(sources.filter((s) => s.marked));
+  if (sources.length) lines.push('', `In all: ${all.n} items, ${kb(all.b)}. Marked: ${marked.n} items, ${kb(marked.b)}.`);
   lines.push('');
   lines.push(`[x] marks a source with ${markMax} items or fewer. Enter imports nothing; y imports the marked sources;`);
   lines.push('all imports every source; numbers such as 1,3 import those. memev import undo removes an import.');

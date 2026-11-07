@@ -362,6 +362,7 @@ test('history setup offer: lists what the scan found, marks small sources, leave
   assert.match(shown, /History found on this computer/);
   assert.match(shown, /\[x\] Claude Code: 1 sessions/);
   assert.match(shown, /\[ \] Chat export \(.*chatgpt-export\.zip\): .*not counted yet/, 'an export in Downloads is listed by size at setup and not marked');
+  assert.match(shown, /^In all: \d+ items, [\d.]+ (?:KB|MB|GB)\. Marked: 8 items, [\d.]+ (?:KB|MB|GB)\.$/m, 'the total size of everything, and of what y imports');
   assert.match(shown, /Import these items\? \[y\/N\]/);
   assert.equal(r.accepted, true);
   assert.ok(!r.chosen.some((id) => id.startsWith('export:')), 'y leaves the unmarked export out');
@@ -393,5 +394,55 @@ test('history damaged export: a zip cut short imports what it could read and cou
   const r = await runFullImport(v, OWNER, { history: [`export:${zip}`], env: { HOME: home } });
   assert.equal(r.conversations, 0);
   assert.ok(r.skipped >= 1, JSON.stringify(r));
+  v.close();
+});
+
+test('history long conversation: split into parts under the limit, cut between turns, one key, idempotent, undone whole', async () => {
+  const home = tmpdir('hist-long-');
+  const env = { HOME: home };
+  const sid = '5e550000-0000-4000-8000-0000000000aa';
+  const rec = (type, i, content) => JSON.stringify({ type, uuid: `${type}${i}`, sessionId: sid, cwd: '/home/user/long', timestamp: new Date(Date.UTC(2026, 10, 1, 10, 0, i)).toISOString(), message: { role: type, content } });
+  const lines = [];
+  for (let i = 0; i < 40; i++) lines.push(rec('user', i, `question ${i} about quokkas ` + 'q'.repeat(300)), rec('assistant', i, [{ type: 'text', text: `answer ${i} ` + 'a'.repeat(300) }]));
+  // one turn longer than a whole part, with one line longer than a part too
+  lines.push(rec('user', 99, Array.from({ length: 30 }, (_, k) => `pasted line ${k} ` + 'p'.repeat(400)).join('\n') + '\n' + 'L'.repeat(20000) + '\nthe last words'));
+  put(path.join(home, '.claude', 'projects', '-home-user-long', `${sid}.jsonl`), lines.join('\n') + '\n');
+  const LIMIT = 8 * 1024;
+  const { v } = newVault();
+  const r = await runFullImport(v, OWNER, { history: ['claude-code'], env, maxNoteBytes: LIMIT });
+  assert.equal(r.conversations, 1);
+  assert.equal(r.split, 1);
+  assert.equal(r.too_large, 0, 'nothing is skipped for its length');
+  const parts = notesOf(v).sort((a, b) => (Number(/-part-(\d+)\.md$/.exec(a)?.[1] || 1)) - (Number(/-part-(\d+)\.md$/.exec(b)?.[1] || 1)));
+  assert.equal(parts.length, r.notes);
+  assert.ok(parts.length > 5, `${parts.length} parts`);
+  const bodies = parts.map((p) => v.get(OWNER, p).body);
+  bodies.forEach((b, i) => {
+    assert.ok(Buffer.byteLength(b) <= LIMIT, `part ${i + 1} is ${Buffer.byteLength(b)} bytes`);
+    assert.match(b, new RegExp(`^# .* \\(part ${i + 1} of ${parts.length}\\)$`, 'm'));
+    assert.match(b, new RegExp(`^Key: claude-code:${sid}$`, 'm'), 'every part carries the one key');
+  });
+  const all = bodies.map((b) => b.split(/^Hash: .*$/m)[1]).join('');
+  let at = -1;
+  for (let i = 0; i < 40; i++) {
+    const q = all.indexOf(`question ${i} about`); const a = all.indexOf(`answer ${i} `);
+    assert.ok(q > at && a > q, `turn ${i} in order`); at = a;
+  }
+  for (let k = 0; k < 30; k++) assert.ok(all.includes(`pasted line ${k} `), `pasted line ${k} kept`);
+  assert.equal((all.match(/L/g) || []).length >= 20000, true, 'the long line is kept whole, across parts');
+  assert.ok(all.includes('the last words'));
+  assert.ok(bodies.some((b) => /\(continued\)$/m.test(b)), 'a turn cut across parts says it continues');
+  // a turn that fits is never cut: each question sits whole in one part
+  for (let i = 0; i < 40; i++) assert.ok(bodies.some((b) => b.includes(`question ${i} about quokkas ${'q'.repeat(300)}`)), `question ${i} whole in one part`);
+  assert.deepEqual(listImports(v).map((x) => x.items), [1], 'listed as one conversation');
+  const again = await runFullImport(v, OWNER, { history: ['claude-code'], env, maxNoteBytes: LIMIT });
+  assert.equal(again.conversations, 0); assert.equal(again.already, 1);
+  // a re-read of the same file (its name not used) still finds the parts by their key
+  const { walkHistory: walk } = await import('../src/engine/importers/history.mjs');
+  fs.renameSync(path.join(home, '.claude', 'projects', '-home-user-long', `${sid}.jsonl`), path.join(home, '.claude', 'projects', '-home-user-long', 'renamed.jsonl'));
+  assert.equal((await walk(v, OWNER, ['claude-code'], { env, maxNoteBytes: LIMIT })).counts.already, 1, 'known by the key in the part names');
+  const u = undoImport(v, OWNER, r.id);
+  assert.equal(u.ok, true);
+  assert.equal(notesOf(v).length, 0, 'undo removes every part');
   v.close();
 });

@@ -17,7 +17,7 @@ import { jsonArrayItems, NotAnArray } from '../json-stream.mjs';
 import { detectFormat, chatgptConversation, claudeConversation, iso, short } from './chat-formats.mjs';
 
 export const HISTORY_DIR = 'memory/imports/history';
-export const MAX_NOTE_BYTES = 2 * 1024 * 1024; // a conversation whose note would pass this is skipped, by itself
+export const MAX_NOTE_BYTES = 2 * 1024 * 1024; // a conversation longer than this is written as several notes, each under it
 export const MAX_ITEM_BYTES = 64 * 1024 * 1024; // a raw export element past this is passed over without being kept
 export const MAX_LINE_BYTES = 8 * 1024 * 1024; // a session log line past this is tool payload, not conversation
 export const DEFAULT_MARK_MAX = 100; // setup marks a source for import only when it holds this many items or fewer
@@ -491,22 +491,74 @@ export async function scanHistory({ env, exports = [], findDownloads = true, qui
 
 // ---- notes
 
-function render(conv, meta) {
-  const lines = [`# ${conv.title || 'Untitled conversation'}`, ''];
+function renderHead(conv, meta) {
+  const lines = [`# ${conv.title || 'Untitled conversation'}${meta.parts > 1 ? ` (part ${meta.part} of ${meta.parts})` : ''}`, ''];
   lines.push(`Source: ${meta.source}`);
   lines.push(`App: ${meta.app}`);
   if (conv.project) lines.push(`Project: ${conv.project}`);
   if (conv.created) lines.push(`Started: ${conv.created}`);
   if (conv.updated && conv.updated !== conv.created) lines.push(`Updated: ${conv.updated}`);
+  if (meta.parts > 1) lines.push(`Part: ${meta.part} of ${meta.parts}`);
   lines.push(`Import: ${meta.importId}`, `Key: ${meta.key}`, `Hash: ${meta.hash}`, '');
-  for (const t of conv.turns) {
-    const head = `### ${t.role === 'user' ? 'User' : 'Assistant'}${t.at ? ` (${t.at.slice(0, 16).replace('T', ' ')})` : ''}`;
-    lines.push(head);
-    if (t.text) lines.push(t.text);
-    if (t.tools?.length) lines.push(collapse(t.tools));
-    lines.push('');
+  return lines.join('\n') + '\n';
+}
+
+function renderTurn(t) {
+  const lines = [`### ${t.role === 'user' ? 'User' : 'Assistant'}${t.at ? ` (${t.at.slice(0, 16).replace('T', ' ')})` : ''}${t.cont ? ' (continued)' : ''}`];
+  if (t.text) lines.push(t.text);
+  if (t.tools?.length) lines.push(collapse(t.tools));
+  lines.push('');
+  return lines.join('\n') + '\n';
+}
+
+function render(conv, meta, turns = conv.turns) {
+  return renderHead(conv, meta) + turns.map(renderTurn).join('');
+}
+
+// cut text into pieces of at most max bytes, at line ends where it can, and inside a line only when one line is longer
+function cutText(text, max) {
+  const out = []; let cur = ''; let curBytes = 0;
+  const flush = () => { if (cur) out.push(cur); cur = ''; curBytes = 0; };
+  for (const line of text.split('\n')) {
+    const lb = Buffer.byteLength(line) + 1;
+    if (lb > max) {
+      flush();
+      // a single line over the limit: cut by characters, four bytes being the most one character takes
+      const step = Math.max(1, Math.floor(max / 4));
+      const chars = [...line];
+      for (let i = 0; i < chars.length; i += step) out.push(chars.slice(i, i + step).join(''));
+      continue;
+    }
+    if (curBytes + lb > max) flush();
+    cur = cur ? `${cur}\n${line}` : line; curBytes += lb;
   }
-  return lines.join('\n');
+  flush();
+  return out;
+}
+
+/**
+ * The turns of each part, so every part's note stays under maxBytes: parts are cut between turns, and a turn longer
+ * than a whole part is cut into pieces, each marked as continued.
+ */
+export function splitParts(conv, meta, maxBytes) {
+  // the head of a part, with room for its part line and the longest numbers
+  const headBytes = Buffer.byteLength(renderHead(conv, { ...meta, part: 99999, parts: 99999 })) + 64;
+  const budget = Math.max(1024, maxBytes - headBytes);
+  const pieces = [];
+  for (const t of conv.turns) {
+    if (Buffer.byteLength(renderTurn(t)) <= budget) { pieces.push(t); continue; }
+    const room = budget - Buffer.byteLength(renderTurn({ ...t, text: '', cont: true })) - 16;
+    const cut = cutText(t.text || '', Math.max(256, room));
+    cut.forEach((text, i) => pieces.push({ ...t, text, tools: i === cut.length - 1 ? t.tools : [], cont: i > 0 }));
+  }
+  const parts = []; let cur = []; let bytes = 0;
+  for (const t of pieces) {
+    const b = Buffer.byteLength(renderTurn(t));
+    if (cur.length && bytes + b > budget) { parts.push(cur); cur = []; bytes = 0; }
+    cur.push(t); bytes += b;
+  }
+  if (cur.length) parts.push(cur);
+  return parts;
 }
 
 function collapse(tools) {
@@ -527,10 +579,10 @@ export function conversationKey(appId, conv, sourcePath) {
   return `${appId}:${sha256(`${sourcePath}\0${conv.created || ''}\0${conv.title || ''}`).slice(0, 24)}`;
 }
 
-export function noteRelFor(appId, conv, key) {
+export function noteRelFor(appId, conv, key, part = 1) {
   const date = (conv.created || conv.updated || '').slice(0, 10) || 'undated';
   const proj = conv.projectKey || conv.project ? slug(String(conv.projectKey || conv.project).replace(/^[-/\\]+/, ''), 60) : 'chats';
-  return `${HISTORY_DIR}/${slug(appId, 40)}/${proj}/${date}-${slug(titleFrom(conv) || 'conversation', 40)}-${KEY_HASH(key)}.md`;
+  return `${HISTORY_DIR}/${slug(appId, 40)}/${proj}/${date}-${slug(titleFrom(conv) || 'conversation', 40)}-${KEY_HASH(key)}${part > 1 ? `-part-${part}` : ''}.md`;
 }
 
 /** The key hashes already in the vault, read from the note names alone: no note is opened. */
@@ -538,7 +590,7 @@ export function importedKeyHashes(vault) {
   const set = new Set();
   for (const rel of vault.allNotes()) {
     if (!rel.startsWith(HISTORY_DIR + '/')) continue;
-    const m = /-([0-9a-f]{12})\.md$/.exec(rel);
+    const m = /-([0-9a-f]{12})(?:-part-\d+)?\.md$/.exec(rel);
     if (m) set.add(m[1]);
   }
   return set;
@@ -589,10 +641,10 @@ async function* conversationsOf(sel, env, { maxItemBytes = MAX_ITEM_BYTES, known
  * writes each new conversation as its own note as it goes, so only one conversation is held at a time.
  * Returns counts, and up to listMax preview entries.
  */
-export async function walkHistory(vault, identity, selection, { env, importId = null, write = false, onNote = null, listMax = 200, maxItemBytes = MAX_ITEM_BYTES } = {}) {
+export async function walkHistory(vault, identity, selection, { env, importId = null, write = false, onNote = null, listMax = 200, maxItemBytes = MAX_ITEM_BYTES, maxNoteBytes = MAX_NOTE_BYTES } = {}) {
   if (!env) throw new Error('walkHistory needs the env whose home it reads');
   const known = importedKeyHashes(vault);
-  const counts = { found: 0, new: 0, imported: 0, already: 0, secret: 0, too_large: 0, empty: 0, unreadable: 0 };
+  const counts = { found: 0, new: 0, imported: 0, notes: 0, split: 0, already: 0, secret: 0, too_large: 0, empty: 0, unreadable: 0 };
   const bySource = new Map();
   const listed = [];
   const notes = [];
@@ -612,22 +664,30 @@ export async function walkHistory(vault, identity, selection, { env, importId = 
       seenThisRun.add(kh);
       if (!conv.turns.some((t) => t.text)) { bump('empty'); continue; }
       const title = titleFrom(conv) || 'Untitled conversation';
-      const body0 = render({ ...conv, title }, { source: r.source, app: r.app, importId: importId || 'imp-preview', key, hash: 'sha256:' + '0'.repeat(16) });
-      if (Buffer.byteLength(body0) > MAX_NOTE_BYTES) { bump('too_large'); if (listed.length < listMax) listed.push({ title, reason: 'too large', source: sel.id }); continue; }
+      const meta0 = { source: r.source, app: r.app, importId: importId || 'imp-preview', key, hash: 'sha256:' + '0'.repeat(16) };
+      const body0 = render({ ...conv, title }, meta0);
       if (findSecrets(body0).length) { bump('secret'); if (listed.length < listMax) listed.push({ title, reason: 'secret', source: sel.id }); continue; }
+      // a long conversation is not skipped: it is written as several notes, cut between turns, each under the limit
+      const parts = Buffer.byteLength(body0) > maxNoteBytes ? splitParts({ ...conv, title }, meta0, maxNoteBytes) : [conv.turns];
       bump('new');
-      if (listed.length < listMax) listed.push({ title, size: Buffer.byteLength(body0), source: sel.id, date: (conv.created || '').slice(0, 10) || null });
+      if (parts.length > 1) counts.split++;
+      if (listed.length < listMax) listed.push({ title, size: Buffer.byteLength(body0), parts: parts.length, source: sel.id, date: (conv.created || '').slice(0, 10) || null });
       if (!write) continue;
       const hash = 'sha256:' + sha256(body0).slice(0, 16);
-      const body = render({ ...conv, title }, { source: r.source, app: r.app, importId, key, hash });
-      const rel = noteRelFor(r.appId, { ...conv, title }, key);
+      const written = [];
       try {
-        vault.write(identity, { path: rel, body, client: 'import' });
-        known.add(kh); counts.imported++; notes.push(rel);
-        if (onNote) onNote(rel);
+        parts.forEach((turns, i) => {
+          const meta = { source: r.source, app: r.app, importId, key, hash, part: i + 1, parts: parts.length };
+          const rel = noteRelFor(r.appId, { ...conv, title }, key, i + 1);
+          vault.write(identity, { path: rel, body: render({ ...conv, title }, meta, turns), client: 'import' });
+          written.push(rel);
+        });
+        known.add(kh); counts.imported++; counts.notes += written.length;
+        for (const rel of written) { notes.push(rel); if (onNote) onNote(rel); }
       } catch (e) {
-        // the vault's own guard has the last word: a note it refuses is counted, never half written
-        if (e && e.code === 'secret') { counts.new--; per.new--; bump('secret'); } else { counts.new--; per.new--; bump('unreadable'); }
+        // the vault's own guard has the last word: a conversation it refuses in any part is taken out whole and counted
+        for (const rel of written) { try { vault.delete(identity, { path: rel, client: 'import' }); } catch {} }
+        counts.new--; per.new--; bump(e && e.code === 'secret' ? 'secret' : 'unreadable');
       }
     }
   }

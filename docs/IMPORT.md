@@ -71,9 +71,17 @@ A tool call or a tool's output becomes one short line, such as
 added to your turn (instructions, environment details, reminders) and subagent
 turns are left out too.
 
-A conversation is skipped by itself when its note would pass 2 MB, or when an
-export entry passes 64 MB. The rest of the source is still imported, and the
-preview and the summary give the count.
+A conversation longer than 2 MB is not skipped. It is written as several notes,
+part 1 of N and on, each under 2 MB, at
+`<date>-<title>-<id>-part-2.md` and on. Parts are cut between turns. A single
+turn longer than a part is cut at line ends, and is marked `(continued)`. Every
+part carries the conversation's one key, so importing again adds no part, and
+undo removes every part. `memev import list` counts the conversation once.
+
+Two limits still skip. An export entry over 64 MB is passed over by itself, and
+so is a session log line over 8 MB; such a line is a tool's payload, not a turn.
+The rest of the source is still imported, and the preview and the summary give
+the count.
 
 ### Large exports
 
@@ -163,7 +171,7 @@ memev import undo imp-1a2b3c4d
 On a terminal, init offers the import once, after the lead question. It lists
 every source the scan found: this folder, the AI memory files, each app's sessions
 and any export in `~/Downloads`. It shows each source's count, size and dates, and
-asks one question. A source with 100 items or fewer is marked `[x]`. A bigger one,
+asks one question. A line under the list gives the total count and size of every source, and of the marked ones. A source with 100 items or fewer is marked `[x]`. A bigger one,
 or an export not yet counted, is shown but not marked. The answers:
 
 - Enter imports nothing.

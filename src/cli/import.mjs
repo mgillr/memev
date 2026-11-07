@@ -54,7 +54,7 @@ function historyPreview(walk) {
     const skips = [['already', 'already imported'], ['secret', 'skipped, they look like they hold a secret'], ['too_large', 'skipped as too large'], ['empty', 'empty'], ['unreadable', 'unreadable']].filter(([k]) => s[k]).map(([k, w]) => `${s[k]} ${w}`);
     lines.push(`${s.id}:`, `  ${s.found} conversation(s) found, ${s.new} to import${skips.length ? `; ${skips.join(', ')}` : ''}`);
     const mine = walk.listed.filter((x) => x.source === s.id);
-    for (const it of mine.slice(0, 10)) lines.push(it.reason ? `  skipped: ${it.title} (${it.reason})` : `  - ${it.date || 'undated'} ${it.title} (${Math.ceil(it.size / 1024)} KB)`);
+    for (const it of mine.slice(0, 10)) lines.push(it.reason ? `  skipped: ${it.title} (${it.reason})` : `  - ${it.date || 'undated'} ${it.title} (${Math.ceil(it.size / 1024)} KB${it.parts > 1 ? `, in ${it.parts} parts` : ''})`);
     if (s.new > 10) lines.push(`  ... and ${s.new - Math.min(10, mine.filter((x) => !x.reason).length)} more`);
     lines.push('');
   }
@@ -174,7 +174,7 @@ export async function command(cmd, pos, flags, { root, env, stdin = process.stdi
 
       const result = await runFullImport(v, identity, { items: selected || [], history: takeHistory ? history : [], env });
       if (!result.id) { console.log('Nothing to import.'); return 0; }
-      const extra = [result.conversations ? `${result.conversations} conversation(s)` : null, result.secret ? `${result.secret} skipped as they look like they hold a secret` : null, result.too_large ? `${result.too_large} skipped as too large` : null, result.already ? `${result.already} already imported` : null].filter(Boolean);
+      const extra = [result.conversations ? `${result.conversations} conversation(s)${result.split ? `, ${result.split} of them long enough to be written in parts (${result.notes} notes)` : ''}` : null, result.secret ? `${result.secret} skipped as they look like they hold a secret` : null, result.too_large ? `${result.too_large} skipped as too large` : null, result.already ? `${result.already} already imported` : null].filter(Boolean);
       console.log(`Imported ${result.imported} item(s) as ${result.id} (${result.skipped} skipped${extra.length ? `; ${extra.join(', ')}` : ''}).`);
       console.log(`Undo with: memev import undo ${result.id}`);
       return 0;
