@@ -245,6 +245,8 @@ export function verifyProof(pubkey, { method, path: p, ts, nonce, sig, body = ''
  * The known limit: after a damaged store, a request from a device whose clock ran ahead can be replayed within the skew,
  * since its signed time falls after not_before. Removing this would refuse every signed request for up to 5 minutes and
  * needs a change to SR-1.03, which signs that a fresh request is served right after damage.
+ * A mark ahead of the clock, inside the skew, which only a clock stepped back after the damage reaches: fresh requests are
+ * refused until the clock passes it, up to the skew.
  */
 export class NonceCache {
   constructor(file, { skewMs = 5 * 60e3 } = {}) {
