@@ -1,0 +1,31 @@
+[
+  {
+    "uuid": "c0000000-0000-4000-8000-000000000001",
+    "name": "Zephyrquokka naming",
+    "summary": "",
+    "created_at": "2026-01-02T09:00:00.000000Z",
+    "updated_at": "2026-01-02T09:05:00.000000Z",
+    "account": { "uuid": "u0000000-0000-4000-8000-000000000001" },
+    "project_uuid": "p0000000-0000-4000-8000-000000000001",
+    "chat_messages": [
+      { "uuid": "m1", "text": "Suggest a name for the zephyrquokka project.", "sender": "human", "created_at": "2026-01-02T09:00:00.000000Z", "updated_at": "2026-01-02T09:00:00.000000Z", "content": [{ "type": "text", "text": "Suggest a name for the zephyrquokka project.", "citations": [], "start_timestamp": "2026-01-02T09:00:00.000000Z", "stop_timestamp": "2026-01-02T09:00:00.000000Z" }], "attachments": [{ "file_name": "brief.txt", "file_size": 120, "file_type": "text/plain", "extracted_content": "the brief" }], "files": [] },
+      { "uuid": "m2", "text": "", "sender": "assistant", "created_at": "2026-01-02T09:00:05.000000Z", "updated_at": "2026-01-02T09:00:05.000000Z", "content": [
+        { "type": "thinking", "thinking": "private reasoning that is left out", "summaries": [{ "summary": "thinking" }], "cut_off": false },
+        { "type": "tool_use", "id": "t1", "name": "artifacts", "input": { "command": "create", "id": "names", "type": "text/markdown", "title": "Name ideas", "content": "a long artifact body" } },
+        { "type": "tool_result", "tool_use_id": "t1", "name": "artifacts", "content": [{ "type": "text", "text": "OK" }], "is_error": false },
+        { "type": "text", "text": "How about Quokkaflow?", "citations": [] }
+      ], "attachments": [], "files": [] }
+    ]
+  },
+  {
+    "uuid": "c0000000-0000-4000-8000-000000000002",
+    "name": "Old export with text only",
+    "created_at": "2025-03-01T10:00:00Z",
+    "updated_at": "2025-03-01T10:01:00Z",
+    "account": { "uuid": "u0000000-0000-4000-8000-000000000001" },
+    "chat_messages": [
+      { "uuid": "m3", "text": "Hello from an older export.", "sender": "human", "created_at": "2025-03-01T10:00:00Z" },
+      { "uuid": "m4", "text": "Hello back.", "sender": "assistant", "created_at": "2025-03-01T10:01:00Z" }
+    ]
+  }
+]

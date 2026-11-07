@@ -1,0 +1,34 @@
+[
+  {
+    "title": "Zephyrquokka garden plan",
+    "create_time": 1767225600.0,
+    "update_time": 1767225720.5,
+    "conversation_id": "6a1b0c2d-0000-4000-8000-000000000001",
+    "id": "6a1b0c2d-0000-4000-8000-000000000001",
+    "default_model_slug": "gpt-5-2",
+    "current_node": "n4",
+    "mapping": {
+      "root": { "id": "root", "message": null, "parent": null },
+      "n0": { "id": "n0", "parent": "root", "message": { "id": "n0", "author": { "role": "system" }, "create_time": null, "content": { "content_type": "text", "parts": [""] }, "metadata": { "is_visually_hidden_from_conversation": true }, "recipient": "all" } },
+      "n1": { "id": "n1", "parent": "n0", "message": { "id": "n1", "author": { "role": "user" }, "create_time": 1767225660.0, "content": { "content_type": "text", "parts": ["How do I plant zephyrquokka seeds?"] }, "metadata": {}, "recipient": "all" } },
+      "n2x": { "id": "n2x", "parent": "n1", "message": { "id": "n2x", "author": { "role": "assistant" }, "create_time": 1767225730.0, "content": { "content_type": "text", "parts": ["The newest answer, on a branch the person moved away from."] }, "metadata": {}, "recipient": "all" } },
+      "n2": { "id": "n2", "parent": "n1", "message": { "id": "n2", "author": { "role": "assistant" }, "create_time": 1767225680.0, "content": { "content_type": "code", "language": "unknown", "text": "search(\"zephyrquokka seeds\")" }, "metadata": {}, "recipient": "web" } },
+      "n3": { "id": "n3", "parent": "n2", "message": { "id": "n3", "author": { "role": "tool", "name": "web" }, "create_time": 1767225690.0, "content": { "content_type": "tether_browsing_display", "result": "a long page of search results" }, "metadata": {}, "recipient": "all" } },
+      "n4": { "id": "n4", "parent": "n3", "message": { "id": "n4", "author": { "role": "assistant" }, "create_time": 1767225720.0, "content": { "content_type": "multimodal_text", "parts": ["Plant them in spring, two centimetres deep.", { "content_type": "image_asset_pointer", "asset_pointer": "sediment://file_00000000000000000000000000000001", "width": 512, "height": 512 }] }, "metadata": { "model_slug": "gpt-5-2" }, "recipient": "all" } }
+    },
+    "is_archived": false
+  },
+  {
+    "title": "No current node",
+    "create_time": 1767312000.0,
+    "update_time": 1767312060.0,
+    "conversation_id": "6a1b0c2d-0000-4000-8000-000000000002",
+    "id": "6a1b0c2d-0000-4000-8000-000000000002",
+    "mapping": {
+      "r": { "id": "r", "message": null, "parent": null },
+      "a": { "id": "a", "parent": "r", "message": { "id": "a", "author": { "role": "user" }, "create_time": 1767312000.0, "content": { "content_type": "text", "parts": ["What rhymes with quokka?"] }, "metadata": {} } },
+      "b": { "id": "b", "parent": "a", "message": { "id": "b", "author": { "role": "assistant" }, "create_time": 1767312060.0, "content": { "content_type": "text", "parts": ["Polka, nearly."] }, "metadata": {} } }
+    }
+  },
+  {}
+]
