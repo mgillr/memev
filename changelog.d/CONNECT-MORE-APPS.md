@@ -1,3 +1,4 @@
 ### Added
 
 - `memev connect` takes several apps in one call, for example `memev connect claude-code cursor vscode`, and connects exactly those. Every name is checked before any file changes, so an unknown name connects nothing. `memev connect` and `memev connect all` still connect every app found, and still skip the apps you disconnected. The remote setup screen can send the apps the person ticked in one command.
+- Memev connects more AI apps, each at the path and key its own MCP docs give: Qwen Code, Kimi Code CLI, Factory Droid, Augment (Auggie CLI), Tabnine CLI, iFlow CLI, Warp and Mistral Vibe. They get the MCP server and the protocol through the MCP instructions. Where an app's docs name no Windows location (Factory Droid, Augment, Tabnine CLI, Warp), Memev connects it on macOS and Linux only, and on Windows lists it as found, not supported yet.

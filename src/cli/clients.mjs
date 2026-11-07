@@ -34,6 +34,17 @@ export function platformDirs(env = process.env) {
   return { home, appData };
 }
 
+// The folders an app's docs name, for the platform given (not the one this runs on), so a test can ask
+// for the Windows paths on any machine. appData is the per-user settings folder (Roaming on Windows),
+// localAppData is Local on Windows, xdg is the XDG config folder elsewhere.
+export function osDirs(env = process.env, platform = process.platform) {
+  const home = homeDir(env);
+  const xdg = env.XDG_CONFIG_HOME || path.join(home, '.config');
+  if (platform === 'win32') return { home, xdg, appData: env.APPDATA || path.join(home, 'AppData', 'Roaming'), localAppData: env.LOCALAPPDATA || path.join(home, 'AppData', 'Local') };
+  if (platform === 'darwin') { const a = path.join(home, 'Library', 'Application Support'); return { home, xdg, appData: a, localAppData: a }; }
+  return { home, xdg, appData: xdg, localAppData: xdg };
+}
+
 const isOurs = (cmd) => typeof cmd === 'string' && /memev/.test(cmd) && / hook /.test(cmd);
 const hookCmd = (launcher, event, client, format) => `${launcher} hook ${event} --client ${client}${format ? ` --format ${format}` : ''}`;
 
@@ -301,8 +312,53 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
         // Copilot CLI reads its user-level instructions from copilot-instructions.md in the same folder
         return [json(path.join(copilotHome, 'mcp-config.json'), setServer('mcpServers', entry), delServer('mcpServers')), mdBlock(path.join(copilotHome, 'copilot-instructions.md'))];
       } },
+    ...moreApps(env, platform, stdio),
   ];
-  return defs;
+  // An app whose docs give no Windows location is not connected on Windows; unsupportedDefs lists it there instead.
+  return platform === 'win32' && !opts.allPlatforms ? defs.filter((d) => d.windows !== false) : defs;
+}
+
+// ---- More apps. Every path, key and entry shape below is the one the app's own MCP docs give; docs/CLIENTS.md
+// cites each page. windows: false marks an app whose docs name no Windows location, so it is not connected there.
+const VIBE_TABLE = /^\s*name\s*=\s*["']memev["']/m;
+function upsertVibeToml(t, block) {
+  const base = removeBlock(t, [TOML_START, TOML_END]);
+  if (VIBE_TABLE.test(base)) return base; // the person already has a server named memev: leave it as it is
+  return addBlock(base, block, [TOML_START, TOML_END]);
+}
+const vibeSkipNote = (b) => (b && VIBE_TABLE.test(removeBlock(b, [TOML_START, TOML_END])) ? 'Mistral Vibe already has an mcp_servers table named memev in config.toml, so Memev left it as-is' : null);
+function moreApps(env, platform, stdio) {
+  const { home } = osDirs(env, platform);
+  const kimiHome = env.KIMI_CODE_HOME || path.join(home, '.kimi-code');
+  const vibeHome = env.VIBE_HOME || path.join(home, '.vibe');
+  const mcpJson = (file, id, key = 'mcpServers', extra = {}) => json(file, setServer(key, { ...extra, ...stdio(id) }), delServer(key));
+  return [
+    // https://qwenlm.github.io/qwen-code-docs/en/users/features/mcp : "~/.qwen/settings.json" (~ is your home directory)
+    { id: 'qwen-code', name: 'Qwen Code', mode: 'instructions', detect: () => exists(path.join(home, '.qwen')),
+      edits: () => [mcpJson(path.join(home, '.qwen', 'settings.json'), 'qwen-code')] },
+    // https://www.kimi.com/code/docs/en/kimi-code-cli/customization/mcp.html : "~/.kimi-code/mcp.json (or $KIMI_CODE_HOME/mcp.json)"
+    { id: 'kimi-code', name: 'Kimi Code CLI', mode: 'instructions', detect: () => exists(kimiHome),
+      edits: () => [mcpJson(path.join(kimiHome, 'mcp.json'), 'kimi-code')] },
+    // https://docs.factory.com/cli/configuration/mcp : "~/.factory/mcp.json", type "stdio"
+    { id: 'factory-droid', name: 'Factory Droid', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.factory')),
+      edits: () => [mcpJson(path.join(home, '.factory', 'mcp.json'), 'factory-droid', 'mcpServers', { type: 'stdio' })] },
+    // https://docs.augmentcode.com/cli/integrations : "~/.augment/settings.json"
+    { id: 'augment', name: 'Augment (Auggie CLI)', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.augment')),
+      edits: () => [mcpJson(path.join(home, '.augment', 'settings.json'), 'augment')] },
+    // https://docs.tabnine.com/main/getting-started/tabnine-agent/mcp-intro-and-setup/mcp-server-config : "~/.tabnine/agent/settings.json" (macOS/Linux)
+    { id: 'tabnine', name: 'Tabnine CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.tabnine', 'agent')),
+      edits: () => [mcpJson(path.join(home, '.tabnine', 'agent', 'settings.json'), 'tabnine')] },
+    // https://platform.iflow.cn/en/cli/configuration/settings : "~/.iflow/settings.json" (~ represents your home directory)
+    { id: 'iflow', name: 'iFlow CLI', mode: 'instructions', detect: () => exists(path.join(home, '.iflow')),
+      edits: () => [mcpJson(path.join(home, '.iflow', 'settings.json'), 'iflow')] },
+    // https://docs.warp.dev/knowledge-and-collaboration/mcp : global "~/.warp/.mcp.json"
+    { id: 'warp', name: 'Warp', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.warp')),
+      edits: () => [mcpJson(path.join(home, '.warp', '.mcp.json'), 'warp')],
+      manual: 'If Warp asks you to approve the change to its MCP config, approve it; memev then starts on its own.' },
+    // https://docs.mistral.ai/vibe/code/cli/configuration : "~/.vibe/config.toml" (VIBE_HOME moves it); one [[mcp_servers]] table per server
+    { id: 'mistral-vibe', name: 'Mistral Vibe', mode: 'instructions', detect: () => exists(vibeHome),
+      edits: () => { const e = stdio('mistral-vibe'); return [text(path.join(vibeHome, 'config.toml'), (t) => upsertVibeToml(t, `${TOML_START}\n[[mcp_servers]]\nname = "memev"\ntransport = "stdio"\ncommand = ${tomlEsc(e.command)}\nargs = [${e.args.map(tomlEsc).join(', ')}]\n${TOML_END}`), (t) => removeBlock(t, [TOML_START, TOML_END]), vibeSkipNote)]; } },
+  ];
 }
 
 /** Whether Claude Code's settings.json allows Memev's memory tools right now (any of the per-tool entries in permissions.allow). */
@@ -314,10 +370,10 @@ export function claudeToolsAllowed(env = process.env) {
 
 /** The apps Memev detects but does not support yet. They are listed as found, not supported, and their files are never changed.
  *  Each app is looked up at the directory its own docs name, which differs per app and per platform. */
-export function unsupportedDefs(env) {
+export function unsupportedDefs(env, platform = process.platform) {
   const { home, appData } = platformDirs(env);
   const xdg = env.XDG_CONFIG_HOME || path.join(home, '.config');
-  const win = process.platform === 'win32';
+  const win = platform === 'win32';
   return [
     { id: 'cline', name: 'Cline', detect: () => exists(path.join(home, '.cline')) },
     { id: 'roo', name: 'Roo', detect: () => exists(path.join(home, '.roo')) },
@@ -326,6 +382,8 @@ export function unsupportedDefs(env) {
     { id: 'jetbrains-ai', name: 'JetBrains AI', detect: () => exists(path.join(appData, 'JetBrains')) },
     { id: 'amp', name: 'Amp', detect: () => exists(win ? path.join(home, '.config', 'amp') : path.join(xdg, 'amp')) },
     { id: 'goose', name: 'Goose', detect: () => exists(win ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(xdg, 'goose')) },
+    // apps connected on macOS and Linux whose docs name no Windows location: found on Windows, never changed there
+    ...(win ? clientDefs(env, 'memev', platform, { allPlatforms: true }).filter((d) => d.windows === false).map((d) => ({ id: d.id, name: d.name, detect: d.detect, manual: `${d.name}'s docs give no Windows location for its MCP config, so Memev does not change it on Windows yet.` })) : []),
   ];
 }
 
@@ -493,13 +551,17 @@ export const RESTART = {
   cursor: 'Open a new Cursor chat', 'claude-desktop': 'Quit and reopen Claude Desktop', windsurf: 'Quit and reopen Windsurf',
   vscode: 'Reload the VS Code window (Developer: Reload Window)', zed: 'Quit and reopen Zed',
   opencode: 'Quit and reopen OpenCode', 'copilot-cli': 'Start a new Copilot CLI session',
+  'qwen-code': 'Restart Qwen Code in the same project', 'kimi-code': 'Start a new Kimi Code CLI session',
+  'factory-droid': 'Nothing to do: Droid reloads mcp.json when it changes', augment: 'Start a new Auggie session (check with /mcp)',
+  tabnine: 'Run /mcp reload in Tabnine CLI', iflow: 'Run /mcp refresh in iFlow CLI', warp: 'Open a new Warp agent session',
+  'mistral-vibe': 'Start a new Mistral Vibe session',
 };
 // Apps whose session-start hook brings the protocol, so their MCP instructions need not repeat it.
 export const HOOK_CLIENTS = new Set(clientDefs({}, 'memev').filter((d) => d.mode === 'hooks').map((d) => d.id));
 export function detect(env = process.env, launcher = 'memev', platform = process.platform) {
   const st = loadState(env);
   const supported = clientDefs(env, launcher, platform).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}`, supported: true }));
-  const unsupported = unsupportedDefs(env).map((d) => ({ id: d.id, name: d.name, found: !!d.detect(), supported: false }));
+  const unsupported = unsupportedDefs(env, platform).map((d) => ({ id: d.id, name: d.name, found: !!d.detect(), supported: false, manual: d.manual || null }));
   return [...supported, ...unsupported];
 }
 

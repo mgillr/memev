@@ -27,6 +27,22 @@ background connect back on.
 | OpenCode | `mcp` entry in `~/.config/opencode/opencode.json`; a block in the OpenCode rules file (skipped if the Claude rules file exists and the OpenCode one is missing) | instructions |
 | GitHub Copilot CLI | `mcpServers` entry in `~/.copilot/mcp-config.json` and a block in `~/.copilot/copilot-instructions.md` (in `$COPILOT_HOME` when it is set) | instructions |
 
+More apps, each at the path and key its own MCP docs give. `~` is your home folder (`%USERPROFILE%` on
+Windows). Where the docs name no Windows location, Memev connects the app on macOS and Linux only; on
+Windows it is listed as found, not supported yet, and its files are not changed. These apps are in
+instructions mode.
+
+| App | What Memev adds | Windows | Docs |
+|---|---|---|---|
+| Qwen Code | `mcpServers` entry in `~/.qwen/settings.json` | yes | [MCP](https://qwenlm.github.io/qwen-code-docs/en/users/features/mcp) |
+| Kimi Code CLI | `mcpServers` entry in `~/.kimi-code/mcp.json` (in `$KIMI_CODE_HOME` when it is set) | yes | [MCP](https://www.kimi.com/code/docs/en/kimi-code-cli/customization/mcp.html), [data locations](https://moonshotai.github.io/kimi-code/en/configuration/data-locations.html) |
+| Factory Droid | `mcpServers` entry (`type: stdio`) in `~/.factory/mcp.json` | not documented | [MCP](https://docs.factory.com/cli/configuration/mcp) |
+| Augment (Auggie CLI) | `mcpServers` entry in `~/.augment/settings.json` | not documented | [integrations](https://docs.augmentcode.com/cli/integrations) |
+| Tabnine CLI | `mcpServers` entry in `~/.tabnine/agent/settings.json` | not documented | [MCP config](https://docs.tabnine.com/main/getting-started/tabnine-agent/mcp-intro-and-setup/mcp-server-config) |
+| iFlow CLI | `mcpServers` entry in `~/.iflow/settings.json` | yes | [settings](https://platform.iflow.cn/en/cli/configuration/settings), [MCP](https://platform.iflow.cn/en/cli/examples/mcp) |
+| Warp | `mcpServers` entry in `~/.warp/.mcp.json` | not documented | [MCP](https://docs.warp.dev/knowledge-and-collaboration/mcp) |
+| Mistral Vibe | a `[[mcp_servers]]` table named memev in `~/.vibe/config.toml` (in `$VIBE_HOME` when it is set), between `# memev:start` and `# memev:end`; left alone if you already have a server named memev | yes | [configuration](https://docs.mistral.ai/vibe/code/cli/configuration), [reference](https://docs.mistral.ai/vibe/code/cli/configuration-reference) |
+
 **Aider** has no MCP and no hooks, so the hand-off is different: `memev card --aider` writes the
 resume card to a conventions file and adds it to the `read:` list in `~/.aider.conf.yml`, which Aider
 reads into context at session start. It is opt-in, so `memev connect` does not touch it; `memev
