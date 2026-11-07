@@ -693,14 +693,244 @@
             "sig": "CEiuup2yp9mLtG5aZ0/MK43s3mf/8qFXCco2wGLteaL9nRPoO9fgFNDJJjTxppWKPoeC2p4pzSJtrWl2W464Cw=="
           }
         ]
+      }
+    },
+    {
+      "round": 3,
+      "spec_sha256": "11c409deab0865287dddc794f5e6c65ab9a83e1e49ac5a69793f5c498389b3dc",
+      "base_commit": "92000dbdd5e3c11eb13d11c1182a0c60b0d084d9",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "21d5aa97719a86699221e79b64f679cc45e12a1d23ec1cd6f662f12102dc5fdc"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "28ec9c1f6ddb69a3d4c87dfb65f19712be1094f7394ae8d60dfba53ceea10759"
+          },
+          {
+            "path": "scripts/bench/speed/targets.mjs",
+            "sha256": "04c728bdc81206d92671dba2b29a066fbd81e4dd424849cfd740650bd35014d4"
+          },
+          {
+            "path": "docs/testing/SPEED-RESULTS.md",
+            "sha256": "2ee7a27a16ebc844a38cf416c61467b54541af23f101d8b666ffd14a44f02313"
+          },
+          {
+            "path": "docs/BUS.md",
+            "sha256": "7c14e4d7e31520d6e2715eb916534d713ec0659563e813fa1d79d15dc02af232"
+          },
+          {
+            "path": "package.json",
+            "sha256": "df0a33344e4d35bdb39ce4d9d2fbecc02f1d44b6037fd181a27740fe80195606"
+          },
+          {
+            "path": "scripts/leak-scan.mjs",
+            "sha256": "1bde309b58d535e9b5c091a0b771470738555b97578e61046fcecc7bd5f27a87"
+          },
+          {
+            "path": "test/hooks-startup.test.mjs",
+            "sha256": "550fb1082518f0d6aa6133c90e3f49bdded98871b177507933a23b083362bbd8"
+          },
+          {
+            "path": "test/leak-scan.test.mjs",
+            "sha256": "1e51554019bf59e1a21ef2b84e6d68ebb499e257e5158a7978afe8e02ea86d2f"
+          }
+        ]
       },
-      "closing": {
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "second seat on the same machine; the criteria were run, as stated here, and this is not an independent review: both seats are AI on one machine. Version 3 exists because version 2 could not pass as signed. A rehearsal of the real contractVerify of the owner's signed version 2 body, at a local commit holding only the leak scan exemption for its merge commit, as a non-root user on a Linux server with a fresh GitHub clone as the vault, failed the scope criterion on all seven tasks on scripts/leak-scan.mjs, and failed T1-c00. The T1-c00 cause the earlier rehearsals missed: contractVerify runs each criterion command with MEMEV_CONTRACT_BASE set to the base, and test/hooks-startup.test.mjs compared SR-1.29's start-up against that base, which already holds SR-1.29's change, so the ratio was about 1 against a 0.7 bar on every run. Their reruns did not set that variable, so the test was skipped and the failure was taken for a flake. A rerun now uses the verifier's environment, base included. Read against version 2: no criterion statement, verifier, requirement, stop rule or dependency changed; four paths are added to every task's scope, under reviewer note 3; the request gains one Version 3 paragraph and loses nothing. Run at PR 453 (the fixes under this version), as ci on the Linux server: the full suite without the variable, 1585 tests and 0 failures, with the SR-1.29 start-up test run, not skipped; with MEMEV_CONTRACT_BASE set to this contract's base, as the verifier sets it, the full suite again gives 1585 tests and 0 failures, the SR-1.29 tests included. The leak scan history is clean, a synthetic merge with GitHub's default subject is clean, and the same with no origin fails closed. For the verify: nothing else may land on memev main between PR 453 and the verify, since the scope range runs from the base to the verify head.",
+      "amendments": [
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "changelog.d/sr-1-35-v3-gates.md",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "scripts/leak-scan.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "test/hooks-startup.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T1",
+          "field": "scope",
+          "to": "test/leak-scan.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "changelog.d/sr-1-35-v3-gates.md",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "scripts/leak-scan.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "test/hooks-startup.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T2",
+          "field": "scope",
+          "to": "test/leak-scan.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "changelog.d/sr-1-35-v3-gates.md",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "scripts/leak-scan.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/hooks-startup.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/leak-scan.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "changelog.d/sr-1-35-v3-gates.md",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "scripts/leak-scan.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "test/hooks-startup.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "test/leak-scan.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "changelog.d/sr-1-35-v3-gates.md",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "scripts/leak-scan.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "test/hooks-startup.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "test/leak-scan.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "changelog.d/sr-1-35-v3-gates.md",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "scripts/leak-scan.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "test/hooks-startup.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T6",
+          "field": "scope",
+          "to": "test/leak-scan.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "changelog.d/sr-1-35-v3-gates.md",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "scripts/leak-scan.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "test/hooks-startup.test.mjs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T7",
+          "field": "scope",
+          "to": "test/leak-scan.test.mjs",
+          "reviewer_note": 3
+        }
+      ],
+      "sig": {
         "payloadType": "application/vnd.memev.contract-sha256",
-        "payload": "MTg5ZDgwY2M5YTQ5NTY5MDNiMGQyYjhmMzU2NDUyYTNmYmVmN2Q1Y2E5ZWIyYjRjODIyZWU0MTM5YzBjOGYzMA==",
+        "payload": "MzU3ZWQ4MjdlOTlmZjcwMDJkZTdkNmNiMzcyYjUwMTE0ZGM5YTQ0Y2FlNmMyODBhYTllYmMyMTA4NDg3MGJmOQ==",
         "signatures": [
           {
             "keyid": "1f6b4e7c00729bc7",
-            "sig": "4J5KbreSau6Ga4/VULfhj1/prT4YqtBXf/E/e7lvmps/xVZLuZ7cfPiqxkYfcIHrmwC8MBrv08IchDlZ8i+EBg=="
+            "sig": "XobeWG3XYxON39xbpFL/T4lWnwkCD0o+wF/RYOVNFpVx7xWu5VBuncVUX/ZBUPB8Ikaanka4g+OEKOEHfv8hCA=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MTRkNDliNWQzOTMzYjM3Y2RlOTBiMGRlNWFjZTU2M2FkN2JjMjE2ZGNhZmY3ZTExMTM1N2M1YmU1YmNiMGMzMw==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "JqHXOXc/s7ytPBFvVlCyNMtrLoPoAznnx28WjoGfftxHQhFrigbGpV1TBZmflZruv+/vmRtPYV4j+FlZd/orCQ=="
           }
         ]
       }
@@ -731,6 +961,20 @@
           {
             "keyid": "1f6b4e7c00729bc7",
             "sig": "uMyPV2SEBbLJo/TSC39Qb70yBbMmwZBbZaGofq7tOtw+UBHTuyP82XDLzvFi6FEgPsRvIN3MMKlXQr6Xv/sPAA=="
+          }
+        ]
+      }
+    },
+    {
+      "n": 3,
+      "text": "second seat on the same machine; run through the real verifier's scope criterion at a later commit. Version 3 of SR-1.35 adds four paths to every task's scope, since the fixes that let version 2's failures pass are in them: changelog.d/sr-1-35-v3-gates.md, scripts/leak-scan.mjs, test/hooks-startup.test.mjs, test/leak-scan.test.mjs. No criterion changes, and none of these widens what a criterion allows.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjgyOTU5NmRmOGZjYzZhMGM4ZDE2ZGRhMDc2ZTY3ZjUwMmMwOThhY2QwY2I1Mzc4MGMzNWJkMTkzMTNmOTZjZA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "/d5/yFTrGwP49qsnYEOOIJx3FRYkB1xtO/tsaAo9BJYugaZCHrj889AhlG/qZ38GOLdRgcX2gKGUvNeP6JLpAQ=="
           }
         ]
       }
