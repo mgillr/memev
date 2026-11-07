@@ -643,7 +643,8 @@ export class Bus {
    * `limit` of the in-order rest cut to BODY_CUT; it marks only what it showed read and says how
    * many it left. Uncapped it returns every fresh message and marks them all read, as the hook
    * path does. */
-  unread(ctx, { seat = null, peek = false, limit = null, capped = false } = {}) {
+  // quiet (a viewer such as the desktop app, never a seat at work): with peek, it also leaves presence alone and answers no comms check
+  unread(ctx, { seat = null, peek = false, quiet = false, limit = null, capped = false } = {}) {
     const who = this.resolve(ctx, { seat });
     const p = this._pulse(who.seat); const st = readState(p);
     const view = this._view(); const all = view.msgs;
@@ -688,9 +689,11 @@ export class Bus {
     // what this call saw: the bus position and, per device, the highest counter
     const frontier = all.length ? all[all.length - 1].seq : (p.seen_seq || 0);
     const seenDseq = this.counters();
-    this.pulse(ctx, { who, read: peek ? null : st.read, readExtra: peek ? null : st.extra, seen: peek ? null : frontier, seenDseq: peek ? null : seenDseq });
+    // only the vault's own terminal (the desktop viewer runs it) may read quietly; an AI app's read always shows it is alive
+    const silent = peek && quiet && !!(ctx.cli && ctx.local);
+    if (!silent) this.pulse(ctx, { who, read: peek ? null : st.read, readExtra: peek ? null : st.extra, seen: peek ? null : frontier, seenDseq: peek ? null : seenDseq });
     const acked = [];
-    for (const m of ackOf) {
+    for (const m of silent ? [] : ackOf) {
       try { if (!ctx.identity?.read_only) { this._append(who, { to: m.from, type: 'ack', body: 'comms check: here', ref: m.id, project: null }); acked.push(m.id); } } catch {}
     }
     return { seat: who.seat, operator: who.operator, hold, messages, ...(cap ? { not_shown: notShown } : {}), acked, ...(this.operator() ? {} : { lead_needed: LEAD_NEEDED }) };
