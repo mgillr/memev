@@ -118,14 +118,376 @@
             "sig": "tCI+WflPScEEywkCDrZY2BduK11dyT3tDiQ0dkHazErYQ/qD/w4TZnbxcRfRvioJdykvjX0L/z1uWy8fEmriCw=="
           }
         ]
+      }
+    },
+    {
+      "round": 3,
+      "spec_sha256": "50abac85e92df07cc5088eef7a35ff16edce9ac09bf19dd3af0106a0ed25ad96",
+      "base_commit": "1b58023196e565bdbf2b26e9713b74c77f8c2e28",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "fef5139ba1222068699f08e3d2d75a5fda18bdad8c75181ca007bded9edc84ee"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "28ec9c1f6ddb69a3d4c87dfb65f19712be1094f7394ae8d60dfba53ceea10759"
+          },
+          {
+            "path": "docs/scope-one/DECISIONS.md",
+            "sha256": "3307322f2c70781f4362f95243bcd1905e86e8214abf604ed965ca540aa9c696"
+          },
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "f41a022de450edb6ca7f055b5f0418479a2e1093d21a4aef598a108a1e65e810"
+          },
+          {
+            "path": "package.json",
+            "sha256": "df0a33344e4d35bdb39ce4d9d2fbecc02f1d44b6037fd181a27740fe80195606"
+          }
+        ]
       },
-      "closing": {
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "second seat on the same machine; only read the criteria. This is not an independent review: both seats are AI on one machine. Round 3 is here because the speed work landed (PRs 436, 437, 439, 440, 441) and changed files in this spec's scope, which made round 2 stale; the second seat told the lead so before landing, by running the gate. The second seat read T3, T5, T6 and T9 against what landed, and the names of files in every other criterion against the diff since round 2. It reread none of T1, T2 or T4 beyond that. Two additions, neither weakening anything. T9 can now remove the route in scripts/sign, which its scope did not hold, and must. T5 holds MEMEV-STRATEGY.md, which the owner added after round 2, to the same two pages, with one new criterion. T3-c01's order still stands: T3 is built after SR-1.35 is signed. None of the 147 criteria was run, since most need work not yet built. Prior findings are in first-trial/REDTEAM-B-SR-0.04.md in the team's private bundle.",
+      "amendments": [
+        {
+          "task": "T9",
+          "field": "scope",
+          "to": "scripts/sign/**",
+          "reviewer_note": 2
+        },
+        {
+          "task": "T9",
+          "field": "scope",
+          "to": "test/owner-sign.test.mjs",
+          "reviewer_note": 2
+        },
+        {
+          "task": "T5",
+          "field": "scope",
+          "to": "MEMEV-STRATEGY.md",
+          "reviewer_note": 2
+        }
+      ],
+      "sig": {
         "payloadType": "application/vnd.memev.contract-sha256",
-        "payload": "OWQyZmY2OTgyOTI1ZGExYTY2ZDEwZjYzNmYwN2Q2M2IzNzUzOGJmOGE5ZTY3OWY2N2RkZGVkYWM0NDc0MDJiNA==",
+        "payload": "YjMyMjZmMDgzMmMxNWVkNmM4NTFlMjJiOWJkZDgzNGY2NmU2YWM3YTRmY2RiMzg4ZDUxODQ2YTBjNjU4NDkzYQ==",
         "signatures": [
           {
             "keyid": "1f6b4e7c00729bc7",
-            "sig": "GgakCEc9kOVJ9O+ZBmZbudYHBu4Ib3NPOmGXlrQjfMpSkCcrJLj0umwWBCrMjfLIqPynZL0e9sq8Ube0ZOHGAg=="
+            "sig": "bMCw5SJo8V99WaZUy685dEn0oivwf3wPThbGjeF/CvYrhiB+oJ9h5F/PqLTtG0bwC5kYQcQVh+v/8zZlT/9JBQ=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 4,
+      "spec_sha256": "9cbaf31863724f3eb4b97f1779855709d0ceaea2ebb942e8101d97a0abb9f682",
+      "base_commit": "c21a0740bfb198ceecd874a2b178902e254f56f6",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "21d5aa97719a86699221e79b64f679cc45e12a1d23ec1cd6f662f12102dc5fdc"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "28ec9c1f6ddb69a3d4c87dfb65f19712be1094f7394ae8d60dfba53ceea10759"
+          },
+          {
+            "path": "docs/scope-one/DECISIONS.md",
+            "sha256": "3307322f2c70781f4362f95243bcd1905e86e8214abf604ed965ca540aa9c696"
+          },
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "f41a022de450edb6ca7f055b5f0418479a2e1093d21a4aef598a108a1e65e810"
+          },
+          {
+            "path": "package.json",
+            "sha256": "df0a33344e4d35bdb39ce4d9d2fbecc02f1d44b6037fd181a27740fe80195606"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "second seat on the same machine; only read the criteria, none run, since most need work not yet built; the gate run. This is not an independent review: both seats are AI on one machine. Round 4 follows the owner's decisions of 7 Nov 2026: no freeze, coordination in its place, and the scope check changed by a new task, T2f, with his word that it changes SR-0.03's meaning. T3 and T4 gain the scope their builds were found to need. SR-1.35 was signed as version 2 and verified before this round, and its body is in this round's range. T3, T4 and T9 are built on branches and their full suites pass on the box; nothing of them is in this round's range. Removed with the freeze: T1's exit rule, T2e's freeze exit and its criterion T2e-c07, under reviewer note 3.",
+      "amendments": [
+        {
+          "task": "T1",
+          "field": "requirement",
+          "from": "Rule 0, the freeze (the request holds it in full, with why fix pull requests in memev wait): from signing, no contract is drafted, signed or superseded in memev, memev-ops or memev-app, and no design record, tier or repository is added. Allowed: this contract; security fixes, through T4; SR-1.35, signed after the second seat's round, with a receipt like any other; SR-3.02 if the owner says so under O5",
+          "to": "Coordination, in place of a freeze (the owner, 7 Nov 2026: 'what freeze and why just coordinate the work and sync'): the register of 7 Nov 2026 is the one list of work, each of its rows has one owner seat, no seat starts a row another seat holds, nothing lands inside a contract's scope while that contract waits for its verify, and every seat syncs on the team bus. Until this contract verifies, work that is not its own builds in memev-app or memev-ops, or on a memev branch that does not land, as the owner decided on 7 Nov 2026; T2f lets later contracts run side by side",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T1",
+          "field": "requirement",
+          "from": "Rule 0, after the freeze too: a stale index row or an unlisted scope path never causes a new signed version",
+          "to": "a stale index row or an unlisted scope path never causes a new signed version",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T1",
+          "field": "requirement",
+          "from": "Rule 0, exit: the freeze lifts when T2 is closed (T2e). If T2 is not closed by 13 Nov 2026 (the lead's proposal; the owner may change the date), the owner decides whether it continues. The freeze holds the first trial's contracts (installers, PL-1, MU-1, BO-1) until then",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T1",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T2a",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T2b",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T2c",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T2d",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T2e",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T3",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T4",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T5",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T6",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T7",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T8",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T9",
+          "field": "stop_rule",
+          "from": "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T2e",
+          "field": "requirement",
+          "from": "the freeze's exit is recorded: when T2 is closed, or when the owner ends the freeze at its review date, contracts/receipts/FREEZE-LIFTED.md is committed and names the last commit the freeze held at. Up to that commit nothing but the allowed work is added in this repository (T2e-c07). memev-ops and memev-app cannot be checked from here",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T2e",
+          "field": "criterion",
+          "from": "T2e-c07: Rule 0 in this repository: between the base and HEAD (or the commit contracts/receipts/FREEZE-LIFTED.md names, once the freeze is lifted) no file is added under contracts/signed, contracts/*/specs, docs/scope-one/design or docs/tiers, other than the signed bodies of SR-0.04, SR-1.35 and SR-3.02 and the spec of SR-1.35",
+          "to": null,
+          "reviewer_note": 3
+        },
+        {
+          "task": "T3",
+          "field": "requirement",
+          "from": "no contract is signed or superseded for this (Rule 0): SR-1.01 and SR-1.06 stay as signed, and their receipts come from T2e",
+          "to": "no contract is signed or superseded for this (this contract adds no signed version): SR-1.01 and SR-1.06 stay as signed, and their receipts come from T2e",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T4",
+          "field": "requirement",
+          "from": "no bearer token in a URL (SR-1.04; test/connector-url.test.mjs), or SR-1.04 is amended by the owner with the reason, since the connector address carries one today and docs/DOCKER.md documents it. DRAFT 3 says amended and not how. Under Rule 0 it cannot be a new signed version, so here it is the owner's decision written in docs/scope-one/DECISIONS.md as one line that begins 'SR-1.04 amended by the owner' and holds 'reason:' and the reason; the red-team round settles the form",
+          "to": "no bearer token in a URL (SR-1.04; test/connector-url.test.mjs), or SR-1.04 is amended by the owner with the reason, since the connector address carries one today and docs/DOCKER.md documents it. DRAFT 3 says amended and not how. This contract adds no signed version, so here it is the owner's decision written in docs/scope-one/DECISIONS.md as one line that begins 'SR-1.04 amended by the owner' and holds 'reason:' and the reason; the red-team round settles the form",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T4",
+          "field": "requirement",
+          "from": "no contract is signed or superseded for this (Rule 0): the signed SR-1.03 and SR-1.05 stay as they are and get their receipts from T2e; SR-1.02, SR-1.04, SR-1.07 and SR-1.08 stay unsigned specs",
+          "to": "no contract is signed or superseded for this (this contract adds no signed version): the signed SR-1.03 and SR-1.05 stay as they are and get their receipts from T2e; SR-1.02, SR-1.04, SR-1.07 and SR-1.08 stay unsigned specs",
+          "reviewer_note": 3
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/import.test.mjs",
+          "reviewer_note": 4
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/index-damage.test.mjs",
+          "reviewer_note": 4
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/notestate.test.mjs",
+          "reviewer_note": 4
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/oplog-sliced-snapshot.test.mjs",
+          "reviewer_note": 4
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/speed-promises.test.mjs",
+          "reviewer_note": 4
+        },
+        {
+          "task": "T3",
+          "field": "scope",
+          "to": "test/paid-client.test.mjs",
+          "reviewer_note": 4
+        },
+        {
+          "task": "T4",
+          "field": "scope",
+          "to": "test/setup-session.test.mjs",
+          "reviewer_note": 4
+        },
+        {
+          "task": "T9",
+          "field": "verifier.timeout_s",
+          "statement": "T9-c08: the full suite passes (on CI, never on the Mac)",
+          "from": null,
+          "to": 1800,
+          "reviewer_note": 3
+        }
+      ],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YWEzNGNjYzg4YjgyM2QzNTk3N2FiMTJhN2EwMDg2NTdmNTJmNTlhNTc1MDk5NTM0OWJkYzlhNzcxN2IzMTg0MA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "4GM6U98OAZhUFu9K6+wtJ82/3LziRB8YNZDOfuevVNPG+bf/3ZgswXPbk7AENXHBMbahL/KS3d/HxFSel9nTCQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjFmOGI5ZjM4OTQ3ZWJhZmJlMmY1YmVkNzgxZTk4NmY3ZjY5NWFjOTY2N2MxNzkxNDhiOGRmNDk5ZTY5NmQxOQ==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "T4nTngX72N9gpNXUG6sVxtzrO0m/Zug7uoIE2jEE1Pvd9CVOv3FJYmHZVC/0X5TwQn4iln1rzS8AGC5KEcVuAw=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 5,
+      "spec_sha256": "9cbaf31863724f3eb4b97f1779855709d0ceaea2ebb942e8101d97a0abb9f682",
+      "base_commit": "515d9bb8135c2adbca6256d89821ea75aaf66aa6",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "21d5aa97719a86699221e79b64f679cc45e12a1d23ec1cd6f662f12102dc5fdc"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "28ec9c1f6ddb69a3d4c87dfb65f19712be1094f7394ae8d60dfba53ceea10759"
+          },
+          {
+            "path": "docs/scope-one/DECISIONS.md",
+            "sha256": "3307322f2c70781f4362f95243bcd1905e86e8214abf604ed965ca540aa9c696"
+          },
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "f41a022de450edb6ca7f055b5f0418479a2e1093d21a4aef598a108a1e65e810"
+          },
+          {
+            "path": "package.json",
+            "sha256": "df0a33344e4d35bdb39ce4d9d2fbecc02f1d44b6037fd181a27740fe80195606"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "second seat on the same machine; the gate run; no criterion run. Round 5 is round 4 unchanged, reviewed again at the commit after memev #458 landed, because a landing in any task scope makes the last round stale. #458 changed five test files only (address, index-damage, installers, project-store and coordinator tests), all inside the test/** scope of one task: ports from the run reservation, processes lined up by files, and the coordinator test double taking its lock as the real store does. It changed no src, script, spec, criterion command or verifier, and none of the five input files of round 4. This seat wrote #458 and the lead reviewed it, so this round is not an independent review of that change: both seats are AI on one machine.",
+      "amendments": [],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjI2MjMwNDA5ZWE5ZWRjMDg3OWZlNThlMjJmZmUwNzMwNzRjYTQzNmY4NzExNjg5NTg2NTRmZGRkOGZiM2Y0ZQ==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "tBFqfclosv9BUnFmTeYCem5zSGba7aLk0UN9wDO7QXf+3LNrpqotiyfb+AvVv9WPW9YwXqQiLxBh8jTpb6RFCQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MWI1NmE3ZTBmNzY2YjZmOWMwYjE0MmNhOGI5NmRlZGJkMDUwZjljNWRjNmJmMzI0ZGEyYjcxNjI4MThkNTkwOQ==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "b8FFtxgVUQKMt+fo4QhBcfpxTktnxeiLMNkMVy+9zaSo/y35yCAPXIQWFbcJdArMLPtzcsElwepYDAKKR9QjAw=="
           }
         ]
       }
@@ -142,6 +504,48 @@
           {
             "keyid": "1f6b4e7c00729bc7",
             "sig": "NJU7r77Du8quLtR5ytcTPEDCoCuegDsg+CisSy0TyaVn4+WfZ/V09aZSqUQcdh2z7rxRCaq8zzrF+xeYCcL+Dg=="
+          }
+        ]
+      }
+    },
+    {
+      "n": 2,
+      "text": "second seat on the same machine; read the files, none run. Round 3 of SR-0.04 adds three paths to scope, because of what landed after round 2. T9 gets scripts/sign/** and test/owner-sign.test.mjs: PR 436 put the owner's signing route there, the two programs and a README under scripts/sign, and T9 replaces that route and could not have removed it. T5 gets MEMEV-STRATEGY.md: the owner added that page at the repository root, it names tiers and licences, and T5 exists so that every such page agrees with the two pages that hold the truth. None of the three widens what any existing criterion allows in another task.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZjRkOTVjMTFjOGRlZWNiNmVkYjY3M2QyYWVhNTk4YTU2MDgyOTNlMDkwMDk3OTVmNGY4Y2E5ODZhNGRlY2IxMA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "eTX8BkbAj1qTFo2qyT7JkVnqywId8c6zkYcER28BVmPLYRdW4e00ewzg1ihYpxLpqpXQneGP6oPiVqqP1l1qDQ=="
+          }
+        ]
+      }
+    },
+    {
+      "n": 3,
+      "text": "second seat on the same machine; read, and the gate run. T9-c08, the full suite, had no timeout_s, so the verifier gave it 300 s, and the full suite took about 300 s on the server (268 to 301 s on 7 Nov 2026, load 4 to 13): it now has 1800 s, as T1-c12, T2a-c14, T3-c07, T4-c11, T6-c12 and T7-c13 have, and T2f-c06 copies it. The command and the statement are unchanged. Round 4 removes the freeze, by the owner's decision of 7 Nov 2026 (\"what freeze and why just coordinate the work and sync\"), and carries his coordination rule in its place in T1. Each item below is removed or reworded for that reason alone, and is carried by T1's coordination requirement and by T2f where it is carried at all: \"Rule 0, the freeze (the request holds it in full, with why fix pull requests in memev wait): from signing, no contract is drafted, signed or superseded in memev, memev-ops or memev-app, and no design record, tier or repository is added. Allowed: this contract; security fixes, through T4; SR-1.35, signed after the second seat's round, with a receipt like any other; SR-3.02 if the owner says so under O5\" ; \"Rule 0, after the freeze too: a stale index row or an unlisted scope path never causes a new signed version\" ; \"Rule 0, exit: the freeze lifts when T2 is closed (T2e). If T2 is not closed by 13 Nov 2026 (the lead's proposal; the owner may change the date), the owner decides whether it continues. The freeze holds the first trial's contracts (installers, PL-1, MU-1, BO-1) until then\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently. Under Rule 0 an unlisted scope path does not cause a new signed version; how the path is then recorded is the owner's to say.\" ; \"the freeze's exit is recorded: when T2 is closed, or when the owner ends the freeze at its review date, contracts/receipts/FREEZE-LIFTED.md is committed and names the last commit the freeze held at. Up to that commit nothing but the allowed work is added in this repository (T2e-c07). memev-ops and memev-app cannot be checked from here\" ; \"T2e-c07: Rule 0 in this repository: between the base and HEAD (or the commit contracts/receipts/FREEZE-LIFTED.md names, once the freeze is lifted) no file is added under contracts/signed, contracts/*/specs, docs/scope-one/design or docs/tiers, other than the signed bodies of SR-0.04, SR-1.35 and SR-3.02 and the spec of SR-1.35\" ; \"no contract is signed or superseded for this (Rule 0): SR-1.01 and SR-1.06 stay as signed, and their receipts come from T2e\" ; \"no bearer token in a URL (SR-1.04; test/connector-url.test.mjs), or SR-1.04 is amended by the owner with the reason, since the connector address carries one today and docs/DOCKER.md documents it. DRAFT 3 says amended and not how. Under Rule 0 it cannot be a new signed version, so here it is the owner's decision written in docs/scope-one/DECISIONS.md as one line that begins 'SR-1.04 amended by the owner' and holds 'reason:' and the reason; the red-team round settles the form\" ; \"no contract is signed or superseded for this (Rule 0): the signed SR-1.03 and SR-1.05 stay as they are and get their receipts from T2e; SR-1.02, SR-1.04, SR-1.07 and SR-1.08 stay unsigned specs\"",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjAyNGM2NWU4ZTljMWM5YzIyNGNmMDcyMGQwMjhjNTU4NmI1YWEyOTllMmIyMTZjNDFmNmY1NzMyNWY3MmE0Mw==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "dws/uTXvQItKNbURHCjjXpMSQMi2tHHBxQCSmVc60dEDDoXyUrbJZ0mFzzoK6R7XKwKyLZ+Vu7a4qyjrflqvBA=="
+          }
+        ]
+      }
+    },
+    {
+      "n": 4,
+      "text": "second seat on the same machine; the paths were found by running the suite. T3's rebase of the parked lock onto the speed work made six test files fake a kill inside one process, which the lock refuses, so they let the lock go as a real kill would; T4's allowlist fix needs the setup session test. Scope added: test/import.test.mjs, test/index-damage.test.mjs, test/notestate.test.mjs, test/oplog-sliced-snapshot.test.mjs, test/speed-promises.test.mjs, test/paid-client.test.mjs, test/setup-session.test.mjs.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZWQwYmE0YWI2YTEzNmE2Mzc5MDE1Mjk2OGIyMjBlYzViMGYzOGY3MmZkYjYwZWM1NjIzNTRjNzY3MDgxMjM4MA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "pqj7SmXxrpeRe8h967vURc0Qy6jp4UL0xGlCFQJbSLoGlyuCZTOECWprB4QciIKbubr0RXeEyroc1eZ+yVUpCA=="
           }
         ]
       }
