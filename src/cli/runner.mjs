@@ -115,7 +115,7 @@ export function runTurn({ cmd, body, cwd, seat = null, env = process.env } = {})
   const parts = String(cmd).split(/\s+/).filter(Boolean);
   return new Promise((resolve) => {
     // MEMEV_SEAT pins the turn's session to the runner's seat, so its hooks and its bus calls post as that seat
-    const p = spawn(parts[0], parts.slice(1), { cwd, env: seat ? { ...env, MEMEV_SEAT: seat } : env, stdio: ['pipe', 'ignore', 'ignore'] });
+    const p = spawn(parts[0], parts.slice(1), { windowsHide: true, cwd, env: seat ? { ...env, MEMEV_SEAT: seat } : env, stdio: ['pipe', 'ignore', 'ignore'] });
     p.stdin.on('error', () => {});
     p.stdin.write(String(body));
     p.stdin.end();

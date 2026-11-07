@@ -50,7 +50,7 @@ export function commandProvider(command, { args = [], timeoutMs = 30000, maxBuff
     id,
     resolve({ a, b, base }) {
       const input = JSON.stringify({ a, b, base: base ?? null });
-      const r = spawnSync(command, args, { input, encoding: 'utf8', timeout: timeoutMs, maxBuffer });
+      const r = spawnSync(command, args, { windowsHide: true, input, encoding: 'utf8', timeout: timeoutMs, maxBuffer });
       if (r.error) {
         const code = r.error.code;
         if (code === 'ETIMEDOUT') throw fail(`no answer within ${timeoutMs} ms`);

@@ -98,7 +98,7 @@ const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-')
 export function parentProcName(ppid = process.ppid) {
   if (!ppid) return null;
   try { const c = fs.readFileSync(`/proc/${ppid}/comm`, 'utf8').trim(); if (c) return c; } catch {}
-  try { const o = execFileSync('ps', ['-o', 'comm=', '-p', String(ppid)], { encoding: 'utf8', timeout: 1500 }).trim(); if (o) return o.split('/').pop(); } catch {}
+  try { const o = execFileSync('ps', ['-o', 'comm=', '-p', String(ppid)], { windowsHide: true, encoding: 'utf8', timeout: 1500 }).trim(); if (o) return o.split('/').pop(); } catch {}
   return null;
 }
 

@@ -7,7 +7,7 @@ import { git } from '../engine/git.mjs';
 import { can } from '../engine/entitlements.mjs';
 import { spawnSync } from 'node:child_process';
 
-const which = (bin) => spawnSync(process.platform === 'win32' ? 'where' : 'which', [bin], { encoding: 'utf8' }).status === 0;
+const which = (bin) => spawnSync(process.platform === 'win32' ? 'where' : 'which', [bin], { windowsHide: true, encoding: 'utf8' }).status === 0;
 
 const hostedLater = (id, feature, what) => ({ id, hosted: true, feature, available: () => ({ ok: false, reason: `${what} is not offered yet` }) });
 
