@@ -427,8 +427,9 @@ function moreApps(env, platform, stdio) {
         return [json(f, setServer('mcp', { type: 'local', command: [e.command, ...e.args], enabled: true }), delServer('mcp'))];
       },
       manual: 'Kilo asks before each Memev tool call; to allow them, add "permission": { "memev_*": "allow" } to kilo.jsonc.' },
-    // https://github.com/aws/amazon-q-developer-cli/blob/main/docs/agent-file-locations.md : "~/.aws/amazonq/mcp.json for global",
-    // read by the built-in default agent ("useLegacyMcpJson": true). The CLI is now Kiro CLI; this is for installs that remain.
+    // https://github.com/aws/amazon-q-developer-cli/blob/main/docs/agent-format.md : the legacy file "~/.aws/amazonq/mcp.json for global";
+    // .../docs/default-agent-behavior.md : the default agent "includes MCP servers from the legacy global configuration file".
+    // The CLI is now Kiro CLI; this is for installs that remain.
     { id: 'amazon-q-cli', name: 'Amazon Q Developer CLI', mode: 'instructions', windows: false, detect: () => exists(path.join(home, '.aws', 'amazonq')),
       edits: () => [mcpJson(path.join(home, '.aws', 'amazonq', 'mcp.json'), 'amazon-q-cli')],
       note: 'Custom agents read their own mcpServers; the default agent reads this file.' },
@@ -707,7 +708,7 @@ export async function command(cmd, pos, flags, { env, root }) {
   if (cmd === 'connect') {
     if (target !== 'all' && target !== 'several') {
       const c = detect(env, launcher).find((x) => x.id === target);
-      if (c && c.found && !c.supported) { out.info(`${c.name}: found, not supported yet (see docs/CLIENTS.md to ask for it)`); return 0; }
+      if (c && !c.supported) { out.info(`${c.name}: ${c.found ? 'found, ' : ''}not supported yet${c.manual ? `; ${c.manual}` : ''} (see docs/CLIENTS.md to ask for it)`); return 0; }
     }
     // memev connect claude-code cursor vscode: exactly those apps, checked before anything changes
     if (target === 'several' && pos.includes('all')) throw new Error('memev connect all connects every app: use it alone, or name the apps');

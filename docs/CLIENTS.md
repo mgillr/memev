@@ -56,7 +56,7 @@ instructions mode.
 | Junie (IDE plugin and CLI) | `mcpServers` entry in `~/.junie/mcp/mcp.json` | not documented | [MCP](https://junie.jetbrains.com/docs/junie-cli-mcp-configuration.html) |
 | Amp | `amp.mcpServers` entry in `~/.config/amp/settings.json` (or `settings.jsonc` when that is the one you have) | yes, `%USERPROFILE%\.config\amp` | [settings](https://ampcode.com/docs/cli/settings), [MCP](https://ampcode.com/docs/customize/mcp) |
 | Kilo Code | `mcp` entry (`type: local`, the command as one array) in `~/.config/kilo/kilo.jsonc` (or `kilo.json` when that is the one you have); Kilo asks before each tool call unless `"permission": { "memev_*": "allow" }` is set | yes, `%USERPROFILE%\.config\kilo` | [MCP](https://kilo.ai/docs/automate/mcp/using-in-kilo-code) |
-| Amazon Q Developer CLI | `mcpServers` entry in `~/.aws/amazonq/mcp.json`, which the default agent reads (the CLI is now Kiro CLI; this is for installs that remain) | not documented | [agent file locations](https://github.com/aws/amazon-q-developer-cli/blob/main/docs/agent-file-locations.md) |
+| Amazon Q Developer CLI | `mcpServers` entry in `~/.aws/amazonq/mcp.json`, which the default agent reads (the CLI is now Kiro CLI; this is for installs that remain) | not documented | [agent format](https://github.com/aws/amazon-q-developer-cli/blob/main/docs/agent-format.md), [default agent](https://github.com/aws/amazon-q-developer-cli/blob/main/docs/default-agent-behavior.md) |
 
 **Aider** has no MCP and no hooks, so the hand-off is different: `memev card --aider` writes the
 resume card to a conventions file and adds it to the `read:` list in `~/.aider.conf.yml`, which Aider

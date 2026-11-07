@@ -85,3 +85,13 @@ test('the remote setup allowlist takes the ticked apps, and refuses all, unknown
   assert.equal(checkAllowlist(['connect', 'all'], root).ok, false);
   assert.equal(checkAllowlist(['connect', 'no-such-app', 'other'], root).ok, false);
 });
+
+test('memev connect for an app that is not supported here says so, found or not, and changes nothing', () => {
+  const sb = sandbox();
+  try {
+    const r = sb.run(['connect', 'roo']);
+    assert.equal(r.code, 0, r.out + r.err);
+    assert.match(r.out, /Roo: not supported yet/, r.out);
+    assert.equal(fs.existsSync(path.join(sb.home, '.roo')), false);
+  } finally { sb.stop(); }
+});
