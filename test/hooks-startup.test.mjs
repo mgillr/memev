@@ -1,6 +1,10 @@
 // SR-1.29: a hook process loads only the hook code, so the prompt hook fits MEM-098's 1.5 s budget on a slow runner.
 // The hook is spawned the way an app runs it (node bin/memev.mjs hook <event>), against a stub daemon on loopback.
-// The base-code comparisons build the recorded base with git archive and are skipped when MEMEV_CONTRACT_BASE is unset.
+// The output comparison builds MEMEV_CONTRACT_BASE with git archive and is skipped when that is unset. The start-up comparison
+// builds SR-1.29's own base, read from the base field of its spec, so it measures SR-1.29's change under any later contract's base.
+// It runs whenever that commit is in the clone. It is skipped with a reason only when the spec names a base, that commit is absent
+// and no contract is being verified. It fails when the spec is missing, unreadable or has no base, and when a contract is being
+// verified and the commit is missing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -13,6 +17,12 @@ import { fileURLToPath } from 'node:url';
 const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOAD_LOG = path.join(REPO, 'test', 'helpers', 'load-log.mjs');
 const BASE = process.env.MEMEV_CONTRACT_BASE || '';
+const SR129_SPEC = path.join(REPO, 'contracts', 'seed-readiness', 'specs', 'SR-1.29-a-hook-starts-without-loading-the-whole.json');
+// '' when the spec is missing, unreadable or has no base: the start-up test then fails, never skips
+const SR129_BASE = (() => { try { const b = JSON.parse(fs.readFileSync(SR129_SPEC, 'utf8')).base; return typeof b === 'string' ? b : ''; } catch { return ''; } })();
+const haveCommit = (sha) => /^[0-9a-f]{40}$/.test(sha) && spawnSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: REPO }).status === 0;
+// skipped only in a clone that lacks SR-1.29's base commit (a shallow checkout) while no contract is being verified
+const STARTUP_SKIP = SR129_BASE && !haveCommit(SR129_BASE) && !BASE ? `SR-1.29's base ${SR129_BASE.slice(0, 12)} is not in this clone` : false;
 const EVENTS = { 'session-start': { source: 'startup' }, prompt: { prompt: 'what did I decide about the cache' }, 'pre-compact': {}, stop: {} };
 
 // the stub answers the hook's routes after delayMs (the health check at once) and records each request
@@ -67,16 +77,16 @@ async function loaded(event) {
   } finally { stub.server.close(); fs.rmSync(root, { recursive: true, force: true }); }
 }
 
-// the base code, built once per run from the recorded base commit
-let baseDir = null;
-function baseRepo() {
-  if (baseDir) return baseDir;
+// the base code, built once per run for each commit asked for
+const baseDirs = new Map();
+function baseRepo(commit = BASE) {
+  if (baseDirs.has(commit)) return baseDirs.get(commit);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-hookstart-base-'));
-  const tar = spawnSync('git', ['archive', '--format=tar', BASE], { cwd: REPO, maxBuffer: 1 << 30 });
-  assert.equal(tar.status, 0, `git archive ${BASE} failed: ${tar.stderr}`);
+  const tar = spawnSync('git', ['archive', '--format=tar', commit], { cwd: REPO, maxBuffer: 1 << 30 });
+  assert.equal(tar.status, 0, `git archive ${commit} failed: ${tar.stderr}`);
   const x = spawnSync('tar', ['-x', '-C', dir], { input: tar.stdout });
   assert.equal(x.status, 0, `tar failed: ${x.stderr}`);
-  baseDir = dir;
+  baseDirs.set(commit, dir);
   return dir;
 }
 
@@ -111,8 +121,10 @@ test('SR-1.29 output unchanged', { skip: !BASE && 'MEMEV_CONTRACT_BASE is not se
   }
 });
 
-test('SR-1.29 prompt hook start-up', { skip: !BASE && 'MEMEV_CONTRACT_BASE is not set' }, async () => {
-  const base = baseRepo();
+test('SR-1.29 prompt hook start-up', { skip: STARTUP_SKIP }, async () => {
+  assert.ok(SR129_BASE, `SR-1.29's spec records no base: ${SR129_SPEC}`);
+  assert.ok(haveCommit(SR129_BASE), `SR-1.29's base ${SR129_BASE.slice(0, 12)} is not in this clone`);
+  const base = baseRepo(SR129_BASE);
   const ms = { base: [], new: [] };
   for (let i = 0; i < 5; i++) {
     for (const [name, repo] of [['base', base], ['new', REPO]]) {
