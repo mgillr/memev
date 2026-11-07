@@ -85,7 +85,7 @@ export async function runHook(event, flags, env = process.env) {
     let call;
     if (remote) call = (route, body) => remoteFetch(remote, `v1/${route}`, { body: { session, project, ...body }, env, headers: { 'x-memev-client': client }, timeoutMs: 8000 }).then((r) => { if (!r.ok) throw new Error(`${route}: ${r.status}`); return r.json; });
     else {
-      if (!(await ensureDaemon(root, { quiet: true }))) throw new Error(loadingPid(root) ? 'it is still loading this vault and answers when it is done' : 'daemon not reachable');
+      if (!(await ensureDaemon(root, { quiet: true, waitMs: 6000 }))) /* an AI app's hook has seconds, not half a minute */ throw new Error(loadingPid(root) ? 'it is still loading this vault and answers when it is done' : 'daemon not reachable');
       const token = clientToken(root, client);
       call = (route, body) => api(root, `/v1/${route}`, { body: { session, project, ...body }, token, timeoutMs: 4000 }).then((r) => { if (!r.ok) throw new Error(`${route}: ${r.status}`); return r.json; });
     }

@@ -20,7 +20,7 @@ export async function runStdio(root, client) {
   const who = effectiveClient(client);
   const write = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
   let ready = null; let token = null;
-  const ready_ = () => (ready ||= ensureDaemon(root, { quiet: true }).then((ok) => { token = clientToken(root, who); return ok; }));
+  const ready_ = () => (ready ||= ensureDaemon(root, { quiet: true, waitMs: 20000 }).then((ok) => { token = clientToken(root, who); return ok; }));
   const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
   const inflight = new Set();
   const chain = chainOnce(); const linkDir = path.join(root, '.memev', 'hooks');

@@ -86,14 +86,16 @@ export async function whyNotRunning(root) {
   return last ? `the last start could not listen on ${last.bind}:${last.port}: ${last.message}` : null;
 }
 
-export async function ensureDaemon(root, { quiet = false, waitMs = 6000 } = {}) {
+// a person's start can be slow on a cold machine (on Windows the virus scanner checks Node first); a good start returns at once
+export const START_WAIT_MS = 30000;
+export async function ensureDaemon(root, { quiet = false, waitMs = START_WAIT_MS } = {}) {
   if (!fs.existsSync(path.join(root, '.memev', 'config.json'))) return false;
   const info = daemonInfo(root);
   if (info && pidAlive(info.pid) && (await healthy(root))) return true;
   return startDaemon(root, { quiet, waitMs });
 }
 
-export async function startDaemon(root, { quiet = false, waitMs = 6000, spawn: spawnProc = spawn } = {}) {
+export async function startDaemon(root, { quiet = false, waitMs = START_WAIT_MS, spawn: spawnProc = spawn } = {}) {
   // one is already opening this vault: wait for it instead of starting another that would only find the lock taken
   const opening = loadingPid(root);
   if (opening) {
