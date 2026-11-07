@@ -71,3 +71,53 @@ test('the repository URL is not accepted in a commit message', () => {
     assert.match(r.stderr, /commit [0-9a-f]{10}:1: denylisted word/);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+// A merge commit's first line, "Merge pull request #N from <owner>/<branch>", passes when <owner> is the account in the origin
+// remote's GitHub URL, and only then. The words are made up and given to the scan with LEAK_DENYLIST, so no real name is here.
+const OWNER_WORD = 'ownerword';
+const OTHER_WORD = 'otherword';
+const history = (messages, origin) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'leakscan-history-'));
+  try {
+    fs.mkdirSync(path.join(dir, 'scripts'));
+    for (const f of ['leak-scan.mjs', 'leak-denylist.json']) fs.copyFileSync(path.join(here, '..', 'scripts', f), path.join(dir, 'scripts', f));
+    const words = path.join(dir, '..', `${path.basename(dir)}-words.txt`);
+    fs.writeFileSync(words, `${OWNER_WORD}\n${OTHER_WORD}\n`);
+    const git = (...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', '-c', 'commit.gpgsign=false', ...a], { cwd: dir, encoding: 'utf8' });
+    git('init', '-q');
+    if (origin) git('remote', 'add', 'origin', origin);
+    git('add', '-A');
+    for (const m of messages) git('commit', '-q', '--allow-empty', '-m', m);
+    const r = spawnSync(process.execPath, ['scripts/leak-scan.mjs', '--history'], { cwd: dir, encoding: 'utf8', env: { ...process.env, LEAK_DENYLIST: words } });
+    fs.rmSync(words, { force: true });
+    return { code: r.status, out: r.stdout + r.stderr };
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+};
+const HTTPS = `https://github.com/${OWNER_WORD}/memev.git`;
+
+test('a merge subject naming the repository owner passes, for each GitHub origin form', () => {
+  const subject = `Merge pull request #7 from ${OWNER_WORD}/fix-branch`;
+  for (const origin of [HTTPS, `https://github.com/${OWNER_WORD}/memev`, `git@github.com:${OWNER_WORD}/memev.git`, `ssh://git@ssh.github.com:443/${OWNER_WORD}/memev.git`]) {
+    const r = history(['base', subject], origin);
+    assert.equal(r.code, 0, `${origin}: ${r.out}`);
+  }
+});
+
+test('another denylisted login in the owner slot still fails', () => {
+  const r = history(['base', `Merge pull request #7 from ${OTHER_WORD}/fix-branch`], HTTPS);
+  assert.equal(r.code, 1, r.out);
+});
+
+test('with no origin, an origin off GitHub, or a GitHub origin for another repository, the owner merge subject fails closed', () => {
+  const subject = `Merge pull request #7 from ${OWNER_WORD}/fix-branch`;
+  assert.equal(history(['base', subject], null).code, 1);
+  assert.equal(history(['base', subject], `https://example.org/${OWNER_WORD}/memev.git`).code, 1);
+  assert.equal(history(['base', subject], `https://github.com/${OWNER_WORD}/other-repo.git`).code, 1);
+});
+
+test('the owner word is still found in the branch segment, the message body and a subject of another form', () => {
+  assert.equal(history(['base', `Merge pull request #7 from ${OWNER_WORD}/${OWNER_WORD}-patch-1`], HTTPS).code, 1);
+  assert.equal(history(['base', `Merge pull request #7 from ${OWNER_WORD}/fix-branch\n\nthanks ${OWNER_WORD}`], HTTPS).code, 1);
+  assert.equal(history(['base', `Revert "Merge pull request #7 from ${OWNER_WORD}/fix-branch"`], HTTPS).code, 1);
+  assert.equal(history(['base', `fix: a change by ${OWNER_WORD}`], HTTPS).code, 1);
+});
