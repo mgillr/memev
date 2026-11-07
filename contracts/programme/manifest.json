@@ -1562,6 +1562,37 @@
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); additive to the signed SR-0.03.3, which it does not supersede"
     },
     {
+      "id": "QL-W-01B",
+      "kind": "feature",
+      "type": "programme work package",
+      "area": "QL-W",
+      "title": "QL-W-01B A signed contract with no base revision gets one from a signed base attestation that Vault.contractVerify reads, without editing a signed byte (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP23-02 (the back-fill that QL-W-01A leaves open; proposed 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SR-0.03.3",
+          "boundary": "T1 of the signed contract records a base at signing and verify is BLOCKED without one; QL-W-01B adds only a second source for the base, a signed attestation, read by contractVerify for a signed body that has none, and changes no signed body"
+        },
+        {
+          "contract": "QL-W-01A",
+          "boundary": "QL-W-01A (signed; merged in pull request #380) refuses new signings that have no base and leaves contractVerify unchanged; QL-W-01B changes contractVerify, adds contractAttestBase and one export, and touches no function that QL-W-01A touches; a verify of a contract with no attestation behaves as QL-W-01A requirement 4 says"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SR-0.03.3 (base recording, the approval record and the base check) is the build layer, cited by id; this spec changes contractVerify and adds contractAttestBase and checkBaseAttestation in src/engine/contracts.mjs, the protected path in src/engine/vault.mjs, one MCP tool and one CLI command",
+      "depends_on": [
+        "SR-0.03.3",
+        "QL-W-01A"
+      ],
+      "tasks": 1,
+      "criteria": 28,
+      "spec": "specs/QL-W-01B.json",
+      "base": "2686be2edeba642a0c1d2d3f3b0b58d0c255ee3c (the memev main commit that merged pull request #380, QL-W-01A)",
+      "status": "proposed, unsigned; adds no attestation record and changes no signed body"
+    },
+    {
       "id": "PG-03.6",
       "type": "programme work package",
       "area": "PG-03",
@@ -2279,6 +2310,12 @@
       "task": "WP22-01",
       "title": "A red run whose TAP header was cut off is red only when an assertion is visible, and every other kind of output is judged as before",
       "contract": "SR-W-03A",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP23-02",
+      "title": "A signed base attestation gives a locally signed contract with no base a verifiable base: contractAttestBase writes it once, contractVerify reads it when the body has no base, and it never overrides a recorded base",
+      "contract": "QL-W-01B",
       "note": "specified in this set"
     }
   ]
