@@ -109,7 +109,7 @@ A computer's signed request can be used once, also across a restart: what was us
 vault keeps running, a request signed before that moment is refused and a fresh one is served. The known
 limit: after a damaged store, a request from a device whose clock ran ahead can be replayed within the
 skew of five minutes. Removing this would refuse every signed request for up to 5 minutes and needs a
-change to SR-1.03. Admin routes are local only. Contract signing is
+change to a signed contract. Admin routes are local only. Contract signing is
 available remotely; a contract signed from a remote origin records that origin, and its command
 criteria do not run on this machine until a local operator approves it with
 `memev contract approve <id>`. `memev cloud rotate-key` changes the legacy shared key, for apps
