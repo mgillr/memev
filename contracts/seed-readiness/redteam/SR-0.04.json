@@ -436,6 +436,61 @@
           }
         ]
       }
+    },
+    {
+      "round": 5,
+      "spec_sha256": "9cbaf31863724f3eb4b97f1779855709d0ceaea2ebb942e8101d97a0abb9f682",
+      "base_commit": "515d9bb8135c2adbca6256d89821ea75aaf66aa6",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "21d5aa97719a86699221e79b64f679cc45e12a1d23ec1cd6f662f12102dc5fdc"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "28ec9c1f6ddb69a3d4c87dfb65f19712be1094f7394ae8d60dfba53ceea10759"
+          },
+          {
+            "path": "docs/scope-one/DECISIONS.md",
+            "sha256": "3307322f2c70781f4362f95243bcd1905e86e8214abf604ed965ca540aa9c696"
+          },
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "f41a022de450edb6ca7f055b5f0418479a2e1093d21a4aef598a108a1e65e810"
+          },
+          {
+            "path": "package.json",
+            "sha256": "df0a33344e4d35bdb39ce4d9d2fbecc02f1d44b6037fd181a27740fe80195606"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "second seat on the same machine; the gate run; no criterion run. Round 5 is round 4 unchanged, reviewed again at the commit after memev #458 landed, because a landing in any task scope makes the last round stale. #458 changed five test files only (address, index-damage, installers, project-store and coordinator tests), all inside the test/** scope of one task: ports from the run reservation, processes lined up by files, and the coordinator test double taking its lock as the real store does. It changed no src, script, spec, criterion command or verifier, and none of the five input files of round 4. This seat wrote #458 and the lead reviewed it, so this round is not an independent review of that change: both seats are AI on one machine.",
+      "amendments": [],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjI2MjMwNDA5ZWE5ZWRjMDg3OWZlNThlMjJmZmUwNzMwNzRjYTQzNmY4NzExNjg5NTg2NTRmZGRkOGZiM2Y0ZQ==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "tBFqfclosv9BUnFmTeYCem5zSGba7aLk0UN9wDO7QXf+3LNrpqotiyfb+AvVv9WPW9YwXqQiLxBh8jTpb6RFCQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MWI1NmE3ZTBmNzY2YjZmOWMwYjE0MmNhOGI5NmRlZGJkMDUwZjljNWRjNmJmMzI0ZGEyYjcxNjI4MThkNTkwOQ==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "b8FFtxgVUQKMt+fo4QhBcfpxTktnxeiLMNkMVy+9zaSo/y35yCAPXIQWFbcJdArMLPtzcsElwepYDAKKR9QjAw=="
+          }
+        ]
+      }
     }
   ],
   "reviewer_notes": [
