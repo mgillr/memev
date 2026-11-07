@@ -124,3 +124,17 @@ test('an entry reports the size it really is, so the importer\'s own size rule c
   const [e] = readZip(zipOf([{ name: 'conversations.json', comp: zlib.deflateRawSync(data), declared: 16 }]));
   assert.equal(e.size, data.length);
 });
+
+test('a zip that spends its whole total exactly refuses the next entry as too large, and does not read as unreadable', async () => {
+  // 4 x 64 MiB is the total to the byte, and each of them passes: only the fifth entry finds nothing left
+  const comp = await deflatedZeros(64);
+  const small = Buffer.from('{}');
+  const zip = zipOf([
+    ...[1, 2, 3, 4].map((n) => ({ name: `part-${n}.bin`, comp, declared: 64 * MIB })),
+    { name: 'conversations.json', comp: zlib.deflateRawSync(small), declared: 0 }, // a truthful size would be caught by the header check
+  ]);
+  assert.throws(() => readZip(zip), (e) => {
+    assert.equal(e.code, 'zip_too_large', `${e.code}: ${e.message}`);
+    return /too large/.test(e.message) && /conversations\.json/.test(e.message);
+  });
+});

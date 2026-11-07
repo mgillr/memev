@@ -48,7 +48,7 @@ export function readZip(buf) {
     const raw = buf.subarray(dataStart, dataStart + compSize);
     if (method !== 0 && method !== 8) continue;
     const limit = Math.min(MAX_ENTRY_BYTES, MAX_TOTAL_BYTES - total);
-    if (uncompSize > limit || (method === 0 && raw.length > limit)) throw tooLarge(name, limit);
+    if (limit <= 0 || uncompSize > limit || (method === 0 && raw.length > limit)) throw tooLarge(name, limit);
     let data;
     if (method === 0) data = Buffer.from(raw);
     else {
