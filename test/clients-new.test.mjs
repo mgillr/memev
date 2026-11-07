@@ -111,3 +111,39 @@ test('SR-2.09.2 T1: a Grok Build config.toml that already has its own memev tabl
   assert.deepEqual(fs.readFileSync(toml), original);
   assert.match(JSON.stringify(r), /already has a \[mcp_servers\.memev\] table/);
 });
+
+const restoresAll = (d) => d.results.every((x) => x.action === 'restored' || x.action === 'removed');
+for (const [id, name, cfg, key, entryExtra, rules] of [
+  ['kiro', 'Kiro', '.kiro/settings/mcp.json', 'mcpServers', {}, '.kiro/steering/memev.md'],
+  ['cline', 'Cline', '.cline/data/settings/cline_mcp_settings.json', 'mcpServers', { disabled: false }, 'Documents/Cline/Rules/memev.md'],
+  ['amp', 'Amp', '.config/amp/settings.json', 'amp.mcpServers', {}, '.config/amp/AGENTS.md'],
+  ['junie', 'Junie', '.junie/mcp/mcp.json', 'mcpServers', {}, '.junie/AGENTS.md'],
+]) {
+  test(`SR-2.09.2 T2: with a fake ${name} config, init connects ${name} under its own client id and disconnect restores it`, () => {
+    const { home, env, w } = fixtureHome();
+    const file = w(cfg, JSON.stringify({ keep: 'me', [key]: { other: { command: 'other', args: [] } } }, null, 2));
+    const original = fs.readFileSync(file);
+    const r = connectAll({ env, launcher: '/x/memev', platform: 'linux' }).find((x) => x.id === id);
+    assert.equal(r && r.status, 'added', `${id} connects`);
+    assert.equal(r.name, name);
+    const j = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(j.keep, 'me');
+    assert.ok(j[key].other, 'the user server stays');
+    assert.deepEqual(j[key].memev, { command: '/x/memev', args: ['mcp', '--client', id], ...entryExtra });
+    assert.match(fs.readFileSync(path.join(home, rules), 'utf8'), /<!-- memev:start -->/);
+    const d = disconnect(id, { env });
+    assert.ok(restoresAll(d), JSON.stringify(d.results));
+    assert.deepEqual(fs.readFileSync(file), original, `${cfg} is back to its original bytes`);
+    assert.equal(fs.existsSync(path.join(home, rules)), false, 'the rules file Memev made is gone');
+  });
+}
+
+test('SR-2.09.2 T2: Amp uses settings.jsonc when that is the file that exists, and keeps its comments', () => {
+  const { env, w } = fixtureHome();
+  const file = w('.config/amp/settings.jsonc', '{\n  // my theme\n  "amp.theme": "dark"\n}\n');
+  const r = connectAll({ env, launcher: '/x/memev', platform: 'linux' }).find((x) => x.id === 'amp');
+  assert.equal(r.status, 'added');
+  const t = fs.readFileSync(file, 'utf8');
+  assert.match(t, /\/\/ my theme/);
+  assert.match(t, /"amp\.mcpServers"/);
+});

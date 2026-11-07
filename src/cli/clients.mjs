@@ -302,6 +302,26 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
         text(path.join(home, '.grok', 'config.toml'), (t) => upsertCodexToml(t, `${TOML_START}\n[mcp_servers.memev]\ncommand = ${tomlEsc(win ? win.node : bin)}\nargs = [${[...(win ? [win.script] : []), 'mcp', '--client', 'grok'].map(tomlEsc).join(', ')}]\n${TOML_END}`), (t) => removeBlock(t, [TOML_START, TOML_END]),
           (b) => (b && MEMEV_TABLE.test(removeBlock(b, [TOML_START, TOML_END])) ? 'Grok Build already has a [mcp_servers.memev] table in config.toml, so Memev left it as-is' : null)),
       ], manual: 'Grok Build has no rules file Memev writes to; the protocol arrives through the MCP instructions. Check it with: grok mcp list' },
+    // Kiro reads ~/.kiro/settings/mcp.json (mcpServers) and every global steering file in ~/.kiro/steering/*.md.
+    { id: 'kiro', name: 'Kiro', mode: 'instructions', detect: () => exists(path.join(home, '.kiro')),
+      edits: () => [json(path.join(home, '.kiro', 'settings', 'mcp.json'), setServer('mcpServers', stdio('kiro')), delServer('mcpServers')),
+        mdBlock(path.join(home, '.kiro', 'steering', 'memev.md'))],
+      manual: 'Kiro loads MCP servers only when its MCP support setting is on.' },
+    // Cline: every Cline app reads ~/.cline/data/settings/cline_mcp_settings.json (mcpServers, plain JSON), and global rules in Documents/Cline/Rules.
+    { id: 'cline', name: 'Cline', mode: 'instructions', detect: () => exists(path.join(home, '.cline')),
+      edits: () => [json(path.join(env.CLINE_MCP_SETTINGS_PATH || path.join(home, '.cline', 'data', 'settings', 'cline_mcp_settings.json')), setServer('mcpServers', { ...stdio('cline'), disabled: false }), delServer('mcpServers')),
+        mdBlock(path.join(home, 'Documents', 'Cline', 'Rules', 'memev.md'))] },
+    // Amp: the user settings file holds servers under the flat key "amp.mcpServers"; settings.jsonc is used when it is the one that exists.
+    { id: 'amp', name: 'Amp', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'amp')),
+      edits: () => {
+        const dir = path.join(home, '.config', 'amp');
+        const file = exists(path.join(dir, 'settings.jsonc')) && !exists(path.join(dir, 'settings.json')) ? path.join(dir, 'settings.jsonc') : path.join(dir, 'settings.json');
+        return [json(file, setServer('amp.mcpServers', stdio('amp')), delServer('amp.mcpServers')), mdBlock(path.join(dir, 'AGENTS.md'))];
+      } },
+    // Junie (JetBrains) reads ~/.junie/mcp/mcp.json (mcpServers) and ~/.junie/AGENTS.md, in the IDE plugin and the CLI alike.
+    { id: 'junie', name: 'Junie', mode: 'instructions', detect: () => exists(path.join(home, '.junie')),
+      edits: () => [json(path.join(home, '.junie', 'mcp', 'mcp.json'), setServer('mcpServers', stdio('junie')), delServer('mcpServers')),
+        mdBlock(path.join(home, '.junie', 'AGENTS.md'))] },
     { id: 'copilot-cli', name: 'GitHub Copilot CLI', mode: 'instructions', detect: () => exists(env.COPILOT_HOME || path.join(home, '.copilot')),
       edits: () => {
         const copilotHome = env.COPILOT_HOME || path.join(home, '.copilot');
@@ -327,12 +347,9 @@ export function unsupportedDefs(env) {
   const xdg = env.XDG_CONFIG_HOME || path.join(home, '.config');
   const win = process.platform === 'win32';
   return [
-    { id: 'cline', name: 'Cline', detect: () => exists(path.join(home, '.cline')) },
     { id: 'roo', name: 'Roo', detect: () => exists(path.join(home, '.roo')) },
     { id: 'continue', name: 'Continue', detect: () => exists(path.join(home, '.continue')) },
-    { id: 'kiro', name: 'Kiro', detect: () => exists(path.join(home, '.kiro')) },
     { id: 'jetbrains-ai', name: 'JetBrains AI', detect: () => exists(path.join(appData, 'JetBrains')) },
-    { id: 'amp', name: 'Amp', detect: () => exists(win ? path.join(home, '.config', 'amp') : path.join(xdg, 'amp')) },
     { id: 'goose', name: 'Goose', detect: () => exists(win ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(xdg, 'goose')) },
   ];
 }
