@@ -294,6 +294,14 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
         if (!skip) edits.push(mdBlock(mdPath));
         return edits;
       } },
+    // Grok Build (the terminal agent, command grok) reads ~/.grok/config.toml first, above ~/.claude.json and .mcp.json,
+    // so its own [mcp_servers.memev] table gives it its own client id instead of Claude Code's. It names no rules file,
+    // so the protocol arrives through the MCP instructions.
+    { id: 'grok', name: 'Grok Build', mode: 'instructions', detect: () => exists(path.join(home, '.grok')),
+      edits: () => [
+        text(path.join(home, '.grok', 'config.toml'), (t) => upsertCodexToml(t, `${TOML_START}\n[mcp_servers.memev]\ncommand = ${tomlEsc(win ? win.node : bin)}\nargs = [${[...(win ? [win.script] : []), 'mcp', '--client', 'grok'].map(tomlEsc).join(', ')}]\n${TOML_END}`), (t) => removeBlock(t, [TOML_START, TOML_END]),
+          (b) => (b && MEMEV_TABLE.test(removeBlock(b, [TOML_START, TOML_END])) ? 'Grok Build already has a [mcp_servers.memev] table in config.toml, so Memev left it as-is' : null)),
+      ], manual: 'Grok Build has no rules file Memev writes to; the protocol arrives through the MCP instructions. Check it with: grok mcp list' },
     { id: 'copilot-cli', name: 'GitHub Copilot CLI', mode: 'instructions', detect: () => exists(env.COPILOT_HOME || path.join(home, '.copilot')),
       edits: () => {
         const copilotHome = env.COPILOT_HOME || path.join(home, '.copilot');

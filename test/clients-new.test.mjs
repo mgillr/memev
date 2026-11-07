@@ -85,3 +85,29 @@ test('MEM-044 AC01: OpenCode skips its rules file when the Claude rules file exi
   const d = disconnect('opencode', { env });
   assert.deepEqual(d.results.map((x) => x.action), ['restored']);
 });
+
+test('SR-2.09.2 T1: with a fake ~/.grok, init connects Grok Build under its own client id and disconnect restores config.toml', () => {
+  const { env, w } = fixtureHome();
+  const toml = w('.grok/config.toml', 'model = "grok-4"\n\n[mcp_servers.other]\ncommand = "other"\n');
+  const original = fs.readFileSync(toml);
+  const res = connectAll({ env, launcher: '/x/memev', platform: 'linux' });
+  const r = res.find((x) => x.id === 'grok');
+  assert.equal(r.status, 'added');
+  assert.equal(r.name, 'Grok Build');
+  assert.equal(detect(env).find((c) => c.id === 'grok').connected, true);
+  const after1 = fs.readFileSync(toml, 'utf8');
+  assert.match(after1, /\[mcp_servers\.other\][\s\S]*\[mcp_servers\.memev\]\ncommand = "\/x\/memev"\nargs = \["mcp", "--client", "grok"\]/);
+  assert.equal((after1.match(/\[mcp_servers\.memev\]/g) || []).length, 1, 'one memev table');
+  const d = disconnect('grok', { env });
+  assert.deepEqual(d.results.map((x) => x.action), ['restored']);
+  assert.deepEqual(fs.readFileSync(toml), original, 'config.toml is back to its original bytes');
+});
+
+test('SR-2.09.2 T1: a Grok Build config.toml that already has its own memev table is left as it is, and says so', () => {
+  const { env, w } = fixtureHome();
+  const toml = w('.grok/config.toml', '[mcp_servers.memev]\ncommand = "mine"\n');
+  const original = fs.readFileSync(toml);
+  const r = connectAll({ env, launcher: '/x/memev', platform: 'linux' }).find((x) => x.id === 'grok');
+  assert.deepEqual(fs.readFileSync(toml), original);
+  assert.match(JSON.stringify(r), /already has a \[mcp_servers\.memev\] table/);
+});
