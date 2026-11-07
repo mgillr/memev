@@ -242,7 +242,7 @@ export function verifyProof(pubkey, { method, path: p, ts, nonce, sig, body = ''
  * nothing; the store holds what signatures could still be accepted, no more. A damaged store is set aside under
  * <store>.damaged-<time> and the time it was found is kept as not_before: what it held is gone, so a request with a signed
  * time before then is refused as used until no such request could be accepted any more. Fresh requests are served all along.
- * The known limit: after a damaged store, a request from a device whose clock ran ahead can be replayed within the skew,
+ * What that leaves open: after a damaged store, a request from a device whose clock ran ahead can be replayed within the skew,
  * since its signed time falls after not_before. Removing this would refuse every signed request for up to 5 minutes and
  * needs a change to SR-1.03, which signs that a fresh request is served right after damage.
  * A mark ahead of the clock, inside the skew, which only a clock stepped back after the damage reaches: fresh requests are

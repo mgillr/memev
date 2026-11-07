@@ -106,8 +106,8 @@ address limit, and then others with no token, and OAuth sign-in, token refresh a
 wait for it to refill. A computer or app with a valid token is not affected and keeps its own limit.
 A computer's signed request can be used once, also across a restart: what was used is kept in
 `.memev/nonces.json`. If that file is found damaged it is set aside as `nonces.json.damaged-<time>`, the
-vault keeps running, a request signed before that moment is refused and a fresh one is served. The known
-limit: after a damaged store, a request from a device whose clock ran ahead can be replayed within the
+vault keeps running, a request signed before that moment is refused and a fresh one is served. What that
+leaves open: after a damaged store, a request from a device whose clock ran ahead can be replayed within the
 skew of five minutes. Removing this would refuse every signed request for up to 5 minutes and needs a
 change to a signed contract. Admin routes are local only. Contract signing is
 available remotely; a contract signed from a remote origin records that origin, and its command
