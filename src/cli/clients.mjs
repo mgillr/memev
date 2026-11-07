@@ -320,13 +320,23 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
 
 // ---- More apps. Every path, key and entry shape below is the one the app's own MCP docs give; docs/CLIENTS.md
 // cites each page. windows: false marks an app whose docs name no Windows location, so it is not connected there.
-const VIBE_TABLE = /^\s*name\s*=\s*["']memev["']/m;
+// True only when an [[mcp_servers]] table (from its header to the next table header) holds name = "memev": a
+// name = "memev" line under any other table, such as [[profiles]], is not a server.
+function vibeHasMemev(t) {
+  let inServers = false;
+  for (const line of String(t).split('\n')) {
+    const header = /^\s*\[\[?\s*([^\]]+?)\s*\]\]?\s*(#.*)?$/.exec(line);
+    if (header) { inServers = /^\[\[/.test(line.trim()) && header[1] === 'mcp_servers'; continue; }
+    if (inServers && /^\s*name\s*=\s*["']memev["']/.test(line)) return true;
+  }
+  return false;
+}
 function upsertVibeToml(t, block) {
   const base = removeBlock(t, [TOML_START, TOML_END]);
-  if (VIBE_TABLE.test(base)) return base; // the person already has a server named memev: leave it as it is
+  if (vibeHasMemev(base)) return base; // the person already has a server named memev: leave it as it is
   return addBlock(base, block, [TOML_START, TOML_END]);
 }
-const vibeSkipNote = (b) => (b && VIBE_TABLE.test(removeBlock(b, [TOML_START, TOML_END])) ? 'Mistral Vibe already has an mcp_servers table named memev in config.toml, so Memev left it as-is' : null);
+const vibeSkipNote = (b) => (b && vibeHasMemev(removeBlock(b, [TOML_START, TOML_END])) ? 'Mistral Vibe already has an mcp_servers table named memev in config.toml, so Memev left it as-is' : null);
 function moreApps(env, platform, stdio) {
   const { home } = osDirs(env, platform);
   const kimiHome = env.KIMI_CODE_HOME || path.join(home, '.kimi-code');

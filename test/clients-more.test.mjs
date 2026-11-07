@@ -170,6 +170,20 @@ test('mistral-vibe: a server the person already named memev is left as it is, wi
   assert.ok(fs.readFileSync(f).equals(before));
 });
 
+test('mistral-vibe: name = "memev" under another table, such as [[profiles]], is not a server, so Memev still connects', () => {
+  const { home, env } = sandboxEnv();
+  const f = path.join(home, '.vibe', 'config.toml');
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  const theirs = '[[profiles]]\nname = "memev"\nmodel = "devstral"\n\n[[mcp_servers]]\nname = "fetch_server"\ntransport = "stdio"\ncommand = "uvx"\n';
+  fs.writeFileSync(f, theirs);
+  const r = connect('mistral-vibe', { env, launcher: BIN, platform: 'linux' });
+  assert.equal(r.status, 'added');
+  assert.equal((r.notes || []).some((n) => /left it as-is/.test(n)), false);
+  const t = fs.readFileSync(f, 'utf8');
+  assert.ok(t.startsWith(theirs));
+  assert.match(t, /# memev:start\n\[\[mcp_servers\]\]\nname = "memev"/);
+});
+
 test('mistral-vibe: VIBE_HOME moves the file, and on win32 the table runs node.exe', () => {
   const { home, env } = sandboxEnv();
   const vh = path.join(home, 'vibe-elsewhere');
