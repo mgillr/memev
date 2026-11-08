@@ -1291,10 +1291,11 @@ export function initVault(root, { template, port = null } = {}) {
   else if (port) { const c = readJson(cfgFile); c.port = port; writeJson(cfgFile, c, 0o600); }
   const gi = path.join(root, '.gitignore'); if (!exists(gi)) fs.writeFileSync(gi, '.memev/\n*.tmp\n');
   const ga = path.join(root, '.gitattributes'); if (!exists(ga)) fs.writeFileSync(ga, 'memory/**/*.md merge=union\nwork/**/*.md merge=union\n');
-  if (madeGit) {
-    if (!git(root, ['config', 'user.email']).out) { git(root, ['config', 'user.name', 'Memev']); git(root, ['config', 'user.email', 'memev@localhost']); }
-    git(root, ['add', '-A']); git(root, ['commit', '-q', '-m', 'memev: a new vault']);
-  }
+  // The vault's own identity and first commit. Not only when this run made .git: an init stopped after git init and before
+  // these lines (a first Windows start the scanner slows) left a vault with no identity and no commit, so every later commit
+  // failed and init kept failing on bus/ (issue on the owner's first Windows install, 7 Nov 2026).
+  if (!git(root, ['config', 'user.email']).out) { git(root, ['config', 'user.name', 'Memev']); git(root, ['config', 'user.email', 'memev@localhost']); }
+  if (madeGit || !git(root, ['rev-parse', '--verify', '-q', 'HEAD']).ok) { git(root, ['add', '-A']); git(root, ['commit', '-q', '-m', 'memev: a new vault']); }
   installVaultHooks(root);
   const ts = new TokenStore(path.join(root, STATE, 'tokens.json'));
   let admin = null;
