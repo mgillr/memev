@@ -1,0 +1,269 @@
+{
+  "title": "SR-1.37 Select discovered clients and complete connection",
+  "project": "memev-app",
+  "workdir": null,
+  "request": "The owner requested selectable discovery, connection, lead selection and logged acceptance. Repository: memev-app; baseline 589d61ca1ce6853f0bb9a7a520fc45ff20450e54. Programme placement: contracts/programme/specs in memev, with repo memev-app in contracts/programme/manifest.json. Spec workdir remains null as required by the gate. The memev-app checkout goes through the verify CLI workdir argument only: memev contract new <this spec> --workdir <memev-app checkout> --base 589d61ca1ce6853f0bb9a7a520fc45ff20450e54, then memev verify <id> (or memev gate --workdir <memev-app checkout>). Verify runs every command criterion with that workdir as its working directory: red in a temporary worktree of the recorded base holding the head's test files, green in the workdir itself. No command criterion changes directory or names the app checkout, so red and green measure different code. Baseline ancestry (the app HEAD descends from 589d61ca1ce6853f0bb9a7a520fc45ff20450e54) is checked once by the separate precondition criterion T1-c02, not inside behavioral tests. MEMEV_VAULT_WORKDIR names the memev vault checkout; only T4-c03, which checks vault scope, needs it, and it must be set in the environment of the process that runs the criteria. Scope must check both repositories; the vault scope must include contracts/programme/manifest.json and must not silently skip contracts/. Depends on SR-1.36 verified and landed. Only the owner signs. No implementation before signature. Each task's red-green tests name every case they cover as an exact named subtest; red-green behavioral tests require measured failing-base and passing-head results; precondition and regression-only checks are labelled separately and are not red-green proof.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "The guide lists every app found and connects the ones ticked",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the Connect step reads memev discover --json and shows every found app; apps with automation auto are ticked by default, one-step apps show their step and a Copy button, apps with none show found and not connectable",
+        "the primary button reads Connect N apps and connects exactly the ticked apps after one sheet that names the files changed and their backups; the result list shows each app's outcome and seat",
+        "Rows with automation none are unticked and disabled; their ids never appear in the connect invocation. One-step rows also have no tick and are excluded.",
+        "This task's red-green test T1-c01 covers every T1 case, each an exact named subtest: \"T1-c01: connect-list\": the five fixture rows are displayed; only three auto rows are ticked, and the none row is disabled and unticked; \"T1-c01: connect-onestep\": the one-step row shows its step and a Copy button and has no tick; \"T1-c01: connect-selected\": unticking one auto row connects exactly the remaining two auto ids; none and one-step ids are excluded; \"T1-c01: connect-result\": the result list shows each app's status and seat from connect --json. T4-c02 re-runs the same cases as an aggregate check; it does not replace this task's own test.",
+        "This task owns named test T1-c01 in test/installer-self-check.test.mjs; each of its four subtests must actually invoke pwsh -NoProfile -File native/windows/test/self-check.ps1 -Case <case> for its own case, assert observable behavior, fail on the recorded baseline and pass at head. Missing or skipped cases and no-op scripts do not count.",
+        "T1-c02 is a precondition, not red-green proof: verify is invoked with --workdir set to the memev-app checkout root and --base 589d61ca1ce6853f0bb9a7a520fc45ff20450e54, and that checkout's HEAD descends from the baseline."
+      ],
+      "description": "Code: native/windows/Memev.Desktop/MainWindow.Guide.cs:136-178, MainWindow.Screens.cs:336-392, Pages.cs, Memev.Reader/Guide.cs:33-60.",
+      "scope": {
+        "allow": [
+          "native/windows/Memev.Desktop/MainWindow.Guide.cs",
+          "native/windows/Memev.Desktop/MainWindow.Screens.cs",
+          "native/windows/Memev.Desktop/Pages.cs",
+          "native/windows/Memev.Reader/Guide.cs",
+          "native/windows/test/self-check.ps1",
+          "native/windows/test/fixtures/**",
+          "native/REV2-SCREENS.md",
+          "test/installer-self-check.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T1-c01 (red-green, per-task cases): test/installer-self-check.test.mjs contains non-skipped named subtests \"T1-c01: connect-list\", \"T1-c01: connect-onestep\", \"T1-c01: connect-selected\", \"T1-c01: connect-result\", each invoking pwsh -NoProfile -File native/windows/test/self-check.ps1 -Case with its own case; every named subtest must pass; the command runs with the verify workdir (the memev-app checkout bound by --workdir) as its working directory, without changing directory; red runs in the base 589d61ca1ce6853f0bb9a7a520fc45ff20450e54 worktree, green at the proposed head; it fails at base and passes at proposed head; record both results",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/installer-self-check.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/installer-self-check.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01: connect-list$|^T1-c01: connect-onestep$|^T1-c01: connect-selected$|^T1-c01: connect-result$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c02 (precondition, not red-green): in the verify workdir, which must be the memev-app checkout root bound by --workdir, baseline 589d61ca1ce6853f0bb9a7a520fc45ff20450e54 exists as a commit and is an ancestor of HEAD; checked once here, never inside behavioral test commands",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$(git rev-parse --show-toplevel)\" = \"$(pwd -P)\" ] && git cat-file -e 589d61ca1ce6853f0bb9a7a520fc45ff20450e54^{commit} && git merge-base --is-ancestor 589d61ca1ce6853f0bb9a7a520fc45ff20450e54 HEAD",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "The lead step waits for connect and starts Memev first",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "the guide moves to the import step only after the connect sheet finishes (MainWindow.Guide.cs:284-286 today moves at once)",
+        "the lead step reads the roster with Memev started (not JsonIfRunning), shows registered seats as choices, and offers Retry when there are none",
+        "This task's red-green test T2-c01 covers every T2 case, each an exact named subtest: \"T2-c01: order\": the import step is not shown while the fixture connect is still running, and is shown after it ends; \"T2-c01: lead-registered\": with Memev stopped, the lead step starts it and lists a registered seat as a choice; \"T2-c01: lead-retry\": with no seats, the lead step shows Retry and Retry reloads the roster. T4-c02 re-runs the same cases as an aggregate check; it does not replace this task's own test.",
+        "This task owns named test T2-c01 in test/installer-self-check.test.mjs; each of its three subtests must actually invoke pwsh -NoProfile -File native/windows/test/self-check.ps1 -Case <case> for its own case, assert observable behavior, fail on the recorded baseline and pass at head. Missing or skipped cases and no-op scripts do not count."
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "native/windows/Memev.Desktop/MainWindow.Guide.cs",
+          "native/windows/Memev.Desktop/MainWindow.Screens.cs",
+          "native/windows/Memev.Desktop/Pages.cs",
+          "native/windows/test/self-check.ps1",
+          "native/windows/test/fixtures/**",
+          "test/installer-self-check.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T2-c01 (red-green, per-task cases): test/installer-self-check.test.mjs contains non-skipped named subtests \"T2-c01: order\", \"T2-c01: lead-registered\", \"T2-c01: lead-retry\", each invoking pwsh -NoProfile -File native/windows/test/self-check.ps1 -Case with its own case; every named subtest must pass; the command runs with the verify workdir (the memev-app checkout bound by --workdir) as its working directory, without changing directory; red runs in the base 589d61ca1ce6853f0bb9a7a520fc45ff20450e54 worktree, green at the proposed head; it fails at base and passes at proposed head; record both results",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/installer-self-check.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/installer-self-check.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01: order$|^T2-c01: lead-registered$|^T2-c01: lead-retry$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "What is not done says how to fix it",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "the Result sheet and the guide's detail line list each non-ok doctor check with its fix text, and offer Fix the safe ones, which runs doctor --fix --safe-only after its sheet and then retries the failed app once",
+        "This task's red-green test T3-c01 covers every T3 case, each an exact named subtest: \"T3-c01: fix-text\": a failed fixture connect with one failing check shows its fix text and the Fix the safe ones button; \"T3-c01: fix-retry\": Fix the safe ones runs doctor --fix --safe-only once and then connect for the failed app once. T4-c02 re-runs the same cases as an aggregate check; it does not replace this task's own test.",
+        "This task owns named test T3-c01 in test/installer-self-check.test.mjs; each of its two subtests must actually invoke pwsh -NoProfile -File native/windows/test/self-check.ps1 -Case <case> for its own case, assert observable behavior, fail on the recorded baseline and pass at head. Missing or skipped cases and no-op scripts do not count."
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "native/windows/Memev.Desktop/MainWindow.cs",
+          "native/windows/Memev.Desktop/MainWindow.Guide.cs",
+          "native/windows/Memev.Desktop/Sheet.cs",
+          "native/windows/test/self-check.ps1",
+          "native/windows/test/fixtures/**",
+          "test/installer-self-check.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T3-c01 (red-green, per-task cases): test/installer-self-check.test.mjs contains non-skipped named subtests \"T3-c01: fix-text\", \"T3-c01: fix-retry\", each invoking pwsh -NoProfile -File native/windows/test/self-check.ps1 -Case with its own case; every named subtest must pass; the command runs with the verify workdir (the memev-app checkout bound by --workdir) as its working directory, without changing directory; red runs in the base 589d61ca1ce6853f0bb9a7a520fc45ff20450e54 worktree, green at the proposed head; it fails at base and passes at proposed head; record both results",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/installer-self-check.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c01:' test/installer-self-check.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T3-c01: fix-text$|^T3-c01: fix-retry$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "The installers pin the new core and build",
+      "phase": "implement",
+      "depends_on": [
+        "T1",
+        "T2",
+        "T3"
+      ],
+      "requirements": [
+        "the installers pin the memev commit where SR-1.36 verified, and the Windows installer builds on CI",
+        "Run the self-check on Windows CI or the acceptance laptop, never assume node --test alone exercises it. Record red at base and green after implementation. Pin verification uses a bounded fetch of an advertised branch followed by explicit deepening or unshallowing when necessary; never select the first arbitrary SHA or fetch an unadvertised raw SHA at depth one.",
+        "The programme manifest is a vault-relative change expressly allowed here. Record independent app and vault bases/heads and changed paths. Run vault scope with contracts/programme/manifest.json included, never an exclude=contracts filter; run app scope against the union of this contract app allow-paths. Neither repository may be silently skipped. T4-c03 tests both positive in-scope changes and rejected out-of-scope changes, including an unauthorized contracts/ change.",
+        "Named red-green cases: T4-c01 covers \"T4-c01: single-field\", \"T4-c01: malformed-rejected\", \"T4-c01: bounded-fetch\", \"T4-c01: reachable-from-main\", \"T4-c01: signed-artifacts\", \"T4-c01: mismatch-fails\"; T4-c02 is the aggregate red-green check of all nine self-check cases \"T4-c02: connect-list\", \"T4-c02: connect-onestep\", \"T4-c02: connect-selected\", \"T4-c02: connect-result\", \"T4-c02: order\", \"T4-c02: lead-registered\", \"T4-c02: lead-retry\", \"T4-c02: fix-text\", \"T4-c02: fix-retry\"; T4-c03 covers \"T4-c03: app-in-scope\", \"T4-c03: vault-manifest-allowed\", \"T4-c03: app-out-of-scope-rejected\", \"T4-c03: vault-contracts-rejected\", \"T4-c03: repo-omitted-fails\". T4-c03 treats its working directory (the verify workdir) as the app repository and MEMEV_VAULT_WORKDIR as the vault repository; no T4 command changes directory."
+      ],
+      "description": "Depends on contracts: SR-1.36 verified and landed.",
+      "scope": {
+        "allow": [
+          "installers/**",
+          ".github/workflows/ci.yml",
+          "test/installer-pin.test.mjs",
+          "test/installer-self-check.test.mjs",
+          "contracts/programme/manifest.json",
+          "test/dual-repository-scope.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T4-c01 (red-green, per-task cases): non-skipped named subtests \"T4-c01: single-field\", \"T4-c01: malformed-rejected\", \"T4-c01: bounded-fetch\", \"T4-c01: reachable-from-main\", \"T4-c01: signed-artifacts\", \"T4-c01: mismatch-fails\": the pin verifier parses exactly one documented core revision field, rejects ambiguous or malformed pins, fetches the advertised main ref and required history without raw-SHA depth-1 fetches, verifies the pin resolves to a commit reachable from fetched main and holds the verified SR-1.36 signed artifacts; mismatched fixtures fail; every named subtest must pass; the command runs with the verify workdir (the memev-app checkout bound by --workdir) as its working directory, without changing directory; red runs in the base 589d61ca1ce6853f0bb9a7a520fc45ff20450e54 worktree, green at the proposed head",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/installer-pin.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T4-c01:' test/installer-pin.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T4-c01: single-field$|^T4-c01: malformed-rejected$|^T4-c01: bounded-fetch$|^T4-c01: reachable-from-main$|^T4-c01: signed-artifacts$|^T4-c01: mismatch-fails$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T4-c02 (red-green, aggregate of T1-c01, T2-c01 and T3-c01 cases; not a substitute for them): non-skipped named subtests \"T4-c02: connect-list\", \"T4-c02: connect-onestep\", \"T4-c02: connect-selected\", \"T4-c02: connect-result\", \"T4-c02: order\", \"T4-c02: lead-registered\", \"T4-c02: lead-retry\", \"T4-c02: fix-text\", \"T4-c02: fix-retry\" each invoke pwsh -NoProfile -File native/windows/test/self-check.ps1 -Case with its own case; every invocation succeeds with non-skipped assertions, and missing cases or a no-op script fail; the command runs with the verify workdir (the memev-app checkout bound by --workdir) as its working directory, without changing directory; red runs in the base 589d61ca1ce6853f0bb9a7a520fc45ff20450e54 worktree, green at the proposed head",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/installer-self-check.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T4-c02:' test/installer-self-check.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T4-c02: connect-list$|^T4-c02: connect-onestep$|^T4-c02: connect-selected$|^T4-c02: connect-result$|^T4-c02: order$|^T4-c02: lead-registered$|^T4-c02: lead-retry$|^T4-c02: fix-text$|^T4-c02: fix-retry$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T4-c03 (red-green, per-task cases): non-skipped named subtests \"T4-c03: app-in-scope\", \"T4-c03: vault-manifest-allowed\", \"T4-c03: app-out-of-scope-rejected\", \"T4-c03: vault-contracts-rejected\", \"T4-c03: repo-omitted-fails\": the dual-repository scope check examines actual recorded app and vault base-to-head diffs, with the app repository taken from its working directory and the vault from MEMEV_VAULT_WORKDIR; permits only declared app paths and the exact programme manifest vault change, rejects out-of-scope paths in either repository including other contracts/ paths, and fails if either repository is omitted; every named subtest must pass; the command runs with the verify workdir (the memev-app checkout bound by --workdir) as its working directory, without changing directory; red runs in the base 589d61ca1ce6853f0bb9a7a520fc45ff20450e54 worktree, green at the proposed head",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/dual-repository-scope.test.mjs",
+            "cmd": ": \"${MEMEV_VAULT_WORKDIR:?set the memev vault checkout}\"; out=$(node --test --test-reporter=tap --test-name-pattern='^T4-c03:' test/dual-repository-scope.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T4-c03: app-in-scope$|^T4-c03: vault-manifest-allowed$|^T4-c03: app-out-of-scope-rejected$|^T4-c03: vault-contracts-rejected$|^T4-c03: repo-omitted-fails$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "A logged acceptance run on the owner's Windows laptop",
+      "phase": "implement",
+      "depends_on": [
+        "T4"
+      ],
+      "requirements": [
+        "on the owner's Windows laptop, with the installer of T4 and the passive capture used on 8 Nov 2026, the owner presses Connect once; the record lists every app found, every app connected, each seat, the lead chosen, and the trace folder and its hashes",
+        "MSIX desktop client (MSIX), command-line client, build client and desktop client if installed are connected and seated; manual-step client is found and shows its step; nothing was killed or force-closed",
+        "The record author cannot self-acknowledge the trace. Obtain the owner or designated laptop operator acknowledgement outside the authored summary, naming capture digest, installer digest, core pin and observed outcomes. Keep the original capture immutable and reference its independently supplied location; do not substitute greps of authored markdown.",
+        "Named red-green cases: T5-c01 covers \"T5-c01: digests-and-pin\", \"T5-c01: timestamp-zone\", \"T5-c01: external-ack\", \"T5-c01: ack-missing-fails\", \"T5-c01: ack-mismatch-fails\"; T5-c02 covers \"T5-c02: found-clients\", \"T5-c02: connected-seats\", \"T5-c02: selected-lead\", \"T5-c02: failed-or-unverified\", \"T5-c02: markdown-only-fails\", \"T5-c02: shared-settings-evidence\". Both run in the verify workdir without changing directory."
+      ],
+      "description": "A record, not code: the owner's own action at the laptop. The capture never reads credential files.",
+      "scope": {
+        "allow": [
+          "docs/acceptance/SR-1.37-laptop.md",
+          "test/acceptance-trace.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T5-c01 (red-green, per-task cases): non-skipped named subtests \"T5-c01: digests-and-pin\", \"T5-c01: timestamp-zone\", \"T5-c01: external-ack\", \"T5-c01: ack-missing-fails\", \"T5-c01: ack-mismatch-fails\": the acceptance record references immutable trace and installer digests, exact core pin, timestamp with zone and an external trace acknowledgement by the owner or the designated laptop operator, matched against independently supplied capture artifacts; missing or mismatched acknowledgement fails; every named subtest must pass; the command runs with the verify workdir (the memev-app checkout bound by --workdir) as its working directory, without changing directory; red runs in the base 589d61ca1ce6853f0bb9a7a520fc45ff20450e54 worktree, green at the proposed head",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/acceptance-trace.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T5-c01:' test/acceptance-trace.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T5-c01: digests-and-pin$|^T5-c01: timestamp-zone$|^T5-c01: external-ack$|^T5-c01: ack-missing-fails$|^T5-c01: ack-mismatch-fails$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T5-c02 (red-green, per-task cases): non-skipped named subtests \"T5-c02: found-clients\", \"T5-c02: connected-seats\", \"T5-c02: selected-lead\", \"T5-c02: failed-or-unverified\", \"T5-c02: markdown-only-fails\", \"T5-c02: shared-settings-evidence\": independent capture artifacts and external acknowledgement corroborate each found client, connected seat, selected lead and failed or unverified outcome; fabricated markdown rows alone fail; the desktop shared-settings claim requires observed settings consumption and installed version; every named subtest must pass; the command runs with the verify workdir (the memev-app checkout bound by --workdir) as its working directory, without changing directory; red runs in the base 589d61ca1ce6853f0bb9a7a520fc45ff20450e54 worktree, green at the proposed head",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/acceptance-trace.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T5-c02:' test/acceptance-trace.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T5-c02: found-clients$|^T5-c02: connected-seats$|^T5-c02: selected-lead$|^T5-c02: failed-or-unverified$|^T5-c02: markdown-only-fails$|^T5-c02: shared-settings-evidence$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    }
+  ]
+}
