@@ -1728,8 +1728,8 @@
       "requirements": [],
       "cross_references": [
         {
-          "contract": "SR-1.37",
-          "boundary": "the memev-app companion: the guide's tick list, lead step, fix button, installer pin and the logged laptop acceptance run that SR-1.36 T3 waits on"
+          "contract": "none",
+          "boundary": "the memev-app side (the guide's tick list, lead step, fix button, installer pin and laptop retest) has no contract: the owner waived it on 10 Nov 2026, and it goes through two-seat review and CI in memev-app"
         }
       ],
       "vault_contracts": [],
@@ -1738,31 +1738,6 @@
       "criteria": 39,
       "spec": "specs/SR-1.36-memev-finds-every-ai-app-and-connects-the-ones-chosen.json",
       "base": "043854de5fce639531294a4b569f239baab235eb (memev main after pull request #475, the core the laptop note check passed on)",
-      "status": "proposed, unsigned; drafts reviewed in five rounds on the team bus (lines 11480 to 11520); a signed red-team round has not landed yet"
-    },
-    {
-      "id": "SR-1.37",
-      "kind": "feature",
-      "type": "programme work package",
-      "area": "SR-1",
-      "title": "The desktop guide lets the user tick every AI app found, pick a lead and fix what is not done, and the installers carry the new core (memev-app)",
-      "repo": "memev-app",
-      "programme_tasks": "owner's Windows laptop install, 8 to 9 Nov 2026: fixes F9 to F13 (the guide's tick list, guide order and lead retry, a fix button, the installer pin and build, a logged laptop retest)",
-      "requirements": [],
-      "cross_references": [
-        {
-          "contract": "SR-1.36",
-          "boundary": "the core it drives; SR-1.37 changes only memev-app files and this manifest entry"
-        }
-      ],
-      "vault_contracts": [],
-      "depends_on": [
-        "SR-1.36"
-      ],
-      "tasks": 5,
-      "criteria": 14,
-      "spec": "specs/SR-1.37-the-guide-lets-the-user-tick-every-ai-app-found.json",
-      "base": "589d61ca1ce6853f0bb9a7a520fc45ff20450e54 (memev-app, the head of pull request #23 that the laptop note check passed on); the app checkout is given only through the verify workdir argument",
       "status": "proposed, unsigned; drafts reviewed in five rounds on the team bus (lines 11480 to 11520); a signed red-team round has not landed yet"
     }
   ],
