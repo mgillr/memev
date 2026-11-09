@@ -32,6 +32,9 @@ export const REVIEWER_KEYS = Object.freeze([
   // text. It is held here and not under contracts/keys/, because the gate refuses a key listed there as a reviewer key. Remove it
   // once an independent reviewer has re-reviewed what it signed.
   '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEACcqZzomBqwsUyN7MmB0182wH+1Ap+3aDHNk/rqLOfuc=\n-----END PUBLIC KEY-----\n',
+  // reviewer-2, key id 7f00c67bdbdd33ee, added on the owner's decision of 8 November 2026. Rounds and notes only, never
+  // contracts. Its private half is held by the reviewer and is never in this repository.
+  '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA8BY5hO0d6wN6LvQTbm6MVjvGCRvw54T9E3XHaol/XvE=\n-----END PUBLIC KEY-----\n',
 ]);
 
 /**
