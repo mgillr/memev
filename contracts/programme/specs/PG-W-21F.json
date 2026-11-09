@@ -1,0 +1,228 @@
+{
+  "title": "PG-W-21F Trust proposal step: agents propose a grant or revocation as a decision, the person or operator answers, and the signed answer is the only way a trust record is written (memev, provisional under ADR 5)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Contract PG-W-21F in memev: the proposal step for trust changes under ADR 8, work package WP21-F1. Unsigned: a spec proposed for red-team review, PROVISIONAL under ADR 5. ORIGIN. The owner answered ADR 8 on 1 Nov 2026. Question 6: only a person or an operator grants or revokes trust; agents propose, the person approves, and the result is signed and logged. Clarification 5: the proposal step goes through the decision workflow of SO-A-05, and GRANT_AUTHORITY stays provisional under ADR 5. WHAT IT BUILDS. (1) src/engine/federation/trust-propose.mjs: proposeTrustChange makes a trust proposal (a grant or a revocation) as a decision of the decision queue of SO-A-05, with the proposer taken from a resolved actor and never from a field of the proposal, the proposed change validated by the record validator of PG-W-21A.2 without writing anything, a recommendation stored only in the recommendation field, no personal scope and no delegation block accepted; it has no trust book as an argument and so can never write trust. answerTrustChange lets only a person or an operator answer (the one frozen table GRANT_AUTHORITY of PG-W-21B, reused and not repeated; provisional under ADR 5), binds the answer to the hash of the exact change the person saw, has the person sign it (the person's signed act, in the namespace memev-trust-approval), calls the trust book to grant or revoke with the approver as the resolved actor, and appends an audit event; a rejection or a deferral writes no trust record. (2) src/engine/project-store.mjs: the decision entity of SO-A-05 gains two kinds, trust.grant and trust.revoke, in its closed kind list, and nothing else of the store changes. WHY THE PROPOSER CANNOT ANSWER FOR THE PERSON. A trust record names who is trusted for what; an agent that could write one would grant itself or another agent trust. The record is therefore written by the book only on the answer of a person or operator, the issuer of the record is that approver and not the proposer, the answer is explicit (no code path copies a recommendation into an answer, the rule of SO-A-05), and an edited or stale proposal cannot be approved because the approval covers its hash and a proposal not answered within 14 days is no longer approvable. DESIGN DECISIONS FOR THE RED-TEAM. (a) The decision queue is reached through a port { raise, read, settle } that the caller gives, an adapter over the SO-A-05 build; the module does not import the store, so the contract does not depend on names the SO-A-05 build has not fixed, and only the kind list is a named export of the store (DECISION_KINDS, to be aligned with the SO-A-05 build before signing). (b) The exact function names of the trust book (grant and revoke with a resolved actor) are those of the PG-W-21B amendment and are aligned before signing. (c) The proposer may be a person or operator as well as an agent or service; a proposal by a person still waits for an answer, and an operator may answer a proposal that it proposed (no two-person rule, which is a decision for ADR 5). (d) Evidence references on a proposed grant are references only and at most 8, as the record validator says; the external trust service is consulted at approval, never per contribution (PG-W-21B amendment), and this contract never calls it. BOUNDARIES. PG-W-21A.2 (the record, its signature block, verification level, reserved delegation, roots) and PG-W-21B (the book, GRANT_AUTHORITY, the marking overlay) are cited by id and not repeated; SO-A-05 (the decision workflow, seven states) is cited and its build is a dependency: this contract uses its states raised, approved, rejected and deferred by name and defines none; pairing is PG-W-21D; entitlement is PG-W-21E. Nothing here adds a role-by-action matrix or decides ADR 3, ADR 5, ADR 7 or SO-A-05, and the topology of work breakdown row 1.3.6 stays OPEN. Depends on contracts: SO-A-05 (built), the amended PG-W-21B and PG-W-21A.2. Base revision: 4db303071c67c32e2e5b3ecd508a10748b5b5a34, the memev main commit this spec was written against and the commit the red runs are judged at; the SO-A-05 build is applied on it before the build starts. The tests reach the modules by namespace import() inside each test with typeof asserts, so a missing export fails on an assertion and not at load. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository; tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that.",
+  "tasks": [
+    {
+      "id": "T1",
+      "phase": "implement",
+      "depends_on": [],
+      "title": "An agent proposes a trust grant or revocation as a decision; only a person or operator answers; the answer is signed, logged and the only way a record is written",
+      "requirements": [
+        "src/engine/federation/trust-propose.mjs (new) exports PROPOSAL_SCHEMA (memev-trust-proposal/1), ANSWER_NAMESPACE (memev-trust-approval), PROPOSAL_TTL_DAYS (14), proposeTrustChange, answerTrustChange and changeHash; nothing throws on bad input, each returns { ok: false, code, reason }; the module imports src/engine/identity.mjs and, for GRANT_AUTHORITY, the trust book module of PG-W-21B, and does not import src/engine/project-store.mjs or src/engine/merge.mjs",
+        "proposeTrustChange({ queue, actor, change, recommendation, at, validate }) requires a resolved actor (isResolvedActor of src/engine/identity.mjs) of any subject type that the identity model resolves for a credential, and takes the proposer from that actor, never from the change; it refuses a change whose kind is not grant or revoke, that names a personal scope, that carries a delegation block (delegation is reserved in the format and not accepted: ADR 8 clarification 8), more than 8 evidence references, or that the record validator of PG-W-21A.2 refuses (the validator is a parameter, validate, so the test needs no build of it); it raises one decision through queue.raise of kind trust.grant or trust.revoke holding the change, its changeHash, the proposer, the recommendation in the recommendation field only and the time, and returns the decision id; it has no book parameter and writes no trust record",
+        "answerTrustChange({ queue, book, actor, decision, answer, change_hash, sign, principal, at }) reads the decision through queue.read; only an actor whose subject type is permitted by GRANT_AUTHORITY (a person or an operator, provisional under ADR 5) may answer, an agent, service, device or node is refused with not_authorised; the answer is one of approve, reject and defer and is always explicit (the recommendation is never copied into it); an approve needs change_hash equal to the hash of the stored change, a decision still awaiting an answer and not older than PROPOSAL_TTL_DAYS, otherwise it is refused with changed, already_answered or expired",
+        "on approve the person's signature over the decision id, the change hash, the answer, the approver and the time is made with the caller's sign function in the namespace memev-trust-approval and kept with the result; the book is then called once, grant or revoke according to the kind, with the change and the approver's resolved actor as the actor, so the issuer of the record is the approver and never the proposer; the queue is settled approved; a book that refuses leaves the decision unanswered with the refusal logged; reject and defer settle the decision rejected or deferred, call no book method and write no record",
+        "every proposal and every answer appends an event to the operation log through a log the caller gives (trust.proposal.raised, trust.proposal.answered) with the decision id, the kind, the change hash, the proposer, the approver, the answer and, for an approval, the signature; an event holds references and hashes and never the content of a contribution, a token or a key",
+        "src/engine/project-store.mjs: the closed kind list of the decision entity of SO-A-05 (exported as DECISION_KINDS) gains trust.grant and trust.revoke; no other line of the store, the approval conflict rule or the replay changes; the file gains no import",
+        "docs/FEDERATION.md describes the proposal step (agents propose, the person or operator answers, the answer is signed, logged and the only way a record is written, a proposal is bound to its hash and expires after 14 days), says it is provisional under ADR 5 and adds no role-by-action matrix, and says that the external trust service is consulted at approval and never per contribution; no file of src, scripts or vendor changes but the new module and project-store.mjs; each red-green criterion runs only its own subtest whose name starts with T1-cNN: (source: the convention of SR-0.03.3 T1 requirement 8)"
+      ],
+      "description": "Repo: memev. Builds on the SO-A-05 build. The fixtures are an in-memory queue port with raise, read and settle, a fake trust book that records its grant and revoke calls and their actors, resolved actors made by resolveActor of src/engine/identity.mjs for a person, an operator, an agent and a service, a vault OpLog in a temporary directory, and a fake sign and verify pair that hashes the signed message. A stand-in of every subtest was run read-only at the base: each fails on ERR_ASSERTION.",
+      "scope": [
+        "src/engine/federation/trust-propose.mjs",
+        "src/engine/project-store.mjs",
+        "test/trust-propose.test.mjs",
+        "docs/FEDERATION.md",
+        "docs/MODULES.md",
+        "changelog.d/PG-W-21F.md",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "trust-propose.mjs exports PROPOSAL_SCHEMA, ANSWER_NAMESPACE (memev-trust-approval), PROPOSAL_TTL_DAYS 14, proposeTrustChange, answerTrustChange and changeHash; changeHash is the SHA-256 of the canonical change and is the same for equal changes and different for any changed field; DECISION_KINDS of src/engine/project-store.mjs holds trust.grant and trust.revoke beside the kinds it already had and the rest of its content is unchanged. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-propose.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/trust-propose.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "An agent proposes: with a resolved agent actor proposeTrustChange raises one decision of kind trust.grant or trust.revoke through queue.raise holding the change, its hash, the proposer taken from the actor and the recommendation in the recommendation field only; a proposer field written inside the change is ignored in favour of the actor; an object of the shape of an actor that resolveActor did not make is refused; a change with a personal scope, a delegation block, more than 8 evidence references, an unknown kind or one the validator refuses is refused with its own code and raises nothing. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-propose.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/trust-propose.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A proposal writes nothing: after any number of proposals the fake book has had no grant or revoke call, the eligibility of every subject is unchanged, and proposeTrustChange has no book parameter (its source names none); a recommendation of approve by the proposer changes nothing and never becomes an answer. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-propose.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/trust-propose.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Only a person or an operator answers: a resolved person or operator actor may answer; an agent, service, device or node actor is refused with not_authorised and the decision is unchanged and no book method is called; answer must be one of approve, reject or defer and cannot be missing or taken from the recommendation; the table used is GRANT_AUTHORITY of the trust book module, not a copy. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-propose.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/trust-propose.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "An approval is signed, bound and the only way a record is written: approve with the change hash of the stored change makes the person's signature in the namespace memev-trust-approval over the decision id, the change hash, the answer, the approver and the time, calls the book once (grant or revoke by kind) with the approver's resolved actor as the actor so that the issuer is the approver and never the proposer, and settles the decision approved; an approval with a different change hash (the proposal was edited), for a decision already answered, or older than 14 days is refused with changed, already_answered or expired and calls no book method. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-propose.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/trust-propose.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Reject and defer: each settles the decision rejected or deferred, calls no book method and writes no record; a book that refuses an approval leaves the decision unanswered and logs the refusal. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-propose.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/trust-propose.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Audit: trust.proposal.raised and trust.proposal.answered events carry the decision id, the kind, the change hash, the proposer, the approver, the answer and, for an approval, the signature, and hold no contribution content, token or key; the log is the only store the module writes. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-propose.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/trust-propose.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "src/engine/project-store.mjs changes only in its decision kind list, gains no import, and only trust-propose.mjs and project-store.mjs change under src; the module does not import the store or the merge boundary, and the test has no static import of the modules under test",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git diff --name-only \"$MEMEV_CONTRACT_BASE\" HEAD -- src scripts vendor | grep -vE '^src/engine/(federation/trust-propose|project-store)\\.mjs$')\" && test -z \"$(git diff \"$MEMEV_CONTRACT_BASE\" HEAD -- src/engine/project-store.mjs | grep -E '^\\+import ')\" && ! grep -Eq \"from '\\.\\./(project-store|merge)\\.mjs'\" src/engine/federation/trust-propose.mjs && ! grep -Eq \"^import .*src/engine\" test/trust-propose.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The decision and project-store tests stay green",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/decisions.test.mjs test/project-store.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "One full run of test/trust-propose.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c04, T1-c05, T1-c06, T1-c07) with nothing skipped and nothing todo, and prints its whole output.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/trust-propose.test.mjs > \"$f\" 2>&1; rc=$?; cat \"$f\"; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c01:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c02:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c03:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c04:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c05:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c06:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c07:' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "docs/FEDERATION.md describes the proposal step: agents propose, a person or operator answers, the answer is signed and logged, it is provisional under ADR 5, and the external trust service is consulted at approval and never per contribution",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/FEDERATION.md",
+            "pattern": "agents propose.*(person|operator).*answer.*signed.*logged.*provisional.*ADR 5.*(never per contribution)",
+            "flags": "is"
+          }
+        },
+        {
+          "statement": "docs/FEDERATION.md says that a proposal is bound to its hash and expires after 14 days, and adds no role-by-action matrix",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -Eiq 'proposal.*hash' docs/FEDERATION.md && grep -Eiq '14 days' docs/FEDERATION.md && ! grep -Eiq 'role-by-action matrix.*(adds|added|defines)' docs/FEDERATION.md",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The SO-A-05 build is in the tree: the decision entity and its kind list exist",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -q 'DECISION_KINDS' src/engine/project-store.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "docs/MODULES.md lists the new module",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/MODULES.md",
+            "pattern": "src/engine/federation/trust-propose\\.mjs",
+            "flags": ""
+          }
+        },
+        {
+          "statement": "The module map is current",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/docs/module-graph.mjs --check",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "This contract is drafted with the memev checkout as its workdir and a pinned base. The workdir is the checkout top level (git rev-parse --show-toplevel equals the working directory). The base is 4db303071c67c32e2e5b3ecd508a10748b5b5a34, the memev main commit this spec was written against and the commit the red runs are judged at; src/engine/project-store.mjs exists at it",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$MEMEV_CONTRACT_BASE\" = 4db303071c67c32e2e5b3ecd508a10748b5b5a34 ] && [ \"$(git rev-parse --show-toplevel)\" = \"$(pwd -P)\" ] && git cat-file -e \"$MEMEV_CONTRACT_BASE:src/engine/project-store.mjs\"",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "Anything outside the requirements of this task is not built, not stubbed and not defaulted in code; if the work seems to need it, stop and report what it needs.",
+        "A test_red_green command of this contract prints its whole output: it is never piped through tail or head, and never captures its output without printing it.",
+        "Stop and ask when the work would decide ADR 3, ADR 5, ADR 7 or SO-A-05, add a role-by-action matrix, pick the topology of work breakdown row 1.3.6, or touch the licence terms, the tier prices or the crdt-merge terms.",
+        "Stop and ask when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would edit a signed spec or a signed contract: a signed id is superseded by a new id, never edited.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently.",
+        "Stop and ask when the work would let any code path copy a recommendation into an answer, let a proposer answer for a person, write a trust record from the proposal step, or add a role-by-action matrix.",
+        "Stop and ask when the SO-A-05 build names the decision kind list or the queue differently from this spec: amend the spec before building, never bend the test."
+      ]
+    }
+  ]
+}
