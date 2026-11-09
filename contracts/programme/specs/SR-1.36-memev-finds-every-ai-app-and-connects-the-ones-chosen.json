@@ -49,7 +49,7 @@
           }
         },
         {
-          "statement": "T1-c03: a %LOCALAPPDATA%\\Packages\\Claude_pzs8sxrjxfjjc folder alone makes claude-desktop found with evidence msix",
+          "statement": "T1-c03: a %LOCALAPPDATA%\\Packages\\Claude_pzs8sxrjxfjjc folder alone makes claude-desktop found with evidence msix (the family suffix is an example fixture, not laptop evidence; the laptop showed only 'Appx: Claude 4.23118.0.0')",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/discover.test.mjs",
@@ -147,7 +147,7 @@
         "when a Claude_* MSIX package exists, connect writes %LOCALAPPDATA%\\Packages\\<family>\\LocalCache\\Roaming\\Claude\\claude_desktop_config.json (anthropics/claude-code#26073), merging into what is there; otherwise it writes %APPDATA%\\Claude as before",
         "keys already in the file (for example preferences) are kept, and disconnect removes only memev"
       ],
-      "description": "Code: core/src/cli/clients.mjs:291-292 writes %APPDATA%\\Claude only; the MSIX app reads the virtualised copy, so the laptop's MSIX desktop client was never really connected.",
+      "description": "Code: src/cli/clients.mjs:291-292 writes %APPDATA%\\Claude only; the MSIX app reads the virtualised copy, so the laptop's MSIX desktop client was never really connected.",
       "scope": {
         "allow": [
           "src/cli/clients.mjs",
@@ -346,7 +346,7 @@
         "memev connect --json returns, per app, status, files, backups, seat and restart, and the bus operator",
         "bus roster --json lists a seat registered at connect and never seen with state registered, and bus operator accepts it"
       ],
-      "description": "Code: connect already calls /v1/bus-register (core/src/cli/clients.mjs:760,786-801; src/server/http.mjs:328). This task makes the seat visible and choosable before a session.",
+      "description": "Code: connect already calls /v1/bus-register (src/cli/clients.mjs:760,786-801; src/server/http.mjs:328). This task makes the seat visible and choosable before a session.",
       "scope": {
         "allow": [
           "src/cli/clients.mjs",
@@ -535,7 +535,7 @@
           }
         },
         {
-          "statement": "T8-c02: hermetic full-suite regression: the existing unmodified npm test command passes on CI; this is a green-baseline regression check, not a red-green claim",
+          "statement": "T8-c02: hermetic full-suite regression: the existing unmodified npm test command passes where verify runs (the full memev suite, so verify runs on a computer that may run it, not the lead's Mac); this is a green-baseline regression check, not a red-green claim",
           "verifier": {
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GH_TOKEN= GITHUB_TOKEN= GH_CONFIG_DIR=\"$(mktemp -d)\" npm test",
