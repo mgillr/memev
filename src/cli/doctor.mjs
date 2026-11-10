@@ -23,6 +23,51 @@ import { updateLine } from './update.mjs';
 
 const C = (id, title, status, detail = '', fix = null) => ({ id, title, status, detail, fix });
 
+// What the person does by hand for a check that has no automatic fix, so every warn or fail says how to put it right
+// (SR-1.36 T7). A check that has a fix keeps it; this sentence is used only when it has none.
+export const MANUAL = {
+  node: 'Install Node.js 22 or newer from nodejs.org, then run memev doctor again.',
+  git: 'Install git (git-scm.com), then run memev doctor again.',
+  vault: 'Create the vault with memev init.',
+  permissions: 'Make the files in the vault\'s .memev folder readable by you only.',
+  'token-expiry': 'Issue a new token before the old one expires: memev token issue <app>.',
+  oplog: 'Do not edit the vault\'s log by hand; restore the vault from its backup (memev backup) and run memev doctor again.',
+  'index-files': 'Run memev restart; Memev rebuilds the recall index from the notes.',
+  index: 'Run memev restart; Memev rebuilds the recall index from the notes.',
+  drift: 'Run memev restart; Memev imports the notes changed outside it.',
+  secrets: 'Rotate the credential, then remove it from the note (git history keeps old versions).',
+  bus: 'Open each stale app so it checks in on the bus, or remove a seat you no longer use: memev bus roster lists them.',
+  'bus-files': 'Run memev doctor --fix to set bus/ up again.',
+  'bus-seats': 'Run memev connect for each app named, or memev doctor --fix.',
+  'bus-lead': 'Pick the AI that leads the others: memev bus operator <seat> (memev bus roster lists the seats).',
+  launcher: 'Run memev doctor --fix to reinstall the launcher.',
+  apps: 'Run memev connect for each app named, or memev connect to connect every app found.',
+  deployment: 'Run the vault on a host inside your network to use an internal model (docs/DOCKER.md).',
+  remote: 'Check memev cloud status, or switch remote access off with memev cloud off.',
+  backup: 'Set up a backup with memev github setup.',
+  writers: 'Let one computer push the git backup; the others join it with memev init --join.',
+  license: 'Report only: memev license status shows the licence and seats.',
+  relay: 'Check memev cloud relay status; the git backup still carries the notes meanwhile.',
+  merge: 'Open both copies of each note named, keep what you want, and delete the other copy.',
+  'license-expired': 'Renew the licence; until then this computer keeps working as before.',
+  'license-change': 'Install a licence for more computers (memev license status shows the seats).',
+  disk: 'Free space on the disk that holds the vault.',
+  update: 'Run memev update.',
+  'container-vault': 'Mount the vault volume writable in the container (docs/DOCKER.md).',
+  'container-loopback': 'Check the host port with docker compose port memev 7787.',
+  'container-remote': 'Run memev cloud off in the container.',
+  daemon: 'Run memev start.',
+  loading: 'Run memev restart.',
+  open: 'Run memev doctor --bundle and send the file as docs/SUPPORT.md says.',
+  mcp: 'Run memev restart.',
+  'two-vaults': 'Join the other vault instead of keeping two: memev init --join.',
+  'backup-vault': 'Point the backup at this vault\'s own repository, or join the vault it belongs to: memev init --join.',
+  'github-net': 'Fix the network, or push over HTTPS with a fine-grained token for that one repository (docs/GITHUB.md).',
+  service: 'Run memev service install.',
+};
+/** Each warn or fail check with a fix: its own, else the sentence of what to do by hand. */
+export const explain = (checks) => checks.map((c) => (c.status === 'ok' || c.fix ? c : { ...c, fix: MANUAL[c.id] ? { manual: MANUAL[c.id] } : { manual: 'Run memev doctor --bundle and send the file as docs/SUPPORT.md says.' } }));
+
 /** Run icacls on a path; null when icacls is not available (not Windows, or not on PATH). */
 export function runIcacls(args) {
   const r = run('icacls', args, { timeout: 15000 });
@@ -145,8 +190,8 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   // after memev init --no-connect the person connects each app themselves, so --fix never connects them all (issue 284)
   const chosen = config(root).clients?.auto_connect === false;
   if (chosen && !ids.length) r.push(C('apps', 'AI apps connected', 'ok', 'none yet, as chosen with --no-connect: memev connect <app> connects one'));
-  else if (chosen && missing.length) r.push(C('apps', 'AI apps connected', 'warn', `${ids.join(', ')}; entries missing for ${[...new Set(missing)].join(', ')}: memev connect <app> for each, as chosen with --no-connect`));
-  else r.push(C('apps', 'AI apps connected', ids.length ? (missing.length ? 'warn' : 'ok') : 'warn', ids.length ? `${ids.join(', ')}${missing.length ? `; entries missing for ${[...new Set(missing)].join(', ')}` : ''}` : 'none yet', ids.length && !missing.length ? null : { desc: 'connect every installed app again', destructive: false, cmd: 'connect' }));
+  else if (chosen && missing.length) r.push({ ...C('apps', 'AI apps connected', 'warn', `${ids.join(', ')}; entries missing for ${[...new Set(missing)].join(', ')}: memev connect <app> for each, as chosen with --no-connect`), related: [...new Set(missing)] });
+  else r.push({ related: [...new Set(missing)], ...C('apps', 'AI apps connected', ids.length ? (missing.length ? 'warn' : 'ok') : 'warn', ids.length ? `${ids.join(', ')}${missing.length ? `; entries missing for ${[...new Set(missing)].join(', ')}` : ''}` : 'none yet', ids.length && !missing.length ? null : { desc: 'connect every installed app again', destructive: false, cmd: 'connect' }) });
   const cfg = config(root);
   // deployment: report where the vault runs and what kind of AI provider it uses. Report only: it
   // never fails the run. The one warning is a choice that cannot work as written.
@@ -254,7 +299,7 @@ export function busChecks({ root, vault = null, connected = [] }) {
   let seats = [];
   try { seats = fs.readdirSync(path.join(root, 'bus', 'seats')).filter((f) => f.endsWith('.json')).map((f) => readJson(path.join(root, 'bus', 'seats', f), null)).filter(Boolean); } catch { /* no seats yet */ }
   const missing = connected.filter((id) => !seats.some((s) => s.client === label(id) && s.device_kind === 'host' && !s.removed));
-  r.push(C('bus-seats', 'every connected app has a bus seat', missing.length ? 'fail' : 'ok', missing.length ? `no seat for ${missing.join(', ')}` : `${connected.length} app(s) seated`, missing.length ? { desc: 'seat them', destructive: false, cmd: 'bus' } : null));
+  r.push({ ...C('bus-seats', 'every connected app has a bus seat', missing.length ? 'fail' : 'ok', missing.length ? `no seat for ${missing.join(', ')}` : `${connected.length} app(s) seated`, missing.length ? { desc: 'seat them', destructive: false, cmd: 'bus' } : null), related: missing });
   const lead = readJson(path.join(root, 'bus', 'operator.json'), null)?.seat || null;
   r.push(C('bus-lead', 'lead AI chosen', lead ? 'ok' : 'warn', lead ? `${lead} leads the others` : 'needs you: no lead AI chosen yet; pick the AI that leads and coordinates the others with memev bus operator <seat> (memev bus roster lists the seats)'));
   return r;
@@ -380,31 +425,43 @@ export function bundle({ root, env, checks }) {
   return file;
 }
 
+/**
+ * Apply the fixes of the checks that are not ok, in order. A fix with only a manual sentence is said, not run. With safeOnly
+ * a fix marked destructive is never run (and never asked about); otherwise it asks first, unless yes. Returns the checks
+ * whose fix ran and the ones skipped, each with why.
+ */
+export async function applyFixes(checks, { safeOnly = false, yes = false, ask = null, apply }) {
+  const tried = []; const skipped = [];
+  for (const c of checks.filter((x) => x.status !== 'ok' && x.fix)) {
+    if (!c.fix.run && !c.fix.cmd) { skipped.push({ check: c, why: 'by hand' }); out.info(`by hand: ${c.fix.manual || c.fix.desc}`); continue; }
+    if (c.fix.destructive !== false && safeOnly) { skipped.push({ check: c, why: 'destructive' }); out.warn(`skipped (not a safe fix, so --safe-only leaves it): ${c.fix.desc}`); continue; }
+    if (c.fix.destructive && !yes) {
+      if (!ask) { skipped.push({ check: c, why: 'needs confirmation' }); out.warn(`skipped (needs confirmation, rerun with --yes): ${c.fix.desc}`); continue; }
+      if (!(await ask(c))) { skipped.push({ check: c, why: 'declined' }); continue; }
+    }
+    try { await apply(c); tried.push(c); } catch (e) { out.bad(`could not fix ${c.title}: ${e.message}`); }
+  }
+  return { tried, skipped };
+}
+
 export async function command(cmd, pos, flags, { root, env }) {
-  const checks = await allChecks({ root, env });
+  const checks = explain(await allChecks({ root, env }));
   const icon = { ok: '\u2713', warn: '!', fail: '\u2717' };
-  if (flags.json) console.log(JSON.stringify(checks.map(({ fix, ...c }) => ({ ...c, fix: fix ? { desc: fix.desc, destructive: fix.destructive } : null })), null, 2));
-  else { console.log(`Memev ${VERSION} doctor · ${root}`); for (const c of checks) console.log(`  ${icon[c.status]} ${c.title}${c.detail ? `: ${c.detail}` : ''}${c.fix && c.status !== 'ok' ? `\n      fix: ${c.fix.desc}${c.fix.destructive ? ' (asks first)' : ''}` : ''}`); }
+  if (flags.json) console.log(JSON.stringify(checks.map(({ fix, ...c }) => ({ ...c, fix: fix ? (fix.desc ? { desc: fix.desc, destructive: fix.destructive } : { desc: fix.manual, destructive: false, manual: true }) : null })), null, 2));
+  else { console.log(`Memev ${VERSION} doctor · ${root}`); for (const c of checks) console.log(`  ${icon[c.status]} ${c.title}${c.detail ? `: ${c.detail}` : ''}${c.fix && c.status !== 'ok' ? (c.fix.desc ? `\n      fix: ${c.fix.desc}${c.fix.destructive ? ' (asks first)' : ''}` : `\n      by hand: ${c.fix.manual}`) : ''}`); }
   let final = checks;
   if (flags.fix) {
-    const tried = [];
-    for (const c of checks.filter((x) => x.status !== 'ok' && x.fix)) {
-      if (c.fix.destructive && !flags.yes) {
-        if (!process.stdin.isTTY) { out.warn(`skipped (needs confirmation, rerun with --yes): ${c.fix.desc}`); continue; }
-        const rl = readline.createInterface({ input: process.stdin, output: process.stdout }); const a = await rl.question(`  ${c.fix.desc}? [y/N] `); rl.close(); if (!/^y/i.test(a)) continue;
-      }
-      try {
+    const ask = process.stdin.isTTY ? async (c) => { const rl = readline.createInterface({ input: process.stdin, output: process.stdout }); const a = await rl.question(`  ${c.fix.desc}? [y/N] `); rl.close(); return /^y/i.test(a); } : null;
+    const { tried } = await applyFixes(checks, { safeOnly: !!flags['safe-only'], yes: !!flags.yes, ask, apply: async (c) => {
         if (c.fix.run) await c.fix.run();
         else if (c.fix.cmd === 'connect') { const m = await import('./clients.mjs'); m.connectAll({ env, launcher: m.launcherPath(env), force: false }); }
         else if (c.fix.cmd === 'runtime' || c.fix.cmd === 'service') { const m = await import('./main.mjs'); m.installRuntime(env); if (c.fix.cmd === 'service') { const s = await import('./service.mjs'); await s.installService({ env, root }); } }
         else if (c.fix.cmd === 'bus') { const st = readJson(path.join(configDir(env), 'clients-state.json'), { connected: {} }); const { setupBus } = await import('./bus-cli.mjs'); const b = await setupBus({ root, env, clients: Object.keys(st.connected || {}), ask: false }); if (!b.ok) throw new Error(b.problems.join('; ')); }
-        else if (c.fix.cmd === 'init') { out.warn('run memev init'); continue; }
-        else if (c.fix.cmd === 'git') { out.warn('install git, then rerun memev doctor'); continue; }
-        tried.push(c);
-      } catch (e) { out.bad(`could not fix ${c.title}: ${e.message}`); }
-    }
+        else if (c.fix.cmd === 'init') { out.warn('run memev init'); throw new Error('memev init creates the vault'); }
+        else if (c.fix.cmd === 'git') { out.warn('install git, then rerun memev doctor'); throw new Error('git is installed by hand'); }
+      } });
     // a fix is done only when its check passes when the checks run again
-    final = await allChecks({ root, env });
+    final = explain(await allChecks({ root, env }));
     for (const c of tried) {
       const now = final.find((x) => x.id === c.id && x.title === c.title) ?? final.find((x) => x.id === c.id);
       if (!now || now.status === 'ok') out.ok(`fixed: ${c.title}`);
