@@ -1,0 +1,711 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Discovery finds every supported client on Windows, macOS and Linux",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "src/cli/discover.mjs exports discover(env, platform, readers) whose registry, directory and PATH readers are injectable, and memev discover --json prints one object per app with id, name, found, evidence, install_path, automation (auto, one-step or none) and step",
+        "on Windows it reads DisplayName, DisplayVersion, InstallLocation and DisplayIcon only, from HKCU, HKLM and HKLM WOW6432Node Uninstall, with one absolute system reg.exe query per hive, shell:false and a timeout; when InstallLocation is blank it falls back to the folder of DisplayIcon, then to the app's known folders",
+        "it also matches MSIX package family names by listing %LOCALAPPDATA%\\Packages folder names, folders under %LOCALAPPDATA%\\Programs, Program Files and AppData, /Applications and ~/Applications on macOS, .desktop files on Linux, files on PATH, and the config folders each app already had",
+        "every id in clientDefs and unsupportedDefs has a probe, and an app the old folder check found is still found (no regression)",
+        "discovery never runs a found binary and never opens a file inside an app's data folder; it reads names, registry values and directory listings only",
+        "Spy on spawn, spawnSync, execFile, execFileSync, fork and exec and readFile, readFileSync, fs.promises.readFile, open, openSync, fs.promises.open, createReadStream and readSync, including imported aliases. Resolve realpath and symlink boundaries before access; reject links escaping permitted discovery roots or targeting client data contents. Metadata-only directory listing is permitted; realpath resolution never grants content access.",
+        "The sole process exception is an absolute system reg.exe query on Windows with shell:false, once per configured hive, bounded by timeout; no PATH lookup, shell command or additional process is allowed."
+      ],
+      "description": "Existing discovery is folder-existence only at baseline. The dated laptop inventory supplies fixtures for blank InstallLocation, the secondary uninstall hive and an MSIX package.",
+      "scope": {
+        "allow": [
+          "src/cli/discover.mjs",
+          "src/cli/clients.mjs",
+          "src/cli/main.mjs",
+          "test/discover.test.mjs",
+          "test/fixtures/discover/**",
+          "test/helpers/**",
+          "docs/CLIENTS.md",
+          "changelog.d/SR-1.36.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "T1-c01: src/cli/discover.mjs exists and a faked HKCU Uninstall entry DisplayName 'Grok Bot' with a blank InstallLocation and a DisplayIcon under %LOCALAPPDATA%\\Programs\\Grok Bot gives grok-bot found with install_path that folder",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/discover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/discover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "T1-c02: a faked HKLM WOW6432Node entry 'Microsoft Copilot' is found and reported with automation none",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/discover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/discover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "T1-c03: a %LOCALAPPDATA%\\Packages\\Claude_pzs8sxrjxfjjc folder alone makes claude-desktop found with evidence msix (the family suffix is an example fixture, not laptop evidence; the laptop showed only 'Appx: Claude 4.23118.0.0')",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/discover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/discover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "T1-c04: on darwin, /Applications/ChatGPT.app or ~/Applications/ChatGPT.app makes chatgpt-desktop found; no invented desktop bundle path is used",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/discover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/discover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "T1-c05: on linux, a .desktop file or a PATH entry named after the app makes it found; a PATH entry that is a directory does not",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/discover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/discover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "T1-c06: every id of clientDefs and unsupportedDefs, on every platform, has a probe, and each fixture home that the old detect() found is still found",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/discover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/discover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "T1-c07: spies cover spawn, spawnSync, execFile, execFileSync, fork and exec; only absolute system reg.exe query with shell:false once per configured hive is allowed on Windows, including timeout cases; no process runs on other platforms",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/discover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/discover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "T1-c08: spies cover readFile, readFileSync, fs.promises.readFile, open, openSync, fs.promises.open, createReadStream and readSync; no client data content is read, including through realpath, symlinks, imported aliases and readSync descriptors; escaping or data-targeting links are rejected",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/discover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/discover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "T1-c09: a registry query that times out leaves discovery working from folders and PATH and reports the timeout in --json",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/discover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c09:' test/discover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "T1-c10: memev discover --json prints the documented shape and exits 0 on an empty home",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/discover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/discover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "T1-c11: no mutant of src/cli/discover.mjs survives this task's tests (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --scope src/cli/discover.mjs --test \"node --test test/discover.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T1-AC12",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "MSIX desktop client installed as MSIX gets the file it reads",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "when a Claude_* MSIX package exists, connect writes %LOCALAPPDATA%\\Packages\\<family>\\LocalCache\\Roaming\\Claude\\claude_desktop_config.json (anthropics/claude-code#26073), merging into what is there; otherwise it writes %APPDATA%\\Claude as before",
+        "keys already in the file (for example preferences) are kept, and disconnect removes only memev"
+      ],
+      "description": "Code: src/cli/clients.mjs:291-292 writes %APPDATA%\\Claude only; the MSIX app reads the virtualised copy, so the laptop's MSIX desktop client was never really connected.",
+      "scope": {
+        "allow": [
+          "src/cli/clients.mjs",
+          "test/clients-claude-msix.test.mjs",
+          "test/fixtures/discover/**",
+          "test/helpers/**",
+          "docs/CLIENTS.md",
+          "changelog.d/SR-1.36.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T2-AC01",
+          "mandatory": true,
+          "statement": "T2-c01: with the MSIX folder and a config holding {\"preferences\":{\"sidebarMode\":\"chat\"}}, connect adds mcpServers.memev there and keeps preferences",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-claude-msix.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/clients-claude-msix.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC02",
+          "mandatory": true,
+          "statement": "T2-c02: in the same case %APPDATA%\\Claude\\claude_desktop_config.json is not created or changed",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-claude-msix.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c02:' test/clients-claude-msix.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC03",
+          "mandatory": true,
+          "statement": "T2-c03: with the package present but LocalCache\\Roaming\\Claude missing, connect creates it and writes the file",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-claude-msix.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c03:' test/clients-claude-msix.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC04",
+          "mandatory": true,
+          "statement": "T2-c04: with no MSIX package, connect writes %APPDATA%\\Claude as before",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-claude-msix.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c04:' test/clients-claude-msix.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC05",
+          "mandatory": true,
+          "statement": "T2-c05: disconnect after an MSIX connect leaves the file equal to its bytes before connect",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-claude-msix.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c05:' test/clients-claude-msix.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC06",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Desktop shared settings require laptop proof",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "The desktop client id chatgpt-desktop uses the existing codex settings table as an unverified configuration path. Both clients remain configured/unverified until independently acknowledged SR-1.37 T5 proof of settings consumption for the installed versions; do not report connection from a configuration write.",
+        "configuring chatgpt-desktop and codex together writes the table once and reports each configured/unverified until SR-1.37 T5 supplies laptop proof; configuration alone never establishes connected status",
+        "SR-1.37 T5 must record installed version and observable successful settings consumption before a connected claim is made; failed or absent proof leaves configured/unverified status."
+      ],
+      "description": "Shared-settings behavior is unverified until SR-1.37 T5 records laptop proof. A configuration write alone must not be reported as verified connection.",
+      "scope": {
+        "allow": [
+          "src/cli/clients.mjs",
+          "test/clients-chatgpt.test.mjs",
+          "test/helpers/**",
+          "docs/CLIENTS.md",
+          "changelog.d/SR-1.36.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T3-AC01",
+          "mandatory": true,
+          "statement": "T3-c01: connect chatgpt-desktop alone writes exactly one [mcp_servers.memev] table in ~/.codex/config.toml",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-chatgpt.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c01:' test/clients-chatgpt.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T3-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC02",
+          "mandatory": true,
+          "statement": "T3-c02: connect codex chatgpt-desktop writes the table once and reports both configured/unverified until independently acknowledged SR-1.37 T5 laptop proof; no connected result is inferred from the write",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-chatgpt.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c02:' test/clients-chatgpt.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T3-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC03",
+          "mandatory": true,
+          "statement": "T3-c03: disconnect chatgpt-desktop while codex remains configured/unverified leaves the shared table; connected status is permitted only after SR-1.37 T5 laptop proof",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-chatgpt.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c03:' test/clients-chatgpt.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T3-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC04",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "Manual-step client discovery covers both desktop platforms",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "grok-bot is found from the Uninstall DisplayName 'Grok Bot', or from %LOCALAPPDATA%\\Programs\\Grok Bot, %APPDATA%\\Grok Bot or ~/.grokbot, and is kept apart from build client (~/.grok, PATH grok)",
+        "until a documented local configuration exists it is automation one-step, with one sentence and the address to copy; nothing of manual-step client's is written or read",
+        "On macOS also discover from /Applications/Grok Bot.app and ~/Library/Application Support/Grok Bot using metadata only; never read contents.",
+        "Also discover from ~/Applications/Grok Bot.app with metadata-only access; each supported macOS location alone must be sufficient."
+      ],
+      "description": "How manual-step client accepts a local MCP server is unverified (8 Nov 2026). Its roaming folder holds files with secret-looking names, which must never be read.",
+      "scope": {
+        "allow": [
+          "src/cli/clients.mjs",
+          "src/cli/discover.mjs",
+          "test/clients-grok-bot.test.mjs",
+          "test/fixtures/discover/**",
+          "test/helpers/**",
+          "docs/CLIENTS.md",
+          "changelog.d/SR-1.36.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T4-AC01",
+          "mandatory": true,
+          "statement": "T4-c01: the named Windows inventory entry alone with blank InstallLocation is found; on macOS either /Applications/Grok Bot.app or ~/Library/Application Support/Grok Bot alone is sufficient, with metadata-only access; ~/Applications/Grok Bot.app alone is also sufficient",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-grok-bot.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T4-c01:' test/clients-grok-bot.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T4-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T4-AC02",
+          "mandatory": true,
+          "statement": "T4-c02: ~/.grok alone makes grok-build found and grok-bot not found; ~/.grokbot alone the reverse",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-grok-bot.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T4-c02:' test/clients-grok-bot.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T4-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T4-AC03",
+          "mandatory": true,
+          "statement": "T4-c03: grok-bot is reported automation one-step with a non-empty step, and connect all neither writes nor reads any file under its folders",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-grok-bot.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T4-c03:' test/clients-grok-bot.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T4-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T4-AC04",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "A connected app has a bus seat before its first session",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "memev connect --json returns, per app, status, files, backups, seat and restart, and the bus operator",
+        "bus roster --json lists a seat registered at connect and never seen with state registered, and bus operator accepts it"
+      ],
+      "description": "Code: connect already calls /v1/bus-register (src/cli/clients.mjs:760,786-801; src/server/http.mjs:328). This task makes the seat visible and choosable before a session.",
+      "scope": {
+        "allow": [
+          "src/cli/clients.mjs",
+          "src/cli/bus-cli.mjs",
+          "src/engine/bus.mjs",
+          "src/server/http.mjs",
+          "test/bus-register-seat.test.mjs",
+          "test/helpers/**",
+          "docs/BUS.md",
+          "changelog.d/SR-1.36.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T5-AC01",
+          "mandatory": true,
+          "statement": "T5-c01: after connect claude-code with no session, bus roster --json holds its seat with state registered",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-register-seat.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T5-c01:' test/bus-register-seat.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T5-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T5-AC02",
+          "mandatory": true,
+          "statement": "T5-c02: bus operator <that seat> succeeds before any session and roster then marks it operator",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-register-seat.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T5-c02:' test/bus-register-seat.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T5-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T5-AC03",
+          "mandatory": true,
+          "statement": "T5-c03: connect --json holds seat for each connected app and the operator",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-register-seat.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T5-c03:' test/bus-register-seat.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T5-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T5-AC04",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    },
+    {
+      "id": "T6",
+      "title": "Every changed config is backed up and never clobbered",
+      "phase": "implement",
+      "depends_on": [
+        "T2",
+        "T3"
+      ],
+      "requirements": [
+        "each file connect changes is copied first, the copy's path is in connect --json backups, and disconnect restores it",
+        "a config file that does not parse is not written; the app is reported failed with the reason",
+        "For every supported client, preserve original existence, bytes and metadata needed for restore; disconnect restores exact original bytes, or removes only the newly created configuration when none existed. Shared-settings ownership must preserve still-connected clients."
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/cli/clients.mjs",
+          "test/clients-backup.test.mjs",
+          "test/helpers/**",
+          "docs/CLIENTS.md",
+          "changelog.d/SR-1.36.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T6-AC01",
+          "mandatory": true,
+          "statement": "T6-c01: for every supported client, backup bytes equal original bytes; a connect/disconnect cycle restores byte-exact original content, and originally absent configurations are removed without unrelated deletion; shared settings preserve still-connected clients",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-backup.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T6-c01:' test/clients-backup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T6-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T6-AC02",
+          "mandatory": true,
+          "statement": "T6-c02: a malformed JSON or TOML config is left byte-identical and the result is failed with a reason",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-backup.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T6-c02:' test/clients-backup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T6-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T6-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    },
+    {
+      "id": "T7",
+      "title": "Doctor fixes the guide can apply",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "every doctor check that can be warn or fail has a fix with desc, or a manual sentence, and a related list of client ids where it concerns an app",
+        "doctor --fix --safe-only applies only fixes marked destructive false and reports each"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/cli/doctor.mjs",
+          "test/doctor-related.test.mjs",
+          "test/doctor.test.mjs",
+          "test/helpers/**",
+          "changelog.d/SR-1.36.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T7-AC01",
+          "mandatory": true,
+          "statement": "T7-c01: over a fixture vault with every check forced to warn, each warn or fail check has fix.desc or manual",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/doctor-related.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T7-c01:' test/doctor-related.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T7-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T7-AC02",
+          "mandatory": true,
+          "statement": "T7-c02: doctor --fix --safe-only never runs a fix marked destructive",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/doctor-related.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T7-c02:' test/doctor-related.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T7-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T7-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    },
+    {
+      "id": "T8",
+      "title": "The suite needs no git identity and no GitHub login",
+      "phase": "implement",
+      "depends_on": [
+        "T1",
+        "T2",
+        "T3",
+        "T4",
+        "T5",
+        "T6",
+        "T7"
+      ],
+      "requirements": [
+        "every test named in this contract and the full suite pass with no global git config, no git identity and no GitHub token",
+        "Do not modify package.json or its npm test script, directly or indirectly. Keep the existing full-suite command and test coverage unchanged; demonstrate red/green with targeted missing-behavior tests, not a weakened runner.",
+        "T8-c01 targeted regression tests exercise the listed behavioral tests hermetically with non-skipped assertions. T8-c02 separately runs the unchanged npm test command as a green-baseline full-suite regression check; no failing baseline is required for T8-c02."
+      ],
+      "description": "Standing rule of 8 Nov 2026.",
+      "scope": {
+        "allow": [
+          "test/helpers/**",
+          "changelog.d/SR-1.36.md",
+          "test/autoconnect-regression.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T8-AC01",
+          "mandatory": true,
+          "statement": "T8-c01: the tests of this contract pass hermetically",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/autoconnect-regression.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T8-c01:' test/autoconnect-regression.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^T8-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T8-AC02",
+          "mandatory": true,
+          "statement": "T8-c02: hermetic full-suite regression: the existing unmodified npm test command passes where verify runs (the full memev suite, so verify runs on a computer that may run it, not the lead's Mac); this is a green-baseline regression check, not a red-green claim",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GH_TOKEN= GITHUB_TOKEN= GH_CONFIG_DIR=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "T8-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently.",
+        "Record the failing base result and passing proposed-head result for each changed test_red_green behavioral criterion; no skipped, missing-test or exit-only substitute counts as proof."
+      ]
+    }
+  ],
+  "id": "k-sr-1-36-discover-support-86f593",
+  "title": "SR-1.36 Discover supported clients and connect selected clients",
+  "workdir": null,
+  "created": "2026-11-10T00:13:13.613Z",
+  "version": 1,
+  "request": "The owner requested discovery of every supported client and connection of selected clients. Repository: memev; baseline 043854de5fce639531294a4b569f239baab235eb. Companion: SR-1.37 in memev-app. Only the owner signs. All implementation requires a signed contract first. Existing coordination and merge gates remain unchanged. Product ids and literal platform paths are technical identifiers, not authorship. Unverified integration claims require SR-1.37 T5 laptop evidence; unsupported automation remains a manual step. Each changed criterion must demonstrably fail at the recorded base and pass at the proposed head; record both executions. No operational credential files may be read.",
+  "provenance": {
+    "record": "contracts/programme/redteam/SR-1.36.json",
+    "review": "second seat on the same machine, round 1 clean with notes, signed by 1f6b4e7c00729bc7; rehearsed through the real contractDraft, contractSign (throwaway key) and contractVerify on the box at 14fa54a6 with base 043854de: 39 criteria fail, 30 red-green on missing tests and 1 mutation on missing code (unbuilt work), 8 scope on the two commits of #476 after that base (so this signature uses the later base 01c566db), and the full suite on the rehearsal's own uncommitted body; the spec is unchanged since; both seats are AI on one machine, so this is not an independent review",
+    "spec_sha256": "24bb404453f94a2be3bf79b0b81dd8ccc09a44305b944a74a1b899e64cdbcb50",
+    "spec": "contracts/programme/specs/SR-1.36-memev-finds-every-ai-app-and-connects-the-ones-chosen.json"
+  },
+  "origin": "local",
+  "base": {
+    "sha": "01c566dbd9d110c315d844f874a99e678c827852",
+    "recorded_at": "2026-11-10T00:13:14.209Z"
+  }
+}
