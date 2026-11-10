@@ -447,7 +447,7 @@ export async function applyFixes(checks, { safeOnly = false, yes = false, ask = 
 export async function command(cmd, pos, flags, { root, env }) {
   const checks = explain(await allChecks({ root, env }));
   const icon = { ok: '\u2713', warn: '!', fail: '\u2717' };
-  if (flags.json) console.log(JSON.stringify(checks.map(({ fix, ...c }) => ({ ...c, fix: fix ? (fix.desc ? { desc: fix.desc, destructive: fix.destructive } : { manual: fix.manual }) : null })), null, 2));
+  if (flags.json) console.log(JSON.stringify(checks.map(({ fix, ...c }) => ({ ...c, fix: fix ? (fix.desc ? { desc: fix.desc, destructive: fix.destructive } : { desc: fix.manual, destructive: false, manual: true }) : null })), null, 2));
   else { console.log(`Memev ${VERSION} doctor · ${root}`); for (const c of checks) console.log(`  ${icon[c.status]} ${c.title}${c.detail ? `: ${c.detail}` : ''}${c.fix && c.status !== 'ok' ? (c.fix.desc ? `\n      fix: ${c.fix.desc}${c.fix.destructive ? ' (asks first)' : ''}` : `\n      by hand: ${c.fix.manual}`) : ''}`); }
   let final = checks;
   if (flags.fix) {

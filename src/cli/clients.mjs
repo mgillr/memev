@@ -817,7 +817,8 @@ export async function command(cmd, pos, flags, { env, root }) {
     const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, project: flags.project, allowTools })
       : target === 'several' ? connectSelected(pos, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project, allowTools })
       : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project, allowTools })];
-    const code = res.some((r) => r.status === 'failed' || r.failed || (target !== 'all' && r.status === 'needs-manual')) ? 1 : 0;
+    // connecting every app exits 0 when some need a step by hand; naming one that cannot be changed exits 1 (MEM-091)
+    const code = res.some((r) => r.status === 'failed' || (target !== 'all' && r.status === 'needs-manual')) ? 1 : 0;
     if (flags.json) {
       // one JSON object and nothing else: each app's outcome, files, backups, seat and restart line, and the lead
       const ids = res.filter((r) => ['added', 'already', 'configured'].includes(r.status)).map((r) => r.id);
