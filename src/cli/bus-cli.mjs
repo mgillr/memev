@@ -131,7 +131,9 @@ export async function command(cmd, pos, flags, { root, env }) {
   if (sub === 'roster') {
     const r = await call('bus_roster', {});
     if (flags.card) { console.log(rosterCard(r)); return 0; }
-    if (flags.json) { json(r); return 0; }
+    // registered: the seat exists (an app connected gets one at once), so it can be picked as the lead before its first
+    // session; state still says whether that session has been seen (never joined, live, stale)
+    if (flags.json) { json({ ...r, seats: r.seats.map((s) => ({ ...s, registered: !!s.seat && s.state !== 'removed' })) }); return 0; }
     console.log(`Lead (operator): ${r.operator || 'not chosen yet; pick one with memev bus operator <seat>'} · live means a heartbeat in the last ${r.live_minutes} min`);
     for (const s of r.seats) console.log(`  ${(s.seat || '(no app yet)').padEnd(28)} ${s.state.padEnd(12)} ${String(s.device_label).padEnd(16)} ${s.last_seen ? `seen ${s.minutes_since} min ago` : 'never seen'}${s.last_message ? ` · last: ${s.last_message.type}` : ''}${s.claims.length ? ` · claims ${s.claims.join(', ')}` : ''}${s.hold ? ' · ON HOLD' : ''}${s.operator ? ' · LEAD' : ''}`);
     return 0;

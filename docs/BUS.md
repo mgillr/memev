@@ -67,6 +67,10 @@ picks it, and no AI can make itself the lead. You might run setup from any AI, s
   that needs you: `memev bus operator <seat>`.
 - An app connected later, even the only one, is never promoted. `memev connect` honours `--lead` and
   `MEMEV_LEAD` too.
+- A seat exists from the moment its app is connected, so it can be chosen as the lead before that app's
+  first session: `memev bus operator <seat>` works on a seat that is still **never joined**.
+  `memev bus roster --json` marks each such seat `registered: true`, and `memev connect --json` gives
+  each app's seat and the lead.
 - While no lead is set, the bus tools, the session-start hook and the instructions tell every
   connected AI to ask you who should lead, then pass your answer to `bus_set_operator`. That tool
   only works from this computer, only while no lead is set, and only with your answer naming the

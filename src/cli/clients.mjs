@@ -220,6 +220,20 @@ export function removeAiderRead(confText, conv = AIDER_CONVENTIONS()) {
 
 /** The apps Memev knows. mode: 'hooks' = state injected by hooks; 'instructions' = MCP + instructions only.
  *  opts.project: the project directory; Cursor gets an always-on rule file in it. */
+/** The folder name of an installed MSIX package whose family name starts with prefix, from the names in Packages only. */
+export function packageFamily(localAppData, prefix) {
+  let names = [];
+  try { names = fs.readdirSync(path.join(localAppData, 'Packages')); } catch { return null; }
+  return names.find((n) => n.startsWith(prefix)) || null;
+}
+const claudeMsix = (env, platform) => (platform === 'win32' ? packageFamily(osDirs(env, 'win32').localAppData, 'Claude_') : null);
+/** The config file the Claude desktop app reads: inside its MSIX package when it is installed that way, else the usual one. */
+export function claudeDesktopFile(env, platform = process.platform, appData = platformDirs(env).appData) {
+  const fam = claudeMsix(env, platform);
+  if (fam) return path.join(osDirs(env, 'win32').localAppData, 'Packages', fam, 'LocalCache', 'Roaming', 'Claude', 'claude_desktop_config.json');
+  return path.join(platform === 'win32' ? osDirs(env, 'win32').appData : appData, 'Claude', 'claude_desktop_config.json');
+}
+
 export function clientDefs(env, bin, platform = process.platform, opts = {}) {
   const { home, appData } = platformDirs(env);
   const win = winSpawn(env, platform);
@@ -288,8 +302,10 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
         }), removeFlatHooks),
         ...(o.project ? [text(path.join(o.project, '.cursor', 'rules', 'memev.mdc'), (t) => addBlock(t, CURSOR_RULE), cursorRuleRemove)] : []),
       ], manual: 'Check that Settings → MCP shows memev connected, and allow its tools.', note: 'Cursor injects the resume card at session start; per-prompt recall and post-compaction state come through the MCP instructions (Cursor hooks cannot add context to a prompt).' },
-    { id: 'claude-desktop', name: 'Claude Desktop', mode: 'instructions', detect: () => exists(path.join(appData, 'Claude')),
-      edits: () => [json(path.join(appData, 'Claude', 'claude_desktop_config.json'), setServer('mcpServers', stdio('claude-desktop')), delServer('mcpServers'))] },
+    // The Claude desktop app installed from the Microsoft Store (MSIX) reads a virtualised copy of its config under its package
+    // folder, not %APPDATA%\Claude (anthropics/claude-code#26073): when that package is there, its copy is the file Memev changes.
+    { id: 'claude-desktop', name: 'Claude Desktop', mode: 'instructions', detect: () => exists(path.join(appData, 'Claude')) || !!claudeMsix(env, platform),
+      edits: () => [json(claudeDesktopFile(env, platform, appData), setServer('mcpServers', stdio('claude-desktop')), delServer('mcpServers'))] },
     { id: 'windsurf', name: 'Windsurf', mode: 'instructions', detect: () => exists(path.join(home, '.codeium', 'windsurf')),
       edits: () => [json(path.join(home, '.codeium', 'windsurf', 'mcp_config.json'), setServer('mcpServers', stdio('windsurf')), delServer('mcpServers')), mdBlock(path.join(home, '.codeium', 'windsurf', 'memories', 'global_rules.md'))] },
     { id: 'vscode', name: 'VS Code', mode: 'instructions', detect: () => exists(path.join(appData, 'Code', 'User')),
@@ -321,6 +337,12 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
     { id: 'grok-build', name: 'Grok Build', mode: 'instructions', detect: () => exists(path.join(home, '.grok')),
       edits: () => [text(path.join(home, '.grok', 'config.toml'), (t) => upsertMcpToml(t, mcpTomlBlock(win, bin, 'grok-build')), (t) => removeBlock(t, [TOML_START, TOML_END]), tomlSkipNote('Grok Build'))],
       note: 'Grok Build also reads ~/.claude.json, so when Claude Code is connected too it may list memev twice; grok mcp list shows the servers it loaded.' },
+    // The ChatGPT desktop app's Codex reads the same ~/.codex/config.toml as the Codex CLI, so both share one [mcp_servers.memev]
+    // table. That the desktop app really loads it is not proven yet (SR-1.36 T3): a write is reported configured, never connected.
+    { id: 'chatgpt-desktop', name: 'ChatGPT (desktop)', mode: 'instructions', unverified: true,
+      detect: () => (platform === 'win32' ? !!packageFamily(osDirs(env, 'win32').localAppData, 'OpenAI.ChatGPT-Desktop_') : platform === 'darwin' && exists(path.join(home, 'Applications', 'ChatGPT.app'))),
+      edits: () => [text(path.join(home, '.codex', 'config.toml'), (t) => upsertMcpToml(t, mcpTomlBlock(win, bin, 'codex')), (t) => removeBlock(t, [TOML_START, TOML_END]), tomlSkipNote('ChatGPT'))],
+      manual: 'ChatGPT reads the Memev entry from the Codex settings it shares with the Codex CLI; Memev reports it configured until a session shows it loaded.' },
     ...moreApps(env, platform, stdio),
   ];
   // An app whose docs give no Windows location is not connected on Windows; unsupportedDefs lists it there instead.
@@ -465,6 +487,10 @@ export function claudeToolsAllowed(env = process.env) {
   return !!(j && j.permissions && Array.isArray(j.permissions.allow) && MEMEV_TOOLS.some((t) => j.permissions.allow.includes(t)));
 }
 
+/** The one step for Grok Bot: where to add Memev by hand, with the address of this computer's Memev. */
+export const mcpAddress = (env = process.env) => `http://127.0.0.1:${Number(env.MEMEV_PORT) || 7787}/mcp`;
+export const grokBotStep = (env = process.env) => `Grok Bot cannot be connected automatically yet: in Grok Bot, add a custom MCP connector with the address ${mcpAddress(env)}`;
+
 /** The apps Memev detects but does not support yet. They are listed as found, not supported, and their files are never changed.
  *  Each app is looked up at the directory its own docs name, which differs per app and per platform. */
 export function unsupportedDefs(env, platform = process.platform) {
@@ -491,6 +517,14 @@ export function unsupportedDefs(env, platform = process.platform) {
       manual: 'Lingma adds MCP servers through a JSON form in the IDE, then asks you to restart the IDE.' },
     { id: 'rovodev', name: 'Rovo Dev CLI', detect: () => exists(path.join(home, '.rovodev')),
       manual: 'Rovo Dev\'s docs name two different MCP files (mcp.json and mcp_config.json): run acli rovodev mcp to add memev in the file your version opens.' },
+    // Grok Bot, xAI's desktop app, apart from Grok Build (~/.grok, the grok command). How it takes a local MCP server is not
+    // documented (8 Nov 2026), so Memev never writes or reads its files: it shows one step and the address to copy.
+    // Only folder names are looked at here; discover also checks the system Applications folder and the registry.
+    { id: 'grok-bot', name: 'Grok Bot', step: grokBotStep(env), manual: grokBotStep(env),
+      detect: () => [path.join(home, '.grokbot'), ...(win ? [path.join(osDirs(env, 'win32').localAppData, 'Programs', 'Grok Bot'), path.join(osDirs(env, 'win32').appData, 'Grok Bot')] : []),
+        ...(platform === 'darwin' ? [path.join(home, 'Applications', 'Grok Bot.app'), path.join(home, 'Library', 'Application Support', 'Grok Bot')] : [])].some(exists) },
+    { id: 'microsoft-copilot', name: 'Microsoft Copilot', detect: () => win && !!packageFamily(osDirs(env, 'win32').localAppData, 'Microsoft.Copilot_'),
+      manual: 'Microsoft Copilot has no setting for a local MCP server, so Memev cannot connect it.' },
     { id: 'crush', name: 'Crush', detect: () => exists(path.join(home, '.config', 'crush')),
       manual: 'Crush now reads a crushrc file of mcp add lines (its JSON config is deprecated): add memev with an mcp add line in ~/.config/crush/crushrc.' },
     // apps connected on macOS and Linux whose docs name no Windows location: found on Windows, never changed there
@@ -505,10 +539,35 @@ const saveState = (env, s) => writeJson(stateFile(env), s, 0o600);
 const backupDir = (env) => path.join(configDir(env), 'backups');
 const readBytes = (f) => { try { return fs.readFileSync(f); } catch { return null; } };
 
+/**
+ * Whether a TOML file is plainly broken, so Memev must not append to it: a line outside any string or array that is
+ * neither a comment, a table header nor a key = value line, or a header, string or array that does not close. It is
+ * conservative: valid TOML it does not fully parse, such as multi-line strings and arrays, is not rejected.
+ */
+export function tomlProblem(text) {
+  let open = null; let depth = 0; let n = 0;
+  for (const raw of String(text).split(/\r?\n/)) {
+    n++;
+    const line = raw.trim();
+    if (open) { if (line.includes(open)) open = null; continue; }
+    if (depth > 0) { depth += (line.match(/\[/g) || []).length - (line.match(/\]/g) || []).length; continue; }
+    if (!line || line.startsWith('#')) continue;
+    if (line.startsWith('[')) { if (!/^\[\[?[^[\]]+\]\]?\s*(#.*)?$/.test(line)) return `line ${n} is a table header that does not close`; continue; }
+    const kv = /^("[^"]*"|'[^']*'|[A-Za-z0-9_.\- ]+)\s*=\s*(.*)$/.exec(line);
+    if (!kv) return `line ${n} is not a key = value line`;
+    const v = kv[2];
+    const ml = /^("""|''')/.exec(v);
+    if (ml && !v.slice(3).includes(ml[1])) { open = ml[1]; continue; }
+    depth = Math.max(0, (v.match(/\[/g) || []).length - (v.match(/\]/g) || []).length);
+  }
+  return open ? 'a multi-line string does not close' : depth > 0 ? 'an array does not close' : null;
+}
+
 function plan(def, opts = {}) {
   const changes = [];
   for (const e of def.edits(opts)) {
     const before = readBytes(e.file);
+    if (before && e.kind === 'text' && e.file.endsWith('.toml')) { const bad = tomlProblem(before.toString('utf8')); if (bad) return { error: `is not valid TOML (${bad})`, file: e.file }; }
     let after;
     if (e.kind === 'json') {
       const text = before ? before.toString('utf8') : '';
@@ -531,7 +590,8 @@ export function connect(id, { env = process.env, launcher, dryRun = false, platf
   const def = clientDefs(env, launcher, platform, { project: proj, allowTools }).find((d) => d.id === id);
   if (!def) throw new Error(`unknown app: ${id}`);
   const p = plan(def, { project: proj });
-  if (p.error) return { id, name: def.name, status: 'needs-manual', reason: `${p.file} ${p.error}`, file: p.file, problem: p.error };
+  // a file that does not parse is never written: the app is not connected, and the reason names the file and the problem
+  if (p.error) return { id, name: def.name, status: 'needs-manual', failed: true, reason: `${p.file} ${p.error}`, file: p.file, problem: p.error, backups: [] };
   const st = loadState(env);
   const changed = p.changes.filter((c) => !c.before || !c.before.equals(c.after));
   const notes = p.changes.map((c) => (c.e.note ? c.e.note(c.before ? c.before.toString('utf8') : '') : null)).filter(Boolean);
@@ -552,8 +612,14 @@ export function connect(id, { env = process.env, launcher, dryRun = false, platf
   st.connected[id] = { at: now(), mode: def.mode, launcher, project: proj };
   st.declined = st.declined.filter((x) => x !== id);
   saveState(env, st);
-  return { id, name: def.name, status: changed.length ? 'added' : 'already', mode: def.mode, files: changed.map((c) => c.e.file), manual: def.manual || null, note: def.note || null, notes };
+  // each of this app's files Memev has changed, with the copy of what was there first (null when the file did not exist)
+  const backups = p.changes.filter((c) => st.files[c.e.file]).map((c) => ({ file: c.e.file, backup: st.files[c.e.file].backup, existed: st.files[c.e.file].existed }));
+  const res = { id, name: def.name, status: changed.length ? 'added' : 'already', mode: def.mode, files: changed.map((c) => c.e.file), backups, manual: def.manual || null, note: def.note || null, notes };
+  // settings shared with an app no session has yet been seen to load them in: configured, never connected (SR-1.36 T3)
+  return def.unverified || Object.keys(st.connected).some((x) => SHARES[x] === id) ? { ...res, status: 'configured', verified: false } : res;
 }
+// An app whose settings file another app reads too: the ChatGPT desktop app reads the Codex CLI's config.toml.
+const SHARES = { 'chatgpt-desktop': 'codex' };
 
 /** What connect adds to each of an app's files, to paste by hand when Memev cannot edit one: memev connect <app> --print. */
 export function snippets(id, { env = process.env, launcher, platform = process.platform, project = null } = {}) {
@@ -602,6 +668,9 @@ export function disconnect(id, { env = process.env, launcher, decline = true, pl
   const results = [];
   for (const [file, rec] of Object.entries(st.files)) {
     if (rec.client !== id) continue;
+    // a file another connected app reads too (shared settings) stays as it is, and that app keeps its backup
+    const heir = Object.keys(st.connected).find((x) => x !== id && defs.find((d) => d.id === x)?.edits().some((e) => e.file === file));
+    if (heir) { rec.client = heir; results.push({ file, action: `kept for ${heir}, which reads it too` }); continue; }
     const cur = readBytes(file);
     if (cur && sha256(cur) === rec.after_sha && !rec.stale_backup) {
       if (rec.existed) { writeAtomic(file, fs.readFileSync(rec.backup), fs.statSync(file).mode & 0o777); results.push({ file, action: 'restored' }); }
@@ -662,6 +731,7 @@ export const RESTART = {
   cursor: 'Open a new Cursor chat', 'claude-desktop': 'Quit and reopen Claude Desktop', windsurf: 'Quit and reopen Windsurf',
   vscode: 'Reload the VS Code window (Developer: Reload Window)', zed: 'Quit and reopen Zed',
   opencode: 'Quit and reopen OpenCode', 'copilot-cli': 'Start a new Copilot CLI session', 'grok-build': 'Start a new Grok Build session',
+  'chatgpt-desktop': 'Quit and reopen the ChatGPT app',
   'qwen-code': 'Restart Qwen Code in the same project', 'kimi-code': 'Start a new Kimi Code CLI session',
   'factory-droid': 'Nothing to do: Droid reloads mcp.json when it changes', augment: 'Start a new Auggie session (check with /mcp)',
   tabnine: 'Run /mcp reload in Tabnine CLI', iflow: 'Run /mcp refresh in iFlow CLI', warp: 'Open a new Warp agent session',
@@ -684,8 +754,13 @@ export function detect(env = process.env, launcher = 'memev', platform = process
 }
 
 /** Connect every app that is installed and not yet connected (and not declined, unless forced). Apps that are found but not supported yet are left alone. */
+/** When one run configures both apps of a shared settings file, both are reported configured, not only the second. */
+const sharedRun = (res) => {
+  const pair = res.filter((r) => SHARES[r.id] && r.status === 'configured').map((r) => SHARES[r.id]);
+  return res.map((r) => (pair.includes(r.id) && ['added', 'already'].includes(r.status) ? { ...r, status: 'configured', verified: false } : r));
+};
 export function connectAll({ env = process.env, launcher, force = false, platform = process.platform, project = null, allowTools } = {}) {
-  return detect(env, launcher, platform).filter((c) => c.found && c.supported && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform, project, allowTools }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
+  return sharedRun(detect(env, launcher, platform).filter((c) => c.found && c.supported && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform, project, allowTools }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } }));
 }
 
 /** Connect exactly the named apps, in the order given (a repeated name counts once). Every name is checked
@@ -699,11 +774,11 @@ export function connectSelected(ids, { env = process.env, launcher, dryRun = fal
   const known = detect(env, launcher, platform);
   const unknown = list.filter((id) => !known.some((c) => c.id === id));
   if (unknown.length) throw new Error(`unknown app${unknown.length > 1 ? 's' : ''}: ${unknown.join(', ')} (memev clients lists the apps)`);
-  return list.map((id) => {
+  return sharedRun(list.map((id) => {
     const c = known.find((x) => x.id === id);
     if (!c.supported) return { id, name: c.name, status: 'unsupported', reason: c.found ? 'found, not supported yet' : 'not supported yet' };
     try { return connect(id, { env, launcher, dryRun, platform, project, allowTools }); } catch (e) { return { id, name: c.name, status: 'failed', reason: e.message }; }
-  });
+  }));
 }
 
 export function launcherPath(env = process.env) { return path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev'); }
@@ -727,6 +802,7 @@ export async function command(cmd, pos, flags, { env, root }) {
   if (cmd === 'connect') {
     if (target !== 'all' && target !== 'several') {
       const c = detect(env, launcher).find((x) => x.id === target);
+      if (c && !c.supported && flags.json) { console.log(JSON.stringify({ apps: [{ id: c.id, name: c.name, status: 'unsupported', files: [], backups: [], seat: null, restart: null, detail: c.manual || 'not supported yet' }], operator: null, seats: [] }, null, 2)); return 0; }
       if (c && !c.supported) { out.info(`${c.name}: ${c.found ? 'found, ' : ''}not supported yet${c.manual ? `; ${c.manual}` : ''} (see docs/CLIENTS.md to ask for it)`); return 0; }
     }
     // memev connect claude-code cursor vscode: exactly those apps, checked before anything changes
@@ -741,6 +817,16 @@ export async function command(cmd, pos, flags, { env, root }) {
     const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, project: flags.project, allowTools })
       : target === 'several' ? connectSelected(pos, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project, allowTools })
       : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project, allowTools })];
+    const code = res.some((r) => r.status === 'failed' || r.failed || (target !== 'all' && r.status === 'needs-manual')) ? 1 : 0;
+    if (flags.json) {
+      // one JSON object and nothing else: each app's outcome, files, backups, seat and restart line, and the lead
+      const ids = res.filter((r) => ['added', 'already', 'configured'].includes(r.status)).map((r) => r.id);
+      const bus = ids.length && !flags['dry-run'] ? await seatOnBus({ root, env, ids, flags, quiet: true }) : { seats: [], operator: null, problems: [] };
+      const { label } = await import('../engine/bus.mjs');
+      const seatOf = (id) => (bus.seats || []).find((x) => x.split('@')[0] === label(id)) || null;
+      console.log(JSON.stringify({ apps: res.map((r) => ({ id: r.id, name: r.name, status: r.failed ? 'failed' : r.status, ...(r.verified === false ? { verified: false } : {}), files: r.files || [], backups: r.backups || [], seat: seatOf(r.id), restart: RESTART[r.id] || `Restart ${r.name}`, ...(r.reason ? { detail: r.reason } : {}), ...(r.manual ? { manual: r.manual } : {}) })), operator: bus.operator || null, seats: bus.seats || [], ...(bus.problems?.length ? { problems: bus.problems } : {}) }, null, 2));
+      return code;
+    }
     if (!res.length) {
       const unsup = detect(env, launcher).filter((c) => c.found && !c.supported);
       if (unsup.length) { console.log(`Found ${unsup.map((c) => c.name).join(', ')} but Memev does not support ${unsup.length > 1 ? 'them' : 'it'} yet (see docs/CLIENTS.md to ask for it).`); return 0; }
@@ -748,6 +834,7 @@ export async function command(cmd, pos, flags, { env, root }) {
     if (!res.length) console.log('No AI apps found. Install one (Codex, Cursor, Gemini CLI, Windsurf, VS Code, Zed, OpenCode, GitHub Copilot CLI, Grok Build, a Claude product, or another app in docs/CLIENTS.md) and run memev connect again.');
     for (const r of res) {
       if (r.status === 'added') out.ok(`${r.name}: connected (${r.mode === 'hooks' ? 'hooks + MCP + instructions' : 'MCP + instructions'})`);
+      else if (r.status === 'configured') out.info(`${r.name}: configured, not yet seen to load it (it shares its settings; a session shows whether it does)`);
       else if (r.status === 'already') out.ok(`${r.name}: already connected`);
       else if (r.status === 'would-change') out.info(`${r.name}: would change ${r.files.join(', ') || 'nothing'}`);
       else if (r.status === 'unsupported') out.info(`${r.name}: ${r.reason} (see docs/CLIENTS.md to ask for it)`);
@@ -756,7 +843,7 @@ export async function command(cmd, pos, flags, { env, root }) {
       if (r.manual) out.warn(r.manual);
       for (const n of r.notes || []) out.warn(n);
     }
-    const ids = res.filter((r) => ['added', 'already'].includes(r.status)).map((r) => r.id);
+    const ids = res.filter((r) => ['added', 'already', 'configured'].includes(r.status)).map((r) => r.id);
     if (ids.length && !flags['dry-run']) await seatOnBus({ root, env, ids, flags });
     // connecting every app is what the background connect does, so asking for it turns that back on after memev init --no-connect;
     // memev connect <app> leaves it off, so one yes connects one app (issue 284)
@@ -764,7 +851,7 @@ export async function command(cmd, pos, flags, { env, root }) {
       const f = path.join(root, '.memev', 'config.json'); const c = readJson(f, null);
       if (c?.clients?.auto_connect === false) { delete c.clients.auto_connect; writeJson(f, c, 0o600); out.info('Memev connects AI apps it finds from now on (memev init --no-connect had turned that off)'); }
     }
-    return res.some((r) => r.status === 'failed' || (target !== 'all' && r.status === 'needs-manual')) ? 1 : 0;
+    return code;
   }
   if (cmd === 'disconnect' || cmd === 'uninstall') {
     const st = loadState(env);
@@ -782,21 +869,26 @@ export async function command(cmd, pos, flags, { env, root }) {
   return 2;
 }
 
-/** After connect: each app gets its seat on the comms bus straight away (here, or on the vault this computer joined). */
-async function seatOnBus({ root, env, ids, flags }) {
+/**
+ * After connect: each app gets its seat on the comms bus straight away (here, or on the vault this computer joined), so
+ * it can be chosen as the lead before its first session. Returns the seats and the lead; quiet prints nothing.
+ */
+async function seatOnBus({ root, env, ids, flags, quiet = false }) {
   const { isVault } = await import('../engine/vault.mjs');
+  const say = quiet ? { ok() {}, bad() {}, warn() {} } : out;
   try {
     if (root && isVault(root)) {
       const bus = await import('./bus-cli.mjs');
-      const r = await bus.setupBus({ root, env, clients: ids, flags });
-      if (r.ok) out.ok(`on the comms bus: ${r.seats.join(', ')} (each joins on its first session)`); else out.bad(`comms bus: ${r.problems.join('; ')}`);
-      for (const n of r.notes || []) out.warn(n);
-      if (r.operator) out.ok(`${r.operator} leads the others`); else out.warn(bus.LEAD_LATER);
-      return;
+      const r = await bus.setupBus({ root, env, clients: ids, flags, ...(quiet ? { ask: false } : {}) });
+      if (r.ok) say.ok(`on the comms bus: ${r.seats.join(', ')} (each joins on its first session)`); else say.bad(`comms bus: ${r.problems.join('; ')}`);
+      for (const n of r.notes || []) say.warn(n);
+      if (r.operator) say.ok(`${r.operator} leads the others`); else say.warn(bus.LEAD_LATER);
+      return { seats: r.seats, operator: r.operator, problems: r.problems };
     }
     const { loadRemote, remoteFetch } = await import('./remote.mjs');
-    const remote = loadRemote(env); if (!remote) return;
+    const remote = loadRemote(env); if (!remote) return { seats: [], operator: null, problems: [] };
     const b = await remoteFetch(remote, 'v1/bus-register', { body: { clients: ids }, env });
-    if (b.ok) out.ok(`on the comms bus: ${b.json.seats.join(', ')}`); else out.bad(`comms bus: the vault answered ${b.status}`);
-  } catch (e) { out.bad(`comms bus: ${e.message}`); }
+    if (b.ok) say.ok(`on the comms bus: ${b.json.seats.join(', ')}`); else say.bad(`comms bus: the vault answered ${b.status}`);
+    return b.ok ? { seats: b.json.seats, operator: b.json.operator || null, problems: [] } : { seats: [], operator: null, problems: [`the vault answered ${b.status}`] };
+  } catch (e) { say.bad(`comms bus: ${e.message}`); return { seats: [], operator: null, problems: [e.message] }; }
 }

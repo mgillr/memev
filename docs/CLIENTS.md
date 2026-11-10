@@ -27,6 +27,36 @@ background connect back on.
 | OpenCode | `mcp` entry in `~/.config/opencode/opencode.json`; a block in the OpenCode rules file (skipped if the Claude rules file exists and the OpenCode one is missing) | instructions |
 | GitHub Copilot CLI | `mcpServers` entry in `~/.copilot/mcp-config.json` and a block in `~/.copilot/copilot-instructions.md` (in `$COPILOT_HOME` when it is set) | instructions |
 | Grok Build | `[mcp_servers.memev]` (stdio: `command`, `args`) in `~/.grok/config.toml`; a table the user already has is left as-is | instructions |
+| ChatGPT (desktop) | the same `[mcp_servers.memev]` table in `~/.codex/config.toml` the Codex CLI reads; reported **configured**, not connected, until a session shows the app loads it | instructions |
+
+The Claude desktop app installed from the Microsoft Store (an MSIX package, `%LOCALAPPDATA%\Packages\Claude_*`)
+reads a copy of its settings inside that package, so there Memev changes
+`%LOCALAPPDATA%\Packages\Claude_<id>\LocalCache\Roaming\Claude\claude_desktop_config.json`, creating the folders
+when they are missing, and leaves `%APPDATA%\Claude` alone. Without the package it changes `%APPDATA%\Claude` as before.
+
+The ChatGPT desktop app and the Codex CLI share one settings file. Memev writes one table for both, and when one of
+them is disconnected while the other is still connected the table stays and the backup moves to the other app.
+
+### Finding apps: `memev discover`
+
+`memev discover` (`--json` for one JSON object) lists every app Memev knows, found or not, and how it was found:
+`registry` (Windows Uninstall entries in HKCU, HKLM and HKLM WOW6432Node: only `DisplayName`, `DisplayVersion`,
+`InstallLocation` and `DisplayIcon`; a blank `InstallLocation` falls back to the folder of `DisplayIcon`, then to the
+app's known folders), `msix` (a package folder name in `%LOCALAPPDATA%\Packages`), `folder` (under Local, Roaming or
+`~/Library/Application Support`), `app-bundle` (`/Applications` or `~/Applications`), `desktop-file` (a Linux `.desktop`
+file), `path` (a command on `PATH`; a folder of that name does not count) or `config` (the folder `memev connect` already
+looked for). Each app has `id`, `name`, `found`, `evidence`, `install_path`, `automation` (`auto`: Memev connects it;
+`one-step`: one step by hand, given in `step`; `none`: found, cannot be connected) and `step`.
+
+Discovery reads names only. It never runs an app and never opens a file; the one process it starts is the system
+`C:\Windows\System32\reg.exe`, once per hive, without a shell and with a time limit. A hive that times out is listed in
+`problems` and the folders and `PATH` are still searched. A link counts only when it resolves inside the folders searched
+and not into an app's data folder (a dot folder in your home, Roaming, Application Support).
+`MEMEV_SYSTEM_APPS` and `MEMEV_SYSTEM_DESKTOP` move the system Applications and `.desktop` folders (for tests).
+
+Every file `memev connect` changes is copied first; `memev connect --json` lists each app's `status`, `files`,
+`backups` (each file with its copy, or `null` when the file did not exist), `seat` and `restart`, and the bus `operator`.
+A JSON or TOML file that does not parse is never written: the app's status is `failed` with the reason.
 
 More apps, each at the path and key its own MCP docs give. `~` is your home folder (`%USERPROFILE%` on
 Windows). Where the docs name no Windows location, Memev connects the app on macOS and Linux only; on
@@ -117,6 +147,8 @@ the next one. Each lookup folder is the one the app's own docs name.
 | Lingma | `~/.lingma` | MCP servers are added through a JSON form in the IDE; the file is not named | [MCP](https://www.alibabacloud.com/help/en/lingma/user-guide/guide-for-using-mcp) |
 | Rovo Dev CLI | `~/.rovodev` | two vendor pages name different files (`mcp.json` and `mcp_config.json`) | [MCP](https://support.atlassian.com/rovo/docs/connect-to-an-mcp-server-in-rovo-dev-cli/), [settings](https://support.atlassian.com/rovo/docs/manage-rovo-dev-cli-settings) |
 | Crush | `~/.config/crush` | the config is now a `crushrc` file of command lines; the JSON form is deprecated | [README](https://github.com/charmbracelet/crush) |
+| Grok Bot | `~/.grokbot`; Windows `%LOCALAPPDATA%\Programs\Grok Bot`, `%APPDATA%\Grok Bot`, the Uninstall entry `Grok Bot`; macOS `/Applications` or `~/Applications/Grok Bot.app`, `~/Library/Application Support/Grok Bot` (names only, never read) | how it takes a local MCP server is not documented (8 Nov 2026): one step by hand, adding a custom MCP connector with the address `memev discover` shows | none yet |
+| Microsoft Copilot | the MSIX package `Microsoft.Copilot_*`, the Uninstall entry `Microsoft Copilot` | it has no setting for a local MCP server | none |
 
 On Windows, the apps above marked "not documented" in the Windows column are listed here too, as found,
 not supported yet, until their docs name a Windows location.
