@@ -1,0 +1,348 @@
+{
+  "title": "PG-W-21D Device pairing and recovery: a one-tap signed act pairs a new device at low trust, and a lost device is recovered through the owner's recovery key or an operator re-grant (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Contract PG-W-21D in memev: device pairing and recovery under ADR 8 (trust governance), work package WP21-D1. Unsigned: a spec proposed for red-team review. ORIGIN. The owner answered ADR 8 on 1 Nov 2026. Question 3: the owner's new device has low trust, raised by a one-tap from a trusted device, else zero. Clarification 1: no trust record in personal scope; low trust means contribute-only at required verification 1, in the owner's organisational scopes only, never above the owner. Clarification 2: the one-tap is the person's signed act and records the approving device; a lost device is recovered through the owner's recovery key or an operator re-grant. This contract builds that act and that recovery as one new module and changes no existing one. WHAT IT BUILDS. (1) src/engine/federation/pairing.mjs: a pairing request from the new device (its subject id, its Ed25519 public key, its owner, the one-time invite it redeemed); a deterministic low-trust derivation from the owner's identity document (purposes exactly contribute, required verification 1, scopes only the organisational scopes where the owner holds a live membership, an expiry no later than any of those memberships and no later than 90 days); a one-tap approval, which is the person's signature, in the namespace memev-pairing, over the request hash, the scopes, the approving device and a short expiry; the check of that approval; and pairDevice, which redeems the invite and enrols the computer through the existing code of src/engine/devices.mjs (redeemInvite, DeviceRegistry.enroll, with its seat policy unchanged), appends audit events to the operation log and hands the derived grant proposal to the trust book of PG-W-21B. (2) Recovery: a person's recovery key, a key of the person subject whose id is recovery or starts with recovery-, signs the same approval for the same low trust without any trusted device; an operator re-grant is the same approval signed by an operator subject of the organisation scope, limited to that scope; losing a device revokes it through DeviceRegistry.revoke and asks the trust book to revoke what it was granted. WHAT IT REUSES AND DOES NOT CHANGE. src/engine/identity.mjs (subject, scope and membership validation, resolveActor, isResolvedActor) and src/engine/devices.mjs (the registry, the invite, the device key and its proof) are reused unchanged: the contract adds no second identity model and no second device registry. The trusted device is the vault host (the registry device of kind host); a paired device is low trust and can approve nothing, so there is no chain. Enrolment alone (redeemInvite as today) gives a device no trust record: that is the zero of Question 3. Personal vault sync for a device goes on through its existing token and seat and is not a trust record. BOUNDARIES. (a) The trust record format (signature block, required verification level, reserved delegation, root records with succession, the personal-scope rule) is PG-W-21A.2 and the book that writes and revokes grants (only a person or operator, signed and logged, GRANT_AUTHORITY provisional under ADR 5) is the amended PG-W-21B; both are cited by id and not repeated. This contract hands the book a grant proposal { subject, scopes, purposes, required_verification, expires } and a resolved actor, and the book writes the record in the format of PG-W-21A.2. The book interface used here (grant and revoke with a resolved actor) is the one of PG-W-21B and is aligned with its amendment before signing. (b) Revocation notices and their push are not here (PG-W-21C and PG-W-21G belong to another author). (c) Entitlement is not here: pairing your own devices is local trust and free; seats stay the existing seat policy (Free: this computer; Personal at $12/month or $120/year for up to 3 computers; Business and Corporate by contacting us); PG-W-21E gates multi-site and cross-organisation use. (d) The topology of work breakdown row 1.3.6 stays OPEN; ADR 3, ADR 5, ADR 7 and SO-A-05 stay open and nothing here decides them; raising a device above low trust is not a pairing act and is an ordinary grant of the trust book. Depends on contracts: PG-W-21A.2 (unsigned, proposed in parallel), SO-F-01 (built), and the amended PG-W-21B for the book. Base revision: 4db303071c67c32e2e5b3ecd508a10748b5b5a34, the memev main commit this spec was written against and the commit the red runs are judged at. The tests reach the module by namespace import() inside each test with typeof asserts, so a missing export fails on an assertion and not at load. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository; tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "A new device is paired at low trust by a one-tap signed act of the person, from the trusted device, and has no trust until then",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "src/engine/federation/pairing.mjs (new) exports PAIRING_NAMESPACE (memev-pairing), REQUEST_SCHEMA (memev-pairing-request/1), APPROVAL_SCHEMA (memev-pairing-approval/1), LOW_TRUST (frozen: purposes ['contribute'], required_verification 1), APPROVAL_TTL_SECONDS (900), DEVICE_GRANT_MAX_DAYS (90), requestPairing, requestHash, deriveLowTrust, approvePairing, verifyApproval and pairDevice; no function throws on bad input, each returns { ok: false, code, reason } instead",
+        "requestPairing validates the device subject id (a device subject of src/engine/identity.mjs, through validateSubject), the owner (a person subject), the device public key (through publicKeyFrom of src/engine/devices.mjs, so only an Ed25519 key passes) and the invite id; requestHash is the SHA-256 of the canonical text of the request and is the same for equal requests (source: validateSubject in src/engine/identity.mjs, publicKeyFrom in src/engine/devices.mjs)",
+        "deriveLowTrust({ request, identity, scopes, at, days }) is pure: the grantable scopes are the scopes of the identity document that are not personal and where the owner has a membership that is live at the time; a requested scope outside them (a personal scope, a scope the owner has no live membership in) is refused with above_owner; with none requested all of them are taken; purposes are exactly contribute, the required verification is exactly 1, the expiry is the earliest of the time plus days (at most DEVICE_GRANT_MAX_DAYS), and the expiry of each membership used; an owner who is revoked or expired gets a refusal; an owner with only a personal scope gets an ok result with no scopes, which is zero trust (source: authorizeScope and validateMembership in src/engine/identity.mjs; PG-W-21A.2 personal-scope rule)",
+        "approvePairing makes the approval { schema, request_hash, person, approved_device, via 'one_tap', scopes, approved_at, expires_at, signature } and signs it with the person's key through a sign function the caller gives (signNamespaced of src/engine/agentid-bind.mjs in the namespace memev-pairing); verifyApproval checks, with a replaceable verifier, that the person is the owner of the request, that the signature verifies with a live key of that person in the identity document, that request_hash is the hash of the request given, that the approval has not expired, that the scopes are within deriveLowTrust, and that approved_device is the trusted device; a changed field, another request, another person's key, an agent, service or device key, an expired approval and a paired low-trust device as approver are each refused with their own code",
+        "the trusted device is the vault host: the registry device of kind host and status active, owned by the same person; a device that was itself paired has low trust and approves nothing, so there is no chain of approvals (decision for the red-team: an owner-designated trusted device is the alternative and is not built here)",
+        "pairDevice({ root, tokens, code, request, approval, identity, log, book, actor, at, verify, policy }) refuses a pairing with no approval (nothing is enrolled and nothing is logged), then redeems the invite and enrols the computer through redeemInvite and DeviceRegistry.enroll of src/engine/devices.mjs, which keep their one-time, expiry and seat rules (a full seat policy refuses with the code seats and leaves nothing logged and no grant); an approval is single use, which the log shows; after enrolment it appends federation.pairing.approved to the operation log with the request hash, the device, the person, the approving device, the scopes, the purposes, the level and the expiry, and no invite secret, token, private key or public key; it then calls book.grant once for each scope with the proposal and the resolved actor of the person (isResolvedActor of src/engine/identity.mjs), never for a personal scope; a book that refuses leaves the device enrolled with no trust and appends federation.pairing.refused with the code",
+        "enrolment alone (redeemInvite as it is today) records no pairing event and gives no grant: the device has zero trust until a pairing approval is made; a paired device keeps using its existing token, scope and seat for the personal vault, which is not a trust record",
+        "src/engine/identity.mjs, src/engine/devices.mjs, src/engine/entitlements.mjs, src/engine/license.mjs and every other file of src/engine/federation are not changed; pairing.mjs imports identity.mjs, devices.mjs and agentid-bind.mjs and defines no identity model, no device registry and no key parser of its own; each red-green criterion runs only its own subtest whose name starts with T1-cNN: (source: the convention of SR-0.03.3 T1 requirement 8)"
+      ],
+      "description": "Repo: memev. The fixtures are an identity document with a person, a host device, a new device, an operator and two scopes (one organisational scope with a live membership, one personal), a DeviceRegistry and TokenStore in a temporary directory, a vault OpLog, a fake trust book { grant, revoke } that records its calls, and a fake sign and verify pair that hashes the signed message so a test sees what a signature covers, with one real ssh-keygen round trip. A stand-in of every subtest was run read-only at the base: each fails on ERR_ASSERTION, none on a load error or a TypeError.",
+      "scope": [
+        "src/engine/federation/pairing.mjs",
+        "test/pairing.test.mjs",
+        "docs/IDENTITY-AND-SCOPES.md",
+        "docs/MODULES.md",
+        "changelog.d/PG-W-21D.md",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "pairing.mjs exports PAIRING_NAMESPACE (memev-pairing), REQUEST_SCHEMA, APPROVAL_SCHEMA, LOW_TRUST (frozen, purposes exactly ['contribute'], required_verification 1), APPROVAL_TTL_SECONDS 900, DEVICE_GRANT_MAX_DAYS 90, requestPairing, requestHash, deriveLowTrust, approvePairing, verifyApproval and pairDevice; requestPairing accepts a device subject, a person owner, an Ed25519 key and an invite id and refuses a non-device subject, a non-person owner, a key that is not Ed25519 and a missing invite, with ok false and a code and without throwing; requestHash is the same for equal requests and differs for any changed field. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pairing.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/pairing.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "deriveLowTrust gives purposes exactly ['contribute'] and required_verification 1, the owner's organisational scopes with a live membership and nothing else; a requested personal scope or a scope the owner has no live membership in is refused with above_owner; an expired or revoked membership is left out; the expiry is the earliest of the time plus the days (at most 90 days whatever days is) and the expiry of every membership used; an owner who is revoked or expired is refused; an owner with only a personal scope gets ok true and no scopes (zero trust); the function reads no clock, file or network. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pairing.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/pairing.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The one-tap is the person's signed act: approvePairing makes an approval of schema memev-pairing-approval/1 with via one_tap that names the request hash, the person, the approving device, the scopes and an expiry 900 seconds after the approval, signed in the namespace memev-pairing; verifyApproval accepts it, and refuses with its own code a changed request_hash, scope, person or approving device, the signature of another person's key, the key of an agent, service or device subject, an approval past its expiry, and an approval made for another request. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pairing.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/pairing.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Only the trusted device approves: with the vault host as approving device the approval verifies; with a device that was itself paired (low trust), a device of another owner, an unknown device, a revoked device or no device it is refused with its own code, so there is no chain of approvals. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pairing.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/pairing.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "pairDevice reuses the existing device code and is atomic: with a valid approval it redeems the invite and enrols the computer through DeviceRegistry.enroll (the device is active, of kind remote-computer, with its public key, and the invite is marked used); with no approval nothing is enrolled and nothing is logged; with an expired or already used invite, or a seat policy that is full, it is refused (the code seats for the seat policy) and nothing is logged and no grant is made; an approval used once is refused the second time; enrolment alone through redeemInvite records no pairing event and no grant. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pairing.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/pairing.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "pairDevice appends federation.pairing.approved with the request hash, the device, the person, the approving device, the scopes, the purposes, the level and the expiry, and the event holds no invite secret, token, private key or public key; the fake book receives exactly one grant call for each derived scope with purposes ['contribute'], required_verification 1 and the resolved actor of the person, and never a call for a personal scope or for the purpose verify; a book that refuses leaves the device enrolled with no trust and appends federation.pairing.refused with the code; an actor that is not a resolved actor is refused before any call. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pairing.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/pairing.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "src/engine/identity.mjs, src/engine/devices.mjs, src/engine/entitlements.mjs, src/engine/license.mjs and every file of src/engine/federation are unchanged by this task, only src/engine/federation/pairing.mjs is added under src, pairing.mjs imports identity.mjs and devices.mjs and has no class or function of its own that parses a key or keeps a device list, and the test has no static import of the module under test",
+          "verifier": {
+            "type": "command",
+            "cmd": "git diff --quiet \"$MEMEV_CONTRACT_BASE\" HEAD -- src/engine/identity.mjs src/engine/devices.mjs src/engine/entitlements.mjs src/engine/license.mjs src/engine/federation/admission.mjs src/engine/federation/contribution.mjs src/engine/federation/membership.mjs src/engine/federation/policy.mjs && test -z \"$(git diff --name-only \"$MEMEV_CONTRACT_BASE\" HEAD -- src scripts vendor | grep -vx src/engine/federation/pairing.mjs)\" && ! grep -Eq \"^import .*src/engine\" test/pairing.test.mjs && grep -Eq \"from '\\.\\./identity\\.mjs'\" src/engine/federation/pairing.mjs && grep -Eq \"from '\\.\\./devices\\.mjs'\" src/engine/federation/pairing.mjs && ! grep -Eq 'class [A-Za-z]*(Registry|Store)|createPublicKey' src/engine/federation/pairing.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "One full run of test/pairing.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c04, T1-c05, T1-c06) with nothing skipped and nothing todo, and prints its whole output.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/pairing.test.mjs > \"$f\" 2>&1; rc=$?; cat \"$f\"; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c01:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c02:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c03:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c04:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c05:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c06:' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "docs/IDENTITY-AND-SCOPES.md describes pairing a new device: the one-tap signed act that records the approving device, low trust (contribute only at required verification 1, in the owner's organisational scopes, never above the owner), zero trust without it and no trust record in a personal scope",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/IDENTITY-AND-SCOPES.md",
+            "pattern": "pairing.*one-tap.*(signed act|person.s signature).*approving device.*(low trust|contribute).*required verification 1.*(zero|no trust record).*personal",
+            "flags": "is"
+          }
+        },
+        {
+          "statement": "docs/MODULES.md lists src/engine/federation/pairing.mjs (the module map is written by node scripts/docs/module-graph.mjs)",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/MODULES.md",
+            "pattern": "src/engine/federation/pairing\\.mjs",
+            "flags": ""
+          }
+        },
+        {
+          "statement": "The module map is current",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/docs/module-graph.mjs --check",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "This contract is drafted with the memev checkout as its workdir and a pinned base. The workdir is the checkout top level (git rev-parse --show-toplevel equals the working directory). The base is 4db303071c67c32e2e5b3ecd508a10748b5b5a34, the memev main commit this spec was written against and the commit the red runs are judged at; src/engine/devices.mjs exists at it",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$MEMEV_CONTRACT_BASE\" = 4db303071c67c32e2e5b3ecd508a10748b5b5a34 ] && [ \"$(git rev-parse --show-toplevel)\" = \"$(pwd -P)\" ] && git cat-file -e \"$MEMEV_CONTRACT_BASE:src/engine/devices.mjs\"",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "Anything outside the requirements of this task is not built, not stubbed and not defaulted in code; if the work seems to need it, stop and report what it needs.",
+        "A test_red_green command of this contract prints its whole output: it is never piped through tail or head, and never captures its output without printing it.",
+        "Stop and ask when the work would decide ADR 3, ADR 5, ADR 7 or SO-A-05, add a role-by-action matrix, pick the topology of work breakdown row 1.3.6, or touch the licence terms, the tier prices or the crdt-merge terms.",
+        "Stop and ask when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would edit a signed spec or a signed contract: a signed id is superseded by a new id, never edited.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently.",
+        "Stop and ask when the work would change src/engine/identity.mjs or src/engine/devices.mjs, add a second identity model or device registry, or add a field to a licence or to a key.",
+        "Stop and ask when the work would write a trust record itself instead of handing a proposal and a resolved actor to the trust book, or would give any device a trust record in a personal scope."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "A lost device is revoked, and a replacement is paired through the owner's recovery key or an operator re-grant at the same low trust",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "recoveryKeyOf(identity, person) returns the live keys of the person subject whose id is recovery or starts with recovery- (a naming convention, because the key schema of src/engine/identity.mjs has no use field and is not changed); approveWithRecoveryKey makes the approval of T1 with via recovery_key and approved_device null, signed with a recovery key, for the same low trust and no more; verifyApproval accepts it with no trusted device present, and refuses a recovery key that is revoked or expired, an ordinary key of the person on this path, a recovery key on the one_tap path, and any key of another person",
+        "approveAsOperator makes the approval of T1 with via operator, signed by a subject of type operator that has a live membership in every scope it grants; the scopes are limited to the scopes of that operator that the owner is also a member of; a personal scope, a scope outside the operator's membership, and a signer that is a person, agent, service, device or node are refused; the result is the same low trust of T1 and nothing higher",
+        "no recovery path raises trust: every approval, whatever its via, derives exactly LOW_TRUST (purposes contribute, required verification 1) within the owner's organisational scopes and no more; an approval of any via is single use and expires after APPROVAL_TTL_SECONDS; raising a device above low trust is an ordinary grant of the trust book (PG-W-21B) and not a pairing act",
+        "revokeDevice({ registry, tokens, deviceId, by, reason, log, book, actor, at }) revokes the device through DeviceRegistry.revoke of src/engine/devices.mjs (its token stops and its seat is free), appends federation.pairing.revoked with the device, who revoked it and the reason, and calls book.revoke once for each scope the log shows was granted to the device, with the reason; the reason is one of compromised, left and error and defaults to compromised (the marking of earlier work from a revoked source is the overlay of PG-W-21B and is not built here); the host device and an unknown device are refused; a book that refuses is reported and does not undo the device revocation",
+        "pairDevice of T1 accepts an approval of any of the three vias and pairs the replacement the same way; recovery paths are logged with their via in federation.pairing.approved and add no other event type; the new device of a recovery is paired through a new invite, never through the credentials of the lost one",
+        "docs/IDENTITY-AND-SCOPES.md describes the recovery key convention, the operator re-grant, the revocation of a lost device and that none of them raises trust; the files of T1 stay as they are apart from pairing.mjs, its test, the docs and the module map; each red-green criterion runs only its own subtest whose name starts with T2-cNN:"
+      ],
+      "description": "Repo: memev. Builds on T1 and uses its fixtures, with a recovery key and an ordinary key on the person subject, an operator subject with a membership in one of two organisational scopes, and a lost device that was paired earlier. A stand-in of every subtest was run read-only at the base: each fails on ERR_ASSERTION.",
+      "scope": [
+        "src/engine/federation/pairing.mjs",
+        "test/pairing.test.mjs",
+        "docs/IDENTITY-AND-SCOPES.md",
+        "docs/MODULES.md",
+        "changelog.d/PG-W-21D.md",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Recovery by the owner's recovery key: recoveryKeyOf, approveWithRecoveryKey and approveAsOperator are exported from pairing.mjs; a recovery key (a person key whose id is recovery or starts with recovery-) signs an approval with via recovery_key and no approving device that verifyApproval accepts with no trusted device present, for exactly the low trust of T1; a revoked or expired recovery key, an ordinary key of the person on this path, a recovery key on the one_tap path and the recovery key of another person are each refused with their own code. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pairing.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/pairing.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Recovery by an operator re-grant: an approval with via operator signed by an operator subject with a live membership in the scopes it grants is accepted for those scopes only and for exactly the low trust of T1; a personal scope, a scope outside the operator's membership, and a signer of type person, agent, service, device or node are refused with their own code. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pairing.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c02:' test/pairing.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "No recovery raises trust, and an approval is single use and short lived: for each via the derived grant is exactly purposes ['contribute'] and required_verification 1 in organisational scopes the owner is a member of, never the purpose verify, never a personal scope; an approval used once is refused again, and one past its 900 seconds is refused; a replacement paired by recovery is enrolled through a new invite and the credentials of the lost device are not reused. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pairing.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c03:' test/pairing.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Losing a device: revokeDevice revokes it through DeviceRegistry.revoke (its token no longer verifies, its seat is free so a replacement can be enrolled under the same seat policy), appends federation.pairing.revoked with the device, who revoked it and the reason, and calls book.revoke once for each scope the log shows was granted to it with the reason; the reason is one of compromised, left or error and defaults to compromised; the host and an unknown device are refused; a book that refuses is reported and the device stays revoked. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pairing.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c04:' test/pairing.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The audit of recovery: federation.pairing.approved carries the via of each path and federation.pairing.revoked the reason, no other event type is added, and no event holds an invite secret, token, private key, recovery key or signature material beyond the request hash and the approval hash. The test fails before the change on an assertion, not on a load error or a TypeError, and passes after.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pairing.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c05:' test/pairing.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/pairing.test.mjs passes every labelled subtest (T2-c01, T2-c02, T2-c03, T2-c04, T2-c05) with nothing skipped and nothing todo, and prints its whole output.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/pairing.test.mjs > \"$f\" 2>&1; rc=$?; cat \"$f\"; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T2-c01:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T2-c02:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T2-c03:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T2-c04:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T2-c05:' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "docs/IDENTITY-AND-SCOPES.md describes the recovery key, the operator re-grant, the revocation of a lost device and that none of them raises trust",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/IDENTITY-AND-SCOPES.md",
+            "pattern": "recovery key.*(recovery-|id is recovery).*operator re-grant.*(lost device|revokes? it).*(none of them raises|no recovery raises|never above low trust)",
+            "flags": "is"
+          }
+        },
+        {
+          "statement": "T1 is untouched in behaviour: the T1 subtests of the same file still pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^T1-c' test/pairing.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "Anything outside the requirements of this task is not built, not stubbed and not defaulted in code; if the work seems to need it, stop and report what it needs.",
+        "A test_red_green command of this contract prints its whole output: it is never piped through tail or head, and never captures its output without printing it.",
+        "Stop and ask when the work would decide ADR 3, ADR 5, ADR 7 or SO-A-05, add a role-by-action matrix, pick the topology of work breakdown row 1.3.6, or touch the licence terms, the tier prices or the crdt-merge terms.",
+        "Stop and ask when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would edit a signed spec or a signed contract: a signed id is superseded by a new id, never edited.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently.",
+        "Stop and ask when the work would change the key schema of src/engine/identity.mjs to mark a recovery key, or when a recovery path would grant more than low trust."
+      ]
+    }
+  ]
+}
