@@ -1519,6 +1519,46 @@
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
+      "id": "PG-W-21F",
+      "type": "programme work package",
+      "area": "PG-W",
+      "title": "Trust proposal step: agents propose a grant or revocation as a decision, the person or operator answers, and the signed answer is the only way a trust record is written (memev, provisional under ADR 5)",
+      "repo": "memev",
+      "programme_tasks": "WP21-F1 (a gap named by the owner's answers on ADR 8 of 1 Nov 2026; proposed 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SO-A-05",
+          "boundary": "owns the decision workflow and its seven states; PG-W-21F uses raised, approved, rejected and deferred by name and defines none; the SO-A-05 build must be in the tree first"
+        },
+        {
+          "contract": "PG-W-21A.2",
+          "boundary": "owns the trust record and its validator, used here without writing"
+        },
+        {
+          "contract": "PG-W-21B",
+          "boundary": "owns the trust book and GRANT_AUTHORITY, which is provisional under ADR 5 and reused here and not repeated; the proposal step is its only caller on the answer of a person or operator"
+        },
+        {
+          "contract": "PG-W-21D",
+          "boundary": "device pairing is a person's signed act on its own path and does not use this step"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SO-A-05 (the decision entity and queue), PG-W-21B (the book) and src/engine/identity.mjs (resolveActor, isResolvedActor) are the build layer, cited by id; this spec adds only the proposal module, two decision kinds and their test",
+      "depends_on": [
+        "SO-A-05",
+        "PG-W-21A.2",
+        "PG-W-21B"
+      ],
+      "tasks": 1,
+      "criteria": 22,
+      "spec": "specs/PG-W-21F.json",
+      "base": "4db303071c67c32e2e5b3ecd508a10748b5b5a34 (the memev main commit this spec was written against)",
+      "status": "proposed, unsigned; no red-team record; the base is recorded; provisional under ADR 5; depends on the build of SO-A-05 and the amended PG-W-21B; the topology of work breakdown row 1.3.6, ADR 3, ADR 5, ADR 7 and SO-A-05 stay open",
+      "kind": "feature"
+    },
+    {
       "id": "SR-0.03.3",
       "type": "superseding spec (version 3 of SR-0.03)",
       "area": "SR-0",
