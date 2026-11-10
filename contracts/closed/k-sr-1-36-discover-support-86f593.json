@@ -1,0 +1,413 @@
+{
+  "id": "k-sr-1-36-discover-support-86f593",
+  "ok": true,
+  "verdict": "PASS",
+  "signature": "signature matches",
+  "verified": "2026-11-10T07:44:26.539Z",
+  "passed": 8,
+  "total": 8,
+  "behaviour": {
+    "passed": 39,
+    "total": 39
+  },
+  "documents": {
+    "passed": 0,
+    "total": 0
+  },
+  "remaining": [],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Discovery finds every supported client on Windows, macOS and Linux",
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "statement": "T1-c01: src/cli/discover.mjs exists and a faked HKCU Uninstall entry DisplayName 'Grok Bot' with a blank InstallLocation and a DisplayIcon under %LOCALAPPDATA%\\Programs\\Grok Bot gives grok-bot found with install_path that folder",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T1-AC02",
+          "statement": "T1-c02: a faked HKLM WOW6432Node entry 'Microsoft Copilot' is found and reported with automation none",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T1-AC03",
+          "statement": "T1-c03: a %LOCALAPPDATA%\\Packages\\Claude_pzs8sxrjxfjjc folder alone makes claude-desktop found with evidence msix (the family suffix is an example fixture, not laptop evidence; the laptop showed only 'Appx: Claude 4.23118.0.0')",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T1-AC04",
+          "statement": "T1-c04: on darwin, /Applications/ChatGPT.app or ~/Applications/ChatGPT.app makes chatgpt-desktop found; no invented desktop bundle path is used",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T1-AC05",
+          "statement": "T1-c05: on linux, a .desktop file or a PATH entry named after the app makes it found; a PATH entry that is a directory does not",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T1-AC06",
+          "statement": "T1-c06: every id of clientDefs and unsupportedDefs, on every platform, has a probe, and each fixture home that the old detect() found is still found",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T1-AC07",
+          "statement": "T1-c07: spies cover spawn, spawnSync, execFile, execFileSync, fork and exec; only absolute system reg.exe query with shell:false once per configured hive is allowed on Windows, including timeout cases; no process runs on other platforms",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T1-AC08",
+          "statement": "T1-c08: spies cover readFile, readFileSync, fs.promises.readFile, open, openSync, fs.promises.open, createReadStream and readSync; no client data content is read, including through realpath, symlinks, imported aliases and readSync descriptors; escaping or data-targeting links are rejected",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T1-AC09",
+          "statement": "T1-c09: a registry query that times out leaves discovery working from folders and PATH and reports the timeout in --json",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T1-AC10",
+          "statement": "T1-c10: memev discover --json prints the documented shape and exits 0 on an empty home",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T1-AC11",
+          "statement": "T1-c11: no mutant of src/cli/discover.mjs survives this task's tests (QL-1.02)",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "survived = 0, wanted == 0 (measured 0, threshold 0, 16 CPUs, 1-minute load 4.86)"
+        },
+        {
+          "id": "T1-AC12",
+          "statement": "Changes stay in scope",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "17 changed files, all inside the scope"
+        }
+      ],
+      "behaviour": {
+        "passed": 12,
+        "total": 12
+      },
+      "documents": {
+        "passed": 0,
+        "total": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "id": "T2",
+      "title": "MSIX desktop client installed as MSIX gets the file it reads",
+      "criteria": [
+        {
+          "id": "T2-AC01",
+          "statement": "T2-c01: with the MSIX folder and a config holding {\"preferences\":{\"sidebarMode\":\"chat\"}}, connect adds mcpServers.memev there and keeps preferences",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T2-AC02",
+          "statement": "T2-c02: in the same case %APPDATA%\\Claude\\claude_desktop_config.json is not created or changed",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T2-AC03",
+          "statement": "T2-c03: with the package present but LocalCache\\Roaming\\Claude missing, connect creates it and writes the file",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T2-AC04",
+          "statement": "T2-c04: with no MSIX package, connect writes %APPDATA%\\Claude as before",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T2-AC05",
+          "statement": "T2-c05: disconnect after an MSIX connect leaves the file equal to its bytes before connect",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T2-AC06",
+          "statement": "Changes stay in scope",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "17 changed files, all inside the scope"
+        }
+      ],
+      "behaviour": {
+        "passed": 6,
+        "total": 6
+      },
+      "documents": {
+        "passed": 0,
+        "total": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "id": "T3",
+      "title": "Desktop shared settings require laptop proof",
+      "criteria": [
+        {
+          "id": "T3-AC01",
+          "statement": "T3-c01: connect chatgpt-desktop alone writes exactly one [mcp_servers.memev] table in ~/.codex/config.toml",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T3-AC02",
+          "statement": "T3-c02: connect codex chatgpt-desktop writes the table once and reports both configured/unverified until independently acknowledged SR-1.37 T5 laptop proof; no connected result is inferred from the write",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T3-AC03",
+          "statement": "T3-c03: disconnect chatgpt-desktop while codex remains configured/unverified leaves the shared table; connected status is permitted only after SR-1.37 T5 laptop proof",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T3-AC04",
+          "statement": "Changes stay in scope",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "17 changed files, all inside the scope"
+        }
+      ],
+      "behaviour": {
+        "passed": 4,
+        "total": 4
+      },
+      "documents": {
+        "passed": 0,
+        "total": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "id": "T4",
+      "title": "Manual-step client discovery covers both desktop platforms",
+      "criteria": [
+        {
+          "id": "T4-AC01",
+          "statement": "T4-c01: the named Windows inventory entry alone with blank InstallLocation is found; on macOS either /Applications/Grok Bot.app or ~/Library/Application Support/Grok Bot alone is sufficient, with metadata-only access; ~/Applications/Grok Bot.app alone is also sufficient",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T4-AC02",
+          "statement": "T4-c02: ~/.grok alone makes grok-build found and grok-bot not found; ~/.grokbot alone the reverse",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T4-AC03",
+          "statement": "T4-c03: grok-bot is reported automation one-step with a non-empty step, and connect all neither writes nor reads any file under its folders",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T4-AC04",
+          "statement": "Changes stay in scope",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "17 changed files, all inside the scope"
+        }
+      ],
+      "behaviour": {
+        "passed": 4,
+        "total": 4
+      },
+      "documents": {
+        "passed": 0,
+        "total": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "id": "T5",
+      "title": "A connected app has a bus seat before its first session",
+      "criteria": [
+        {
+          "id": "T5-AC01",
+          "statement": "T5-c01: after connect claude-code with no session, bus roster --json holds its seat with state registered",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T5-AC02",
+          "statement": "T5-c02: bus operator <that seat> succeeds before any session and roster then marks it operator",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T5-AC03",
+          "statement": "T5-c03: connect --json holds seat for each connected app and the operator",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T5-AC04",
+          "statement": "Changes stay in scope",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "17 changed files, all inside the scope"
+        }
+      ],
+      "behaviour": {
+        "passed": 4,
+        "total": 4
+      },
+      "documents": {
+        "passed": 0,
+        "total": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "id": "T6",
+      "title": "Every changed config is backed up and never clobbered",
+      "criteria": [
+        {
+          "id": "T6-AC01",
+          "statement": "T6-c01: for every supported client, backup bytes equal original bytes; a connect/disconnect cycle restores byte-exact original content, and originally absent configurations are removed without unrelated deletion; shared settings preserve still-connected clients",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T6-AC02",
+          "statement": "T6-c02: a malformed JSON or TOML config is left byte-identical and the result is failed with a reason",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T6-AC03",
+          "statement": "Changes stay in scope",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "17 changed files, all inside the scope"
+        }
+      ],
+      "behaviour": {
+        "passed": 3,
+        "total": 3
+      },
+      "documents": {
+        "passed": 0,
+        "total": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "id": "T7",
+      "title": "Doctor fixes the guide can apply",
+      "criteria": [
+        {
+          "id": "T7-AC01",
+          "statement": "T7-c01: over a fixture vault with every check forced to warn, each warn or fail check has fix.desc or manual",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T7-AC02",
+          "statement": "T7-c02: doctor --fix --safe-only never runs a fix marked destructive",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T7-AC03",
+          "statement": "Changes stay in scope",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "17 changed files, all inside the scope"
+        }
+      ],
+      "behaviour": {
+        "passed": 3,
+        "total": 3
+      },
+      "documents": {
+        "passed": 0,
+        "total": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "id": "T8",
+      "title": "The suite needs no git identity and no GitHub login",
+      "criteria": [
+        {
+          "id": "T8-AC01",
+          "statement": "T8-c01: the tests of this contract pass hermetically",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852"
+        },
+        {
+          "id": "T8-AC02",
+          "statement": "T8-c02: hermetic full-suite regression: the existing unmodified npm test command passes where verify runs (the full memev suite, so verify runs on a computer that may run it, not the lead's Mac); this is a green-baseline regression check, not a red-green claim",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "exit 0"
+        },
+        {
+          "id": "T8-AC03",
+          "statement": "Changes stay in scope",
+          "mandatory": true,
+          "status": "PASS",
+          "detail": "17 changed files, all inside the scope"
+        }
+      ],
+      "behaviour": {
+        "passed": 3,
+        "total": 3
+      },
+      "documents": {
+        "passed": 0,
+        "total": 0
+      },
+      "status": "PASS"
+    }
+  ]
+}

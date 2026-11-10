@@ -1,0 +1,52 @@
+# Receipts for k-sr-1-36-discover-support-86f593
+
+Every verification of the signed contract, newest last.
+
+### 2026-11-10T07:44:26.539Z · verify · PASS · 8/8 tasks
+- PASS T1 Discovery finds every supported client on Windows, macOS and Linux
+  - PASS T1-AC01 T1-c01: src/cli/discover.mjs exists and a faked HKCU Uninstall entry DisplayName 'Grok Bot' with a blank InstallLocation and a DisplayIcon under %LOCALAPPDATA%\Programs\Grok Bot gives grok-bot found with install_path that folder (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T1-AC02 T1-c02: a faked HKLM WOW6432Node entry 'Microsoft Copilot' is found and reported with automation none (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T1-AC03 T1-c03: a %LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc folder alone makes claude-desktop found with evidence msix (the family suffix is an example fixture, not laptop evidence; the laptop showed only 'Appx: Claude 4.23118.0.0') (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T1-AC04 T1-c04: on darwin, /Applications/ChatGPT.app or ~/Applications/ChatGPT.app makes chatgpt-desktop found; no invented desktop bundle path is used (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T1-AC05 T1-c05: on linux, a .desktop file or a PATH entry named after the app makes it found; a PATH entry that is a directory does not (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T1-AC06 T1-c06: every id of clientDefs and unsupportedDefs, on every platform, has a probe, and each fixture home that the old detect() found is still found (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T1-AC07 T1-c07: spies cover spawn, spawnSync, execFile, execFileSync, fork and exec; only absolute system reg.exe query with shell:false once per configured hive is allowed on Windows, including timeout cases; no process runs on other platforms (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T1-AC08 T1-c08: spies cover readFile, readFileSync, fs.promises.readFile, open, openSync, fs.promises.open, createReadStream and readSync; no client data content is read, including through realpath, symlinks, imported aliases and readSync descriptors; escaping or data-targeting links are rejected (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T1-AC09 T1-c09: a registry query that times out leaves discovery working from folders and PATH and reports the timeout in --json (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T1-AC10 T1-c10: memev discover --json prints the documented shape and exits 0 on an empty home (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T1-AC11 T1-c11: no mutant of src/cli/discover.mjs survives this task's tests (QL-1.02) (survived = 0, wanted == 0 (measured 0, threshold 0, 16 CPUs, 1-minute load 4.86))
+  - PASS T1-AC12 Changes stay in scope (17 changed files, all inside the scope)
+- PASS T2 MSIX desktop client installed as MSIX gets the file it reads
+  - PASS T2-AC01 T2-c01: with the MSIX folder and a config holding {"preferences":{"sidebarMode":"chat"}}, connect adds mcpServers.memev there and keeps preferences (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T2-AC02 T2-c02: in the same case %APPDATA%\Claude\claude_desktop_config.json is not created or changed (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T2-AC03 T2-c03: with the package present but LocalCache\Roaming\Claude missing, connect creates it and writes the file (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T2-AC04 T2-c04: with no MSIX package, connect writes %APPDATA%\Claude as before (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T2-AC05 T2-c05: disconnect after an MSIX connect leaves the file equal to its bytes before connect (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T2-AC06 Changes stay in scope (17 changed files, all inside the scope)
+- PASS T3 Desktop shared settings require laptop proof
+  - PASS T3-AC01 T3-c01: connect chatgpt-desktop alone writes exactly one [mcp_servers.memev] table in ~/.codex/config.toml (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T3-AC02 T3-c02: connect codex chatgpt-desktop writes the table once and reports both configured/unverified until independently acknowledged SR-1.37 T5 laptop proof; no connected result is inferred from the write (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T3-AC03 T3-c03: disconnect chatgpt-desktop while codex remains configured/unverified leaves the shared table; connected status is permitted only after SR-1.37 T5 laptop proof (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T3-AC04 Changes stay in scope (17 changed files, all inside the scope)
+- PASS T4 Manual-step client discovery covers both desktop platforms
+  - PASS T4-AC01 T4-c01: the named Windows inventory entry alone with blank InstallLocation is found; on macOS either /Applications/Grok Bot.app or ~/Library/Application Support/Grok Bot alone is sufficient, with metadata-only access; ~/Applications/Grok Bot.app alone is also sufficient (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T4-AC02 T4-c02: ~/.grok alone makes grok-build found and grok-bot not found; ~/.grokbot alone the reverse (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T4-AC03 T4-c03: grok-bot is reported automation one-step with a non-empty step, and connect all neither writes nor reads any file under its folders (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T4-AC04 Changes stay in scope (17 changed files, all inside the scope)
+- PASS T5 A connected app has a bus seat before its first session
+  - PASS T5-AC01 T5-c01: after connect claude-code with no session, bus roster --json holds its seat with state registered (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T5-AC02 T5-c02: bus operator <that seat> succeeds before any session and roster then marks it operator (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T5-AC03 T5-c03: connect --json holds seat for each connected app and the operator (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T5-AC04 Changes stay in scope (17 changed files, all inside the scope)
+- PASS T6 Every changed config is backed up and never clobbered
+  - PASS T6-AC01 T6-c01: for every supported client, backup bytes equal original bytes; a connect/disconnect cycle restores byte-exact original content, and originally absent configurations are removed without unrelated deletion; shared settings preserve still-connected clients (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T6-AC02 T6-c02: a malformed JSON or TOML config is left byte-identical and the result is failed with a reason (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T6-AC03 Changes stay in scope (17 changed files, all inside the scope)
+- PASS T7 Doctor fixes the guide can apply
+  - PASS T7-AC01 T7-c01: over a fixture vault with every check forced to warn, each warn or fail check has fix.desc or manual (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T7-AC02 T7-c02: doctor --fix --safe-only never runs a fix marked destructive (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T7-AC03 Changes stay in scope (17 changed files, all inside the scope)
+- PASS T8 The suite needs no git identity and no GitHub login
+  - PASS T8-AC01 T8-c01: the tests of this contract pass hermetically (red exit 1, green exit 0, base 01c566dbd9d110c315d844f874a99e678c827852)
+  - PASS T8-AC02 T8-c02: hermetic full-suite regression: the existing unmodified npm test command passes where verify runs (the full memev suite, so verify runs on a computer that may run it, not the lead's Mac); this is a green-baseline regression check, not a red-green claim (exit 0)
+  - PASS T8-AC03 Changes stay in scope (17 changed files, all inside the scope)
